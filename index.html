@@ -3318,7 +3318,11 @@ if (_IS_DEV) {
   const _hu = $('hdrUser');           if (_hu) _hu.textContent = 'Dev Mode'
   showRosterView()
 } else {
-  supa.auth.onAuthStateChange((_event, session) => {
+  supa.auth.onAuthStateChange((event, session) => {
+    // Ignore background token refreshes and the initial replay event —
+    // those don't represent a real sign-in/out and would otherwise yank
+    // the user back to the roster every time they tab away.
+    if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') return
     _onSessionChange(session)
   })
   supa.auth.getSession().then(({ data: { session } }) => {
