@@ -1737,6 +1737,26 @@ table.ct td {
   border-color: var(--royal);
 }
 
+.settings-wrap { max-width: 560px; padding: 1.25rem; }
+.settings-toggle {
+  display: flex;
+  gap: .75rem;
+  align-items: flex-start;
+  margin-top: .75rem;
+  font-size: .85rem;
+  color: var(--ch);
+  cursor: pointer;
+}
+.settings-toggle input { margin-top: .25rem; }
+.settings-toggle strong { display: block; color: var(--ink); font-weight: 600; }
+.settings-toggle-hint {
+  display: block;
+  font-size: .75rem;
+  color: var(--mu);
+  margin-top: .15rem;
+  line-height: 1.45;
+}
+
 /* ═══════════════════════════════════════════════════
    PRINT STYLES
 ═══════════════════════════════════════════════════ */
@@ -1921,6 +1941,9 @@ table.ct td {
           <button class="sidebar-nav-item" onclick="showReports()">
             <span>Reports</span>
           </button>
+          <button class="sidebar-nav-item" onclick="showSettings()">
+            <span>Settings</span>
+          </button>
         </nav>
       </div>
 
@@ -2061,6 +2084,9 @@ table.ct td {
           <button class="sidebar-nav-item" onclick="showReports()">
             <span>Reports</span>
           </button>
+          <button class="sidebar-nav-item" onclick="showSettings()">
+            <span>Settings</span>
+          </button>
         </nav>
       </div>
       <div class="sidebar-footer">
@@ -2144,6 +2170,9 @@ table.ct td {
           </button>
           <button class="sidebar-nav-item active" onclick="showReports()" aria-current="page">
             <span>Reports</span>
+          </button>
+          <button class="sidebar-nav-item" onclick="showSettings()">
+            <span>Settings</span>
           </button>
         </nav>
       </div>
@@ -2252,6 +2281,65 @@ table.ct td {
       </div><!-- .rpt-body -->
     </main>
   </div><!-- #pgReports -->
+
+  <!-- ── SETTINGS VIEW ── -->
+  <div id="pgSettings" class="app-shell hidden">
+    <aside class="sidebar" role="complementary" aria-label="Settings navigation">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">The Present Value<span class="dot">.</span></div>
+        <div class="sidebar-brand-sub">Practitioner Suite</div>
+      </div>
+      <div>
+        <div class="sidebar-label">Navigation</div>
+        <nav class="sidebar-nav" aria-label="Primary">
+          <button class="sidebar-nav-item" onclick="showRosterView()"><span>Clients</span></button>
+          <button class="sidebar-nav-item" onclick="showDashboard()"><span>Dashboard</span></button>
+          <button class="sidebar-nav-item" onclick="showReports()"><span>Reports</span></button>
+          <button class="sidebar-nav-item active" onclick="showSettings()" aria-current="page"><span>Settings</span></button>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-pract-name" id="stSidebarName"></div>
+        <div class="sidebar-pract-email" id="stSidebarEmail"></div>
+        <button class="btn-ghost btn-sm btn-full" onclick="signOut()">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main-content" role="main">
+      <div class="roster-topbar"><h2>Settings</h2></div>
+      <div class="settings-wrap">
+        <div class="card">
+          <div class="db-section-title">Profile</div>
+          <div class="fg" style="margin-top:.75rem">
+            <div class="fld span2">
+              <label for="stName">Practitioner name</label>
+              <input type="text" id="stName" autocomplete="name">
+            </div>
+            <div class="fld span2">
+              <label for="stFirm">Firm name</label>
+              <input type="text" id="stFirm" autocomplete="organization">
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <div class="db-section-title">Notifications</div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="stEmailReminders">
+            <span>
+              <strong>Weekly email digest</strong>
+              <span class="settings-toggle-hint">Monday 8:00 AM PHT — deadlines due this week plus any overdue items.</span>
+            </span>
+          </label>
+        </div>
+
+        <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+          <button class="btn-primary btn-sm" onclick="saveSettings()">Save</button>
+          <span id="stSaveMsg" style="font-size:.78rem;color:var(--mu)"></span>
+        </div>
+      </div>
+    </main>
+  </div><!-- #pgSettings -->
 
 </div><!-- #appView -->
 
@@ -2427,9 +2515,14 @@ table.ct td {
  *   email       text,
  *   name        text,
  *   firm_name   text,
- *   plan        text not null default 'pro',
- *   created_at  timestamptz not null default now()
+ *   plan             text    not null default 'pro',
+ *   email_reminders  boolean not null default true,
+ *   created_at       timestamptz not null default now()
  * );
+ *
+ * -- If upgrading an existing deployment:
+ * -- alter table practitioners
+ * --   add column if not exists email_reminders boolean not null default true;
  *
  * alter table practitioners enable row level security;
  *
@@ -2672,6 +2765,7 @@ function showRosterView() {
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
   $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   activeClientId = null
   loadRoster()   // refresh data whenever returning to the roster
 }
@@ -2683,6 +2777,7 @@ function showDashboard() {
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.remove('hidden')
   $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   const n = $('dbSidebarName'), e = $('dbSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   if (e) e.textContent = currentPractitioner?.email || ''
@@ -2810,6 +2905,7 @@ async function showClientDetail(clientId) {
   $('rosterView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
   $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   $('clientView').classList.remove('hidden')
 
   _switchSubtab('obligations')
@@ -4019,6 +4115,7 @@ function showReports() {
   $('rosterView').classList.add('hidden')
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   $('pgReports').classList.remove('hidden')
   const n = $('rptSidebarName'), e = $('rptSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
@@ -4559,6 +4656,63 @@ async function generateReport4() {
     <div class="rpt-print-footer">Generated on ${esc(genTs)} · The Present Value Practitioner Suite · ${esc(firmName)}</div>`
 
   $('rptContent').innerHTML = html
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+
+function showSettings() {
+  $('loginView').classList.add('hidden')
+  $('appView').classList.remove('hidden')
+  $('rosterView').classList.add('hidden')
+  $('clientView').classList.add('hidden')
+  $('pgDashboard').classList.add('hidden')
+  $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.remove('hidden')
+  const n = $('stSidebarName'), e = $('stSidebarEmail')
+  if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
+  if (e) e.textContent = currentPractitioner?.email || ''
+  loadSettings()
+}
+
+async function loadSettings() {
+  if (!currentPractitioner) return
+  $('stSaveMsg').textContent = ''
+  const { data, error } = await supa
+    .from('practitioners')
+    .select('name, firm_name, email_reminders')
+    .eq('id', currentPractitioner.id)
+    .single()
+  if (error) { $('stSaveMsg').textContent = error.message; return }
+  $('stName').value               = data?.name ?? ''
+  $('stFirm').value               = data?.firm_name ?? ''
+  $('stEmailReminders').checked   = data?.email_reminders ?? true
+}
+
+async function saveSettings() {
+  if (!currentPractitioner) return
+  const msg = $('stSaveMsg')
+  msg.style.color   = 'var(--mu)'
+  msg.textContent   = 'Saving…'
+  const payload = {
+    name:            $('stName').value.trim() || null,
+    firm_name:       $('stFirm').value.trim() || null,
+    email_reminders: $('stEmailReminders').checked,
+  }
+  const { error } = await supa
+    .from('practitioners')
+    .update(payload)
+    .eq('id', currentPractitioner.id)
+  if (error) {
+    msg.style.color = 'var(--red)'
+    msg.textContent = error.message
+    return
+  }
+  Object.assign(currentPractitioner, payload)
+  const nEls = ['sidebarPractName', 'dbSidebarName', 'rptSidebarName', 'stSidebarName']
+  nEls.forEach(id => { const el = $(id); if (el) el.textContent = payload.firm_name || payload.name || '' })
+  msg.style.color = 'var(--green)'
+  msg.textContent = 'Saved ✓'
+  setTimeout(() => { msg.textContent = '' }, 2000)
 }
 </script>
 </body>
