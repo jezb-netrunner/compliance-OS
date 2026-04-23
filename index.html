@@ -1433,6 +1433,317 @@ body {
   color: var(--mu);
   margin-top: .2rem;
 }
+
+/* ═══════════════════════════════════════════════════
+   REPORTS  #pgReports
+═══════════════════════════════════════════════════ */
+#pgReports .main-content {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--hdr-h));
+  overflow: hidden;
+}
+
+.rpt-topbar {
+  display: flex;
+  align-items: center;
+  padding: .85rem 2rem;
+  border-bottom: 1px solid var(--bd);
+  background: var(--sf);
+  flex-shrink: 0;
+}
+
+.rpt-topbar h2 {
+  font-family: var(--se);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.02em;
+}
+
+.rpt-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.rpt-selector {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--bd);
+  overflow-y: auto;
+  padding: 1rem 0;
+  background: var(--sf);
+}
+
+.rpt-selector-label {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--mu);
+  padding: 0 1.25rem .6rem;
+}
+
+.rpt-type-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: .65rem 1.25rem .65rem 1.1rem;
+  font-size: .82rem;
+  font-family: var(--sa);
+  color: var(--dim);
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  line-height: 1.4;
+}
+.rpt-type-item:hover { background: var(--s2); color: var(--ch); }
+.rpt-type-item.active {
+  border-left-color: var(--royal);
+  background: var(--rs);
+  color: var(--royal);
+  font-weight: 600;
+}
+
+.rpt-output {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.rpt-controls {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--sf);
+  border-bottom: 1px solid var(--bd);
+  padding: .75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.rpt-controls-title {
+  font-weight: 700;
+  font-size: .88rem;
+  color: var(--ink);
+  margin-right: .25rem;
+}
+
+.rpt-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .82rem;
+  color: var(--dim);
+}
+
+.rpt-ctrl-group select,
+.rpt-ctrl-group input[type=date] {
+  font-family: var(--sa);
+  font-size: .82rem;
+  padding: .32rem .6rem;
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rr);
+  background: var(--sf);
+  color: var(--ink);
+  outline: none;
+  transition: border-color .18s;
+}
+.rpt-ctrl-group select:focus,
+.rpt-ctrl-group input[type=date]:focus { border-color: var(--royal); }
+
+.rpt-content {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+/* Report table */
+table.ct {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--sa);
+  font-size: .82rem;
+}
+table.ct thead { background: var(--s2); }
+table.ct th {
+  text-align: left;
+  padding: .5rem .85rem;
+  font-weight: 600;
+  color: var(--mu);
+  font-size: .74rem;
+  border-bottom: 1px solid var(--bd);
+  white-space: nowrap;
+}
+table.ct td {
+  padding: .5rem .85rem;
+  color: var(--ch);
+  border-bottom: 1px solid var(--bd);
+  vertical-align: middle;
+}
+table.ct tr:last-child td { border-bottom: none; }
+table.ct tfoot td {
+  font-weight: 700;
+  background: var(--s2);
+  border-top: 2px solid var(--bd);
+  border-bottom: none;
+  color: var(--ink);
+}
+
+.rpt-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  margin-bottom: 1.25rem;
+  background: var(--sf);
+}
+
+.rpt-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 2rem;
+  background: var(--s2);
+  border-radius: var(--rr);
+  padding: .75rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: .82rem;
+  color: var(--dim);
+}
+.rpt-summary-strip strong { color: var(--ink); }
+
+.rpt-section-hd {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--mu);
+  margin: 1.5rem 0 .6rem;
+}
+.rpt-section-hd:first-child { margin-top: 0; }
+
+.rpt-client-hd {
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 1.75rem 0 .6rem;
+  padding-bottom: .4rem;
+  border-bottom: 2px solid var(--bd);
+}
+.rpt-client-hd:first-child { margin-top: 0; }
+
+.rpt-warning {
+  margin-top: 1rem;
+  background: var(--am);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--rr);
+  padding: .65rem .85rem;
+  font-size: .78rem;
+  color: var(--ch);
+  line-height: 1.5;
+}
+
+.rpt-grand-total {
+  font-weight: 700;
+  background: var(--s2);
+  border-radius: var(--rr);
+  padding: .65rem 1rem;
+  font-size: .88rem;
+  color: var(--ink);
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ═══════════════════════════════════════════════════
+   PRINT STYLES
+═══════════════════════════════════════════════════ */
+@media print {
+  .hdr,
+  .sidebar,
+  .rpt-selector,
+  .rpt-controls,
+  .print-btn,
+  #addClientSheet { display: none !important; }
+
+  body { background: #fff; font-size: 11px; color: #000; }
+
+  #pgReports { display: block !important; }
+
+  #pgReports .main-content {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .rpt-body { display: block; }
+
+  .rpt-output {
+    overflow: visible;
+    background: #fff;
+  }
+
+  .rpt-topbar {
+    border-bottom: 1px solid #ccc;
+    padding: .5rem 0;
+    margin-bottom: .5rem;
+    display: flex !important;
+  }
+
+  .rpt-content { padding: .5rem 0; }
+
+  .rpt-summary-strip {
+    background: #f4f4f4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .badge-red,
+  .badge-amber,
+  .badge-green,
+  .badge-blue,
+  .badge-dim {
+    background: none !important;
+    color: #000 !important;
+    font-weight: 700;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  table.ct { font-size: 11px; }
+  table.ct thead {
+    background: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  table.ct th,
+  table.ct td { border: 1px solid #ccc !important; padding: .3rem .5rem; }
+  table.ct tfoot td {
+    background: #e8e8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rpt-table-wrap { border: none; overflow: visible; }
+
+  .rpt-month-section { page-break-inside: avoid; break-inside: avoid; }
+  .rpt-client-section { page-break-before: auto; break-before: auto; }
+  .rpt-section-hd,
+  .rpt-client-hd { page-break-after: avoid; break-after: avoid; }
+
+  .rpt-warning {
+    background: #fff8e6 !important;
+    border: 1px solid #ccc;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
 </style>
 </head>
 <body>
@@ -1506,10 +1817,8 @@ body {
           <button class="sidebar-nav-item" onclick="showDashboard()">
             <span>Dashboard</span>
           </button>
-          <button class="sidebar-nav-item" disabled aria-disabled="true"
-            style="opacity:.38;cursor:not-allowed;">
+          <button class="sidebar-nav-item" onclick="showReports()">
             <span>Reports</span>
-            <span style="font-size:.62rem;color:var(--mu)">Soon</span>
           </button>
         </nav>
       </div>
@@ -1646,10 +1955,8 @@ body {
           <button class="sidebar-nav-item active" onclick="showDashboard()" aria-current="page">
             <span>Dashboard</span>
           </button>
-          <button class="sidebar-nav-item" disabled aria-disabled="true"
-            style="opacity:.38;cursor:not-allowed;">
+          <button class="sidebar-nav-item" onclick="showReports()">
             <span>Reports</span>
-            <span style="font-size:.62rem;color:var(--mu)">Soon</span>
           </button>
         </nav>
       </div>
@@ -1714,6 +2021,111 @@ body {
       </div>
     </main>
   </div><!-- #pgDashboard -->
+
+  <!-- ── REPORTS VIEW ── -->
+  <div id="pgReports" class="app-shell hidden">
+
+    <aside class="sidebar" role="complementary" aria-label="Reports navigation">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">The Present Value<span class="dot">.</span></div>
+        <div class="sidebar-brand-sub">Practitioner Suite</div>
+      </div>
+      <div>
+        <div class="sidebar-label">Navigation</div>
+        <nav class="sidebar-nav" aria-label="Primary">
+          <button class="sidebar-nav-item" onclick="showRosterView()">
+            <span>Clients</span>
+          </button>
+          <button class="sidebar-nav-item" onclick="showDashboard()">
+            <span>Dashboard</span>
+          </button>
+          <button class="sidebar-nav-item active" onclick="showReports()" aria-current="page">
+            <span>Reports</span>
+          </button>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-pract-name" id="rptSidebarName"></div>
+        <div class="sidebar-pract-email" id="rptSidebarEmail"></div>
+        <button class="btn-ghost btn-sm btn-full" onclick="signOut()">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main-content" role="main">
+
+      <div class="rpt-topbar">
+        <h2>Reports</h2>
+      </div>
+
+      <div class="rpt-body">
+
+        <!-- Left: report type selector -->
+        <div class="rpt-selector" role="navigation" aria-label="Report types">
+          <div class="rpt-selector-label">Report Type</div>
+          <button class="rpt-type-item active" data-rpt="1" onclick="_selectReport(1)">
+            Per-Client Compliance Report
+          </button>
+          <button class="rpt-type-item" data-rpt="2" onclick="_selectReport(2)">
+            Monthly Filing Summary
+          </button>
+          <button class="rpt-type-item" data-rpt="3" onclick="_selectReport(3)">
+            Penalty Exposure Report
+          </button>
+        </div>
+
+        <!-- Right: controls + output -->
+        <div class="rpt-output" id="rptOutput">
+
+          <!-- Report 1 controls -->
+          <div id="rptCtrl1" class="rpt-controls">
+            <span class="rpt-controls-title">Per-Client Compliance Report</span>
+            <span class="rpt-ctrl-group">
+              <label for="rptClient">Client</label>
+              <select id="rptClient"></select>
+            </span>
+            <span class="rpt-ctrl-group">
+              <label for="rptYear">Year</label>
+              <select id="rptYear"></select>
+            </span>
+            <button class="btn-primary btn-sm" onclick="generateReport1()">Generate</button>
+            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+          </div>
+
+          <!-- Report 2 controls -->
+          <div id="rptCtrl2" class="rpt-controls hidden">
+            <span class="rpt-controls-title">Monthly Filing Summary</span>
+            <span class="rpt-ctrl-group">
+              <label for="rptMonth">Month</label>
+              <select id="rptMonth"></select>
+            </span>
+            <span class="rpt-ctrl-group">
+              <label for="rptYear2">Year</label>
+              <select id="rptYear2"></select>
+            </span>
+            <button class="btn-primary btn-sm" onclick="generateReport2()">Generate</button>
+            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+          </div>
+
+          <!-- Report 3 controls -->
+          <div id="rptCtrl3" class="rpt-controls hidden">
+            <span class="rpt-controls-title">Penalty Exposure Report</span>
+            <span class="rpt-ctrl-group">
+              <label for="rptAsOf">As-of date</label>
+              <input type="date" id="rptAsOf">
+            </span>
+            <button class="btn-primary btn-sm" onclick="generateReport3()">Generate</button>
+            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+          </div>
+
+          <!-- Content area -->
+          <div class="rpt-content" id="rptContent">
+            <p style="color:var(--mu);font-size:.85rem">Select a report type and click <strong>Generate</strong>.</p>
+          </div>
+
+        </div><!-- .rpt-output -->
+      </div><!-- .rpt-body -->
+    </main>
+  </div><!-- #pgReports -->
 
 </div><!-- #appView -->
 
@@ -2127,6 +2539,7 @@ function showRosterView() {
   $('rosterView').classList.remove('hidden')
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
+  $('pgReports').classList.add('hidden')
   activeClientId = null
   loadRoster()   // refresh data whenever returning to the roster
 }
@@ -2137,6 +2550,7 @@ function showDashboard() {
   $('rosterView').classList.add('hidden')
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.remove('hidden')
+  $('pgReports').classList.add('hidden')
   const n = $('dbSidebarName'), e = $('dbSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   if (e) e.textContent = currentPractitioner?.email || ''
@@ -2263,6 +2677,7 @@ async function showClientDetail(clientId) {
   $('appView').classList.remove('hidden')
   $('rosterView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
+  $('pgReports').classList.add('hidden')
   $('clientView').classList.remove('hidden')
 
   _switchSubtab('obligations')
@@ -3412,6 +3827,436 @@ async function loadClientNotes() {
 async function saveClientNotes() {
   const notes = $('clientNotesArea').value
   await supa.from('clients').update({ notes }).eq('id', activeClientId)
+}
+
+
+// ── REPORTS ───────────────────────────────────────────────────
+
+function showReports() {
+  $('loginView').classList.add('hidden')
+  $('appView').classList.remove('hidden')
+  $('rosterView').classList.add('hidden')
+  $('clientView').classList.add('hidden')
+  $('pgDashboard').classList.add('hidden')
+  $('pgReports').classList.remove('hidden')
+  const n = $('rptSidebarName'), e = $('rptSidebarEmail')
+  if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
+  if (e) e.textContent = currentPractitioner?.email || ''
+  _initReportControls()
+}
+
+async function _initReportControls() {
+  const yr = new Date().getFullYear()
+
+  // Client dropdown (Report 1) — load once
+  const clientSel = $('rptClient')
+  if (clientSel && !clientSel.dataset.loaded) {
+    clientSel.innerHTML = '<option value="">Loading…</option>'
+    const { data: clients } = await supa
+      .from('clients')
+      .select('id, display_name')
+      .eq('practitioner_id', currentPractitioner.id)
+      .eq('is_active', true)
+      .order('display_name')
+    clientSel.innerHTML = clients?.length
+      ? clients.map(c => `<option value="${c.id}">${esc(c.display_name)}</option>`).join('')
+      : '<option value="">No active clients</option>'
+    clientSel.dataset.loaded = '1'
+  }
+
+  // Year dropdowns — load once
+  const yearOpts = Array.from({length: 5}, (_, i) => yr - i)
+    .map(y => `<option value="${y}"${y === yr ? ' selected' : ''}>${y}</option>`).join('')
+  const ySel  = $('rptYear')
+  const y2Sel = $('rptYear2')
+  if (ySel  && !ySel.dataset.loaded)  { ySel.innerHTML  = yearOpts; ySel.dataset.loaded  = '1' }
+  if (y2Sel && !y2Sel.dataset.loaded) { y2Sel.innerHTML = yearOpts; y2Sel.dataset.loaded = '1' }
+
+  // Month dropdown — load once
+  const mSel = $('rptMonth')
+  if (mSel && !mSel.dataset.loaded) {
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December']
+    const curMo = new Date().getMonth()
+    mSel.innerHTML = months.map((m, i) =>
+      `<option value="${i + 1}"${i === curMo ? ' selected' : ''}>${m}</option>`
+    ).join('')
+    mSel.dataset.loaded = '1'
+  }
+
+  // As-of date — set to today if blank
+  const asOf = $('rptAsOf')
+  if (asOf && !asOf.value) asOf.value = new Date().toISOString().slice(0, 10)
+}
+
+function _selectReport(n) {
+  document.querySelectorAll('.rpt-type-item').forEach(b => {
+    b.classList.toggle('active', +b.dataset.rpt === n)
+  })
+  ;[1, 2, 3].forEach(i => {
+    const el = $(`rptCtrl${i}`)
+    if (el) el.classList.toggle('hidden', i !== n)
+  })
+  $('rptContent').innerHTML =
+    '<p style="color:var(--mu);font-size:.85rem">Click <strong>Generate</strong> to run this report.</p>'
+}
+
+// ── REPORT HELPERS ────────────────────────────────────────────
+
+function _rptError(msg) {
+  $('rptContent').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(msg)}</p>`
+}
+
+function _rptFmtDate(s) {
+  return s ? new Date(s).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}) : '—'
+}
+
+function _rptFmtAmt(v) {
+  return '₱' + Number(v).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+}
+
+function _rptStatusBadge(r) {
+  const s = getCardStatus(r)
+  const cls = {done:'badge-green', unpaid:'badge-blue', 'trrc-missing':'badge-amber', overdue:'badge-red', pending:'badge-dim'}
+  const lbl = {done:'Filed & Paid', unpaid:'Unpaid', 'trrc-missing':'TRRC Missing', overdue:'Overdue', pending:'Pending'}
+  return `<span class="${cls[s] || 'badge-dim'}">${lbl[s] || s}</span>`
+}
+
+// ── REPORT 1: Per-Client Compliance Report ────────────────────
+
+async function generateReport1() {
+  const clientId = $('rptClient').value
+  const year     = +$('rptYear').value
+  if (!clientId) { _rptError('Select a client first.'); return }
+
+  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+
+  const [{ data: client }, { data: records, error }] = await Promise.all([
+    supa.from('clients')
+      .select('display_name, tin, rdo_code, taxpayer_type, vat_status')
+      .eq('id', clientId).single(),
+    supa.from('compliance_records')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('due_date', `${year}-01-01`)
+      .lte('due_date', `${year}-12-31`)
+      .order('due_date')
+  ])
+
+  if (error) { _rptError(error.message); return }
+  if (!records?.length) {
+    $('rptContent').innerHTML =
+      '<p style="color:var(--mu);font-size:.85rem">No obligations found for this client and year.</p>'
+    return
+  }
+
+  const today    = new Date(); today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().slice(0, 10)
+
+  const _daysLate = r => {
+    if (!r.due_date) return 0
+    const due = new Date(r.due_date); due.setHours(0, 0, 0, 0)
+    const ref = r.filed_date ? new Date(r.filed_date) : today
+    ref.setHours(0, 0, 0, 0)
+    return Math.max(0, Math.round((ref - due) / 86400000))
+  }
+
+  // Summaries
+  let totObl = 0, totFiled = 0, totPending = 0, totOverdue = 0, totPaid = 0
+  records.forEach(r => {
+    totObl++
+    if (r.filed_date) totFiled++
+    else if (r.due_date < todayStr) totOverdue++
+    else totPending++
+    if (r.payment_status === 'paid') totPaid += +(r.amount_paid || 0)
+  })
+
+  // Group by month
+  const byMonth = {}
+  records.forEach(r => {
+    const mo = r.due_date.slice(0, 7)
+    ;(byMonth[mo] = byMonth[mo] || []).push(r)
+  })
+
+  let html = ''
+
+  // Summary strip
+  html += `<div class="rpt-summary-strip">
+    <span><strong>${totObl}</strong> obligations</span>
+    <span><strong style="color:var(--green)">${totFiled}</strong> filed</span>
+    <span><strong>${totPending}</strong> pending</span>
+    <span><strong style="color:var(--red)">${totOverdue}</strong> overdue</span>
+    <span><strong>${_rptFmtAmt(totPaid)}</strong> paid this year</span>
+  </div>`
+
+  // Client meta
+  const metaParts = [
+    client?.tin       ? `TIN: ${esc(client.tin)}`       : '',
+    client?.rdo_code  ? `RDO: ${esc(client.rdo_code)}`  : '',
+    client?.taxpayer_type ? esc(client.taxpayer_type)    : '',
+    client?.vat_status    ? esc(client.vat_status)       : '',
+  ].filter(Boolean)
+  if (metaParts.length) {
+    html += `<p style="font-size:.8rem;color:var(--mu);margin-bottom:1.5rem">${metaParts.join(' · ')}</p>`
+  }
+
+  // Month sections
+  Object.keys(byMonth).sort().forEach(mo => {
+    const recs    = byMonth[mo]
+    const moLabel = new Date(mo + '-15').toLocaleDateString('en-PH', {month:'long', year:'numeric'})
+    let moTotPaid = 0
+    recs.forEach(r => { if (r.payment_status === 'paid') moTotPaid += +(r.amount_paid || 0) })
+
+    html += `<div class="rpt-month-section">`
+    html += `<div class="rpt-section-hd">${esc(moLabel)}</div>`
+    html += `<div class="rpt-table-wrap"><table class="ct"><thead><tr>
+      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
+      <th>TRRC</th><th>Payment</th><th>Amount Paid</th><th>Days Late</th><th>Status</th>
+    </tr></thead><tbody>`
+
+    recs.forEach(r => {
+      const dl = _daysLate(r)
+      html += `<tr>
+        <td>${esc(r.form || '—')}</td>
+        <td>${esc(r.period || '—')}</td>
+        <td>${_rptFmtDate(r.due_date)}</td>
+        <td>${_rptFmtDate(r.filed_date)}</td>
+        <td>${r.trrc_saved ? '✓' : '—'}</td>
+        <td>${esc(r.payment_status || '—')}</td>
+        <td>${r.payment_status === 'paid' ? _rptFmtAmt(r.amount_paid) : '—'}</td>
+        <td>${dl > 0 ? `<span style="color:var(--red)">${dl}</span>` : '—'}</td>
+        <td>${_rptStatusBadge(r)}</td>
+      </tr>`
+    })
+
+    html += `</tbody><tfoot><tr>
+      <td colspan="6" style="text-align:right;color:var(--mu)">Month total paid</td>
+      <td>${_rptFmtAmt(moTotPaid)}</td>
+      <td colspan="2"></td>
+    </tr></tfoot></table></div></div>`
+  })
+
+  $('rptContent').innerHTML = html
+}
+
+// ── REPORT 2: Monthly Filing Summary ──────────────────────────
+
+async function generateReport2() {
+  const month = +$('rptMonth').value
+  const year  = +$('rptYear2').value
+
+  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+
+  const pad        = n => String(n).padStart(2, '0')
+  const mo         = pad(month)
+  const rangeStart = `${year}-${mo}-01`
+  const lastDay    = new Date(year, month, 0).getDate()
+  const rangeEnd   = `${year}-${mo}-${pad(lastDay)}`
+
+  const [{ data: clients, error: cErr }, ] = await Promise.all([
+    supa.from('clients')
+      .select('id, display_name')
+      .eq('practitioner_id', currentPractitioner.id)
+      .eq('is_active', true)
+      .order('display_name')
+  ])
+
+  if (cErr || !clients?.length) {
+    $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
+    return
+  }
+
+  const clientMap = {}
+  clients.forEach(c => { clientMap[c.id] = c.display_name })
+
+  const { data: records, error } = await supa
+    .from('compliance_records')
+    .select('*')
+    .in('client_id', clients.map(c => c.id))
+    .gte('due_date', rangeStart)
+    .lte('due_date', rangeEnd)
+    .order('due_date')
+
+  if (error) { _rptError(error.message); return }
+
+  const today    = new Date(); today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().slice(0, 10)
+
+  // Group by client
+  const byClient = {}
+  ;(records || []).forEach(r => {
+    ;(byClient[r.client_id] = byClient[r.client_id] || []).push(r)
+  })
+
+  // Summaries
+  const clientsWithObl = Object.keys(byClient).length
+  let totObl = 0, totFiled = 0, totPending = 0, totOverdue = 0
+  ;(records || []).forEach(r => {
+    totObl++
+    if (r.filed_date) totFiled++
+    else if (r.due_date < todayStr) totOverdue++
+    else totPending++
+  })
+
+  const moLabel = new Date(rangeStart).toLocaleDateString('en-PH', {month:'long', year:'numeric'})
+
+  let html = ''
+
+  html += `<div class="rpt-summary-strip">
+    <span><strong>${clientsWithObl}</strong> clients</span>
+    <span><strong>${totObl}</strong> obligations</span>
+    <span><strong style="color:var(--green)">${totFiled}</strong> filed</span>
+    <span><strong>${totPending}</strong> pending</span>
+    <span><strong style="color:var(--red)">${totOverdue}</strong> overdue</span>
+  </div>`
+
+  if (!records?.length) {
+    html += '<p style="color:var(--mu);font-size:.85rem">No obligations due this month.</p>'
+    $('rptContent').innerHTML = html
+    return
+  }
+
+  clients.forEach(c => {
+    const recs = byClient[c.id]
+    if (!recs?.length) return
+
+    html += `<div class="rpt-client-section">`
+    html += `<div class="rpt-client-hd">${esc(c.display_name)}</div>`
+    html += `<div class="rpt-table-wrap"><table class="ct"><thead><tr>
+      <th>Form</th><th>Due Date</th><th>Status</th><th>Filed Date</th><th>Amount Paid</th>
+    </tr></thead><tbody>`
+
+    recs.forEach(r => {
+      const amtCell = r.payment_status === 'paid' && r.amount_paid != null
+        ? _rptFmtAmt(r.amount_paid) : '—'
+      html += `<tr>
+        <td>${esc(r.form || '—')}${r.period
+          ? `<br><span style="font-size:.74rem;color:var(--mu)">${esc(r.period)}</span>` : ''}</td>
+        <td>${_rptFmtDate(r.due_date)}</td>
+        <td>${_rptStatusBadge(r)}</td>
+        <td>${_rptFmtDate(r.filed_date)}</td>
+        <td>${amtCell}</td>
+      </tr>`
+    })
+
+    html += `</tbody></table></div></div>`
+  })
+
+  $('rptContent').innerHTML = html
+}
+
+// ── REPORT 3: Penalty Exposure Report ─────────────────────────
+
+async function generateReport3() {
+  const asOf = $('rptAsOf').value || new Date().toISOString().slice(0, 10)
+
+  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+
+  const { data: clients, error: cErr } = await supa
+    .from('clients')
+    .select('id, display_name')
+    .eq('practitioner_id', currentPractitioner.id)
+    .eq('is_active', true)
+
+  if (cErr || !clients?.length) {
+    $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
+    return
+  }
+
+  const clientMap = {}
+  clients.forEach(c => { clientMap[c.id] = c.display_name })
+
+  const { data: records, error } = await supa
+    .from('compliance_records')
+    .select('*')
+    .in('client_id', clients.map(c => c.id))
+    .is('filed_date', null)
+    .lt('due_date', asOf)
+    .order('due_date')
+
+  if (error) { _rptError(error.message); return }
+
+  const asOfD = new Date(asOf); asOfD.setHours(0, 0, 0, 0)
+
+  const _daysLate = dueStr => {
+    const due = new Date(dueStr); due.setHours(0, 0, 0, 0)
+    return Math.max(0, Math.round((asOfD - due) / 86400000))
+  }
+
+  const _penalty = (r, dl) => {
+    if (!r.has_tax_due || r.tax_due == null) return null
+    const t = +r.tax_due
+    return t * 0.25 + t * 0.12 * (dl / 365)
+  }
+
+  const rows = []
+  let knownTotal = 0
+
+  ;(records || []).forEach(r => {
+    const dl  = _daysLate(r.due_date)
+    const pen = _penalty(r, dl)
+    if (pen !== null) knownTotal += pen
+    rows.push({r, dl, pen})
+  })
+
+  // Sort: known penalties desc, then unknown sorted by days late desc
+  rows.sort((a, b) => {
+    if (a.pen !== null && b.pen === null) return -1
+    if (a.pen === null && b.pen !== null) return 1
+    if (a.pen !== null && b.pen !== null) return b.pen - a.pen
+    return b.dl - a.dl
+  })
+
+  const asOfLabel = new Date(asOf).toLocaleDateString('en-PH', {month:'long', day:'numeric', year:'numeric'})
+
+  let html = ''
+
+  html += `<div class="rpt-summary-strip">
+    <span>As of <strong>${esc(asOfLabel)}</strong></span>
+    <span><strong style="color:var(--red)">${rows.length}</strong> unfiled overdue</span>
+    <span>Known estimated exposure: <strong style="color:var(--red)">${_rptFmtAmt(knownTotal)}</strong></span>
+  </div>`
+
+  if (!rows.length) {
+    html += '<p style="color:var(--green);font-size:.85rem">No overdue unfiled obligations. ✓</p>'
+    $('rptContent').innerHTML = html
+    return
+  }
+
+  html += `<div class="rpt-table-wrap"><table class="ct"><thead><tr>
+    <th>Client</th><th>Form</th><th>Period</th><th>Due Date</th>
+    <th>Days Late</th><th>Est. Penalty</th>
+  </tr></thead><tbody>`
+
+  rows.forEach(({r, dl, pen}) => {
+    const penCell = pen !== null
+      ? `<span style="color:var(--red);font-weight:600">${_rptFmtAmt(pen)}</span>`
+      : `<span style="color:var(--mu)">—</span><br><span style="font-size:.72rem;color:var(--mu)">File to determine actual penalty</span>`
+    html += `<tr>
+      <td>${esc(clientMap[r.client_id] || '—')}</td>
+      <td>${esc(r.form || '—')}</td>
+      <td>${esc(r.period || '—')}</td>
+      <td>${_rptFmtDate(r.due_date)}</td>
+      <td><span style="color:var(--red)">${dl}</span></td>
+      <td>${penCell}</td>
+    </tr>`
+  })
+
+  html += `</tbody><tfoot><tr>
+    <td colspan="5" style="text-align:right">Total known estimated penalties</td>
+    <td><span style="color:var(--red);font-weight:700">${_rptFmtAmt(knownTotal)}</span></td>
+  </tr></tfoot></table></div>`
+
+  html += `<div class="rpt-grand-total">
+    <span>Total estimated penalty exposure</span>
+    <span style="color:var(--red)">${_rptFmtAmt(knownTotal)}</span>
+  </div>`
+
+  html += `<div class="rpt-warning">
+    Estimates based on NIRC Sec. 248–249. Actual penalties may vary. Verify with BIR.
+  </div>`
+
+  $('rptContent').innerHTML = html
 }
 </script>
 </body>
