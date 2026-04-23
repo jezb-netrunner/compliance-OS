@@ -403,9 +403,101 @@ function showPg(p, btn) {
 }
 
 function generateObligations(profile) {
-  // Obligation generation requires the personal tax suite data.
-  // Integrate with your generateObligations implementation here.
-  return [];
+  const { taxpayer_type, vat_status } = profile;
+  const year = new Date().getFullYear();
+  const obs = [];
+
+  // dueDate defaults to `year`; pass `yr` override for cross-year deadlines
+  const ob = (localId, form, period, m, d, yr) => ({
+    id: `${year}-${localId}`,
+    form,
+    period,
+    dueDate: new Date(yr || year, m - 1, d)
+  });
+
+  const isBusiness = ['Self-Employed', 'Mixed Income', 'Corporation'].includes(taxpayer_type);
+  const isCorp     = taxpayer_type === 'Corporation';
+  const is8pct     = vat_status === 'Non-VAT (8% Option)';
+  const isVAT      = vat_status === 'VAT-Registered';
+  const isPCT      = vat_status === 'Non-VAT (Percentage Tax)';
+
+  // ── INCOME TAX ─────────────────────────────────────────────
+
+  if (taxpayer_type === 'Employee') {
+    obs.push(ob('1700', 'BIR Form 1700', `CY ${year - 1} Annual ITR (Compensation)`, 4, 15));
+  }
+
+  if (taxpayer_type === 'Self-Employed' || taxpayer_type === 'Mixed Income') {
+    if (!is8pct) {
+      obs.push(ob('1701Q-q1', 'BIR Form 1701Q', `${year} Q1 (Jan–Mar) Quarterly ITR`, 4, 15));
+      obs.push(ob('1701Q-q2', 'BIR Form 1701Q', `${year} Q2 (Jan–Jun) Quarterly ITR`, 8, 15));
+      obs.push(ob('1701Q-q3', 'BIR Form 1701Q', `${year} Q3 (Jan–Sep) Quarterly ITR`, 11, 15));
+    }
+    const annualForm = is8pct ? 'BIR Form 1701A' : 'BIR Form 1701';
+    obs.push(ob('annual-itr', annualForm, `CY ${year - 1} Annual ITR`, 4, 15));
+  }
+
+  if (isCorp) {
+    // 60 days after quarter end: Q1=May 29, Q2=Aug 29, Q3=Nov 29
+    obs.push(ob('1702Q-q1', 'BIR Form 1702Q', `${year} Q1 (Jan–Mar) Corp Quarterly ITR`, 5, 29));
+    obs.push(ob('1702Q-q2', 'BIR Form 1702Q', `${year} Q2 (Apr–Jun) Corp Quarterly ITR`, 8, 29));
+    obs.push(ob('1702Q-q3', 'BIR Form 1702Q', `${year} Q3 (Jul–Sep) Corp Quarterly ITR`, 11, 29));
+    obs.push(ob('1702RT', 'BIR Form 1702-RT', `FY ${year - 1} Annual Corporate ITR`, 4, 15));
+  }
+
+  // ── VAT / PERCENTAGE TAX ───────────────────────────────────
+
+  if (isVAT) {
+    [['jan','January',2],['feb','February',3],['apr','April',5],['may','May',6],
+     ['jul','July',8],['aug','August',9],['oct','October',11],['nov','November',12]]
+      .forEach(([mid, mname, m]) =>
+        obs.push(ob(`2550M-${mid}`, 'BIR Form 2550M', `${mname} ${year} Monthly VAT`, m, 20))
+      );
+    obs.push(ob('2550Q-q1', 'BIR Form 2550Q', `${year} Q1 (Jan–Mar) Quarterly VAT`, 4, 25));
+    obs.push(ob('2550Q-q2', 'BIR Form 2550Q', `${year} Q2 (Apr–Jun) Quarterly VAT`, 7, 25));
+    obs.push(ob('2550Q-q3', 'BIR Form 2550Q', `${year} Q3 (Jul–Sep) Quarterly VAT`, 10, 25));
+    obs.push(ob('2550Q-q4', 'BIR Form 2550Q', `${year} Q4 (Oct–Dec) Quarterly VAT`, 1, 25, year + 1));
+  }
+
+  if (isPCT) {
+    obs.push(ob('2551Q-q1', 'BIR Form 2551Q', `${year} Q1 (Jan–Mar) Percentage Tax`, 4, 25));
+    obs.push(ob('2551Q-q2', 'BIR Form 2551Q', `${year} Q2 (Apr–Jun) Percentage Tax`, 7, 25));
+    obs.push(ob('2551Q-q3', 'BIR Form 2551Q', `${year} Q3 (Jul–Sep) Percentage Tax`, 10, 25));
+    obs.push(ob('2551Q-q4', 'BIR Form 2551Q', `${year} Q4 (Oct–Dec) Percentage Tax`, 1, 25, year + 1));
+  }
+
+  // ── WITHHOLDING TAX ────────────────────────────────────────
+
+  if (isBusiness) {
+    // 0619-E: monthly EWT for non-quarter-end months (due 10th of following month)
+    [['jan','January',2],['feb','February',3],['apr','April',5],['may','May',6],
+     ['jul','July',8],['aug','August',9],['oct','October',11],['nov','November',12]]
+      .forEach(([mid, mname, m]) =>
+        obs.push(ob(`0619E-${mid}`, 'BIR Form 0619-E', `${mname} ${year} Monthly EWT`, m, 10))
+      );
+    // 1601-EQ: quarterly EWT (due last day of month after quarter end)
+    obs.push(ob('1601EQ-q1', 'BIR Form 1601-EQ', `${year} Q1 (Jan–Mar) Quarterly EWT`, 4, 30));
+    obs.push(ob('1601EQ-q2', 'BIR Form 1601-EQ', `${year} Q2 (Apr–Jun) Quarterly EWT`, 7, 31));
+    obs.push(ob('1601EQ-q3', 'BIR Form 1601-EQ', `${year} Q3 (Jul–Sep) Quarterly EWT`, 10, 31));
+    obs.push(ob('1601EQ-q4', 'BIR Form 1601-EQ', `${year} Q4 (Oct–Dec) Quarterly EWT`, 1, 31, year + 1));
+    // 1604-E: annual EWT information return (due March 1 of following year)
+    obs.push(ob('1604E', 'BIR Form 1604-E', `CY ${year} Annual EWT Info Return`, 3, 1, year + 1));
+  }
+
+  if (isCorp) {
+    // 1601-C: monthly compensation withholding (due 10th of following month)
+    [['jan','January',2],['feb','February',3],['mar','March',4],['apr','April',5],
+     ['may','May',6],['jun','June',7],['jul','July',8],['aug','August',9],
+     ['sep','September',10],['oct','October',11],['nov','November',12]]
+      .forEach(([mid, mname, m]) =>
+        obs.push(ob(`1601C-${mid}`, 'BIR Form 1601-C', `${mname} ${year} Compensation Withholding`, m, 10))
+      );
+    obs.push(ob('1601C-dec', 'BIR Form 1601-C', `December ${year} Compensation Withholding`, 1, 10, year + 1));
+    // 1604-C: annual compensation information return (due January 31 of following year)
+    obs.push(ob('1604C', 'BIR Form 1604-C', `CY ${year} Annual Compensation Info Return`, 1, 31, year + 1));
+  }
+
+  return obs;
 }
 
 // ══════════ SUPABASE HELPERS ══════════
@@ -455,8 +547,10 @@ async function recordPayment(recordId, hasTaxDue, taxDue, amountPaid, paymentDat
 }
 async function seedComplianceRecords(clientId, profile) {
   const year = new Date().getFullYear();
+  // Include all obligations the generator produces — Q4 returns are due in the
+  // following year but still belong to the current compliance cycle.
   const obligations = (generateObligations(profile) || [])
-    .filter(o => o.dueDate instanceof Date && o.dueDate.getFullYear() === year);
+    .filter(o => o.dueDate instanceof Date);
   if (!obligations.length) return { inserted: 0, skipped: 0 };
   const { data: existing } = await supa.from('compliance_records').select('obligation_id').eq('client_id', clientId);
   const existingIds = new Set((existing || []).map(r => r.obligation_id));
