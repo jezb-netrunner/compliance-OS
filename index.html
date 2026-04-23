@@ -3,999 +3,1032 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Present Value — Practice Manager</title>
+<meta name="description" content="Philippine BIR compliance tracking for CPAs and bookkeepers">
+<title>The Present Value — Practitioner Suite</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>
-  const SUPA_URL = 'YOUR_URL'
-  const SUPA_KEY = 'YOUR_ANON_KEY'
-  const supa = supabase.createClient(SUPA_URL, SUPA_KEY)
 
-  async function getCurrentPractitioner() {
-    const { data: { user } } = await supa.auth.getUser()
-    if (!user) return null
-    const { data: existing } = await supa
-      .from('practitioners')
-      .select('*')
-      .eq('auth_id', user.id)
-      .maybeSingle()
-    if (existing) return existing
-    const { data: created } = await supa
-      .from('practitioners')
-      .insert({ auth_id: user.id, email: user.email })
-      .select()
-      .single()
-    return created ?? null
-  }
-</script>
 <style>
-:root{--bg:#f9f9fa;--sf:#fff;--s2:#f0f1f3;--s3:#e8e9ec;--bd:#e0e2e6;--bl:#b5b8bd;--ink:#111;--ch:#333;--dim:#595959;--mu:#707070;--lt:#8a8a8a;--royal:#4169e1;--rs:rgba(65,105,225,.07);--rm:rgba(65,105,225,.14);--navy:#2c3e50;--green:#2d8a4e;--gs:rgba(45,138,78,.07);--amber:#d4850a;--as:rgba(212,133,10,.07);--red:#c0392b;--rds:rgba(192,57,43,.07);--teal:#1a8a7a;--ts:rgba(26,138,122,.07);--purple:#6c5ce7;--ps:rgba(108,92,231,.07);--rose:#c44569;--ros:rgba(196,69,105,.07);--slate:#5a6c7d;--sls:rgba(90,108,125,.07);--se:'Source Serif 4',Georgia,serif;--sa:'Inter',system-ui,sans-serif;--r:8px;--rr:5px;--sh:0 1px 3px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.06);--shs:0 1px 2px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);--hdr-h:68px;}
-html{scroll-behavior:smooth}body{font-family:var(--sa);background:var(--bg);color:var(--ch);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
-.sr-only{position:absolute !important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.skip-link{position:absolute;top:-44px;left:8px;background:var(--ink);color:#fff;padding:.5rem .9rem;border-radius:4px;font-weight:700;z-index:1000;text-decoration:none;font-size:.85rem}
-.skip-link:focus{top:8px}
-:focus-visible{outline:2px solid var(--royal);outline-offset:2px}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--royal);outline-offset:2px}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
+/* ═══════════════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════════════ */
+:root {
+  /* Brand */
+  --royal:  #4169e1;
+  --rs:     rgba(65,105,225,.07);
+  --rm:     rgba(65,105,225,.14);
+  --navy:   #2c3e50;
 
-/* HEADER */
-.hdr{background:var(--sf);border-bottom:1px solid var(--bd);padding:1rem 2rem;position:sticky;top:0;z-index:200;box-shadow:0 1px 4px rgba(0,0,0,.03);}
-.hdr-i{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;}
-.brand h1{font-family:var(--se);font-size:1.2rem;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1.1;}
-.brand h1 span{color:var(--royal);}.brand .tl{font-size:.7rem;color:var(--mu);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-top:.1rem;}
-.hdr-r{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
-.pnav{display:flex;background:var(--sf);border:1.5px solid var(--bd);border-radius:100px;overflow:hidden;box-shadow:var(--shs);}
-.pnav button{font-family:var(--sa);font-size:.82rem;font-weight:700;padding:.5rem 1rem;border:none;background:transparent;color:var(--mu);cursor:pointer;transition:all .2s;white-space:nowrap;min-height:36px;}
-.pnav button:not(:last-child){border-right:1px solid var(--bd);}
-.pnav button.active{background:var(--ink);color:var(--sf);}
-.pnav button:hover:not(.active){background:var(--s2);color:var(--ch);}
+  /* Semantic colours */
+  --green:  #2d8a4e;
+  --gs:     rgba(45,138,78,.07);
+  --gm:     rgba(45,138,78,.14);
+  --amber:  #d4850a;
+  --as:     rgba(212,133,10,.07);
+  --am:     rgba(212,133,10,.14);
+  --red:    #c0392b;
+  --rds:    rgba(192,57,43,.07);
+  --rdm:    rgba(192,57,43,.14);
 
-/* PAGES */
-/* PAGES */
-.page{display:none}.page.vis{display:block}
+  /* Neutrals */
+  --bg:   #f9f9fa;
+  --sf:   #fff;
+  --s2:   #f0f1f3;
+  --s3:   #e8e9ec;
+  --bd:   #e0e2e6;
+  --bl:   #b5b8bd;
+  --ink:  #111;
+  --ch:   #333;
+  --dim:  #595959;
+  --mu:   #707070;
+  --lt:   #9a9a9a;
 
-/* SHARED CONTROLS */
-.tbar{background:var(--sf);border-bottom:1px solid var(--bd);padding:.5rem 2rem;}
-.tbar-i{max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;}
-.tl-l{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin-right:.2rem;}
-.tb{font-family:var(--sa);font-size:.78rem;font-weight:600;padding:.4rem .85rem;border-radius:100px;border:1.5px solid var(--bd);background:var(--sf);color:var(--dim);cursor:pointer;transition:all .2s;white-space:nowrap;min-height:32px;}
-.tb:hover{border-color:var(--bl);color:var(--ch)}.tb.act{background:var(--ink);color:var(--sf);border-color:var(--ink)}
-.rbar{max-width:1200px;margin:.55rem auto 0;padding:0 2rem;display:flex;flex-wrap:wrap;gap:.22rem;align-items:center;}
-.rb{font-family:var(--sa);font-size:.75rem;font-weight:600;padding:.35rem .75rem;border-radius:100px;border:1.5px solid var(--bd);background:var(--sf);color:var(--dim);cursor:pointer;transition:all .2s;white-space:nowrap;min-height:30px;}
-.rb:hover{color:var(--ch);border-color:var(--bl)}.rb.act{background:var(--royal);color:#fff;border-color:var(--royal)}
-.mn{max-width:1200px;margin:0 auto;padding:.75rem 2rem 2rem;}
+  /* Shape */
+  --r:    8px;
+  --rr:   5px;
 
-/* VIEW CONTROLS */
-.vt{display:flex;background:var(--sf);border:1.5px solid var(--bd);border-radius:var(--rr);overflow:hidden;box-shadow:var(--shs)}
-.vt button{font-family:var(--sa);font-size:.75rem;font-weight:600;padding:.4rem .75rem;border:none;background:transparent;color:var(--dim);cursor:pointer;transition:all .2s;min-height:32px}
-.vt button:not(:last-child){border-right:1px solid var(--bd)}.vt button.act{background:var(--ink);color:#fff}
-.sb{font-family:var(--sa);font-size:.7rem;font-weight:500;padding:.3rem .6rem;border-radius:var(--rr);border:1.5px solid var(--bd);background:var(--sf);color:var(--ch);width:165px;outline:none;box-shadow:var(--shs)}
-.sb:focus{border-color:var(--royal);box-shadow:0 0 0 3px var(--rs)}.sb::placeholder{color:var(--lt)}
-.ft{display:flex;flex-wrap:wrap;gap:.18rem}
-.fb{font-size:.72rem;font-weight:600;padding:.3rem .55rem;border-radius:100px;border:1.5px solid var(--bd);background:var(--sf);color:var(--mu);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:.25rem;min-height:28px}
-.fb .fd{width:8px;height:8px;border-radius:50%;flex-shrink:0}.fb.fba{color:var(--ch);border-color:var(--bl);background:var(--s2)}
-.stb{display:flex;gap:.5rem;margin-bottom:.65rem;flex-wrap:wrap;font-size:.8rem;color:var(--dim)}.stb strong{color:var(--ink);font-weight:700;font-size:.88rem}
+  /* Shadow */
+  --sh:   0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --shs:  0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
 
-/* OBLIGATION CARDS */
-.ob{background:var(--sf);border-radius:var(--r);padding:.7rem .8rem;margin-bottom:.28rem;position:relative;overflow:hidden;box-shadow:var(--shs);transition:all .2s;border-left:3px solid transparent}
-.ob:hover{box-shadow:var(--sh);transform:translateY(-1px)}
-.ob.c-inc{border-left-color:var(--royal)}.ob.c-biz{border-left-color:var(--green)}.ob.c-wh{border-left-color:var(--purple)}.ob.c-emp{border-left-color:var(--teal)}.ob.c-dst{border-left-color:var(--rose)}.ob.c-adm{border-left-color:var(--amber)}.ob.c-sec{border-left-color:var(--slate)}.ob.dm{opacity:.4}
-.obt{display:flex;align-items:flex-start;justify-content:space-between;gap:.35rem;flex-wrap:wrap}
-.obn{font-family:var(--se);font-size:.85rem;font-weight:600;line-height:1.25;flex:1;min-width:140px;color:var(--ink)}
-.obd{font-size:.72rem;font-weight:600;background:var(--s2);padding:.15rem .45rem;border-radius:4px;color:var(--dim);white-space:nowrap;flex-shrink:0}
-.obm{display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.25rem}
-.obf{font-size:.7rem;font-weight:700;padding:.12rem .4rem;border-radius:4px;background:var(--rs);color:var(--royal)}
-.obpq{margin-top:.25rem;padding:.25rem .5rem;background:var(--ts);border:1px solid rgba(26,138,122,.12);border-radius:var(--rr);font-size:.74rem;color:var(--teal);line-height:1.35}.obpq b{font-weight:700}
-.obds{margin-top:.25rem;font-family:var(--se);font-size:.78rem;line-height:1.4;color:var(--dim)}
-.obat{margin-top:.3rem;padding-top:.25rem;border-top:1px solid var(--s2)}
-.obal{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);margin-bottom:.1rem}
-.al{display:flex;flex-direction:column;gap:.06rem}.ai{font-size:.74rem;color:var(--dim);padding-left:.55rem;position:relative;line-height:1.4}.ai::before{content:'→';position:absolute;left:0;color:var(--lt);font-size:.5rem}
-.oblg{margin-top:.12rem;font-size:.68rem;color:var(--mu);font-weight:500}
+  /* Typography */
+  --se: 'Source Serif 4', Georgia, serif;
+  --sa: 'Inter', system-ui, sans-serif;
 
-/* TABLE */
-table.ct{width:100%;border-collapse:collapse;font-size:.78rem}
-table.ct thead{background:var(--s2)}
-table.ct th{padding:.5rem .6rem;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);border-bottom:1px solid var(--bd)}
-table.ct td{padding:.45rem .6rem;border-bottom:1px solid var(--s2);vertical-align:top}
-table.ct tr:last-child td{border-bottom:none}table.ct tr:hover td{background:var(--s2)}
-
-/* FORMS */
-.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.85rem}
-.fld{display:flex;flex-direction:column;gap:.2rem;min-width:0}
-.fld label{font-size:.82rem;font-weight:600;color:var(--ch);letter-spacing:0}
-.fld .hn{font-size:.72rem;color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0}
-.fld input,.fld select{font-family:var(--sa);font-size:.9rem;font-weight:600;padding:.45rem .65rem;border:1.5px solid var(--bd);border-radius:var(--rr);background:var(--bg);color:var(--ink);outline:none;transition:border-color .2s;min-width:0;width:100%;max-width:100%}
-.fld input:focus,.fld select:focus{border-color:var(--royal);box-shadow:0 0 0 3px var(--rs)}
-.fnote{grid-column:1/-1;font-family:var(--se);font-size:.72rem;color:var(--mu);font-style:italic;padding-top:.35rem;border-top:1px solid var(--s2)}
-.crow{margin-top:.85rem;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
-.cbtn{font-family:var(--sa);font-size:.75rem;font-weight:700;padding:.5rem 1.3rem;border:none;border-radius:100px;background:var(--royal);color:#fff;cursor:pointer;transition:all .2s}
-.cbtn:hover{background:#3558c8;transform:translateY(-1px);box-shadow:0 4px 12px rgba(65,105,225,.3)}
-
-.cr-empty{padding:1.1rem .9rem;text-align:center;font-family:var(--se);font-size:.82rem;color:var(--mu);line-height:1.5;border:1.5px dashed var(--bd);border-radius:var(--r)}
-
-@keyframes wzIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.sheet-ov{position:fixed;inset:0;background:rgba(0,0,0,.46);z-index:500;display:none;align-items:flex-end;justify-content:center;padding:0}
-.sheet-ov.vis{display:flex}
-@media(min-width:600px){.sheet-ov{align-items:center;padding:1rem}}
-.sheet-card{background:var(--sf);border-radius:var(--r) var(--r) 0 0;box-shadow:0 -8px 40px rgba(0,0,0,.18);width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;animation:wzIn .22s ease}
-@media(min-width:600px){.sheet-card{border-radius:var(--r)}}
-.sheet-hdr{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.1rem;border-bottom:1px solid var(--bd);flex-shrink:0}
-.sheet-title{font-family:var(--se);font-size:1rem;font-weight:700;color:var(--ink)}
-.sheet-x{background:none;border:none;font-size:1.35rem;color:var(--dim);cursor:pointer;padding:.1rem .45rem;border-radius:4px;min-height:32px;min-width:32px;line-height:1}
-.sheet-x:hover{background:var(--s2);color:var(--ink)}
-.sheet-body{padding:.85rem 1.1rem 1rem;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
-
-:root{--btmnav-h:56px}
-.cp-sum{-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;scroll-snap-type:x proximity}
-.cp-sum .chip{scroll-snap-align:start}
-.btmnav{display:none}
-.brand-badge{display:none}
-.hdr-mobile-icons{display:none}
-.brand-row{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
-@media(max-width:768px){
-  /* Compact calculator intro */
-  .calc-intro{margin-bottom:.55rem}
-  .calc-intro h2{font-size:1.15rem;line-height:1.2;margin-bottom:0}
-  .calc-intro p{display:none}
-  /* Hide top nav + Reminders + Mode toggle in favor of bottom bar + mobile icons */
-  .pnav{display:none!important}
-  .hdr-r .notif-btn,.hdr-r .mode-toggle{display:none!important}
-  .hdr-r{flex:0 0 auto!important;width:auto!important;justify-content:flex-end!important;max-width:none}
-  .hdr-i{flex-wrap:nowrap;justify-content:space-between}
-  .brand{flex:1;min-width:0}
-  .hdr-mobile-icons{display:inline-flex;align-items:center;gap:.4rem}
-  .hdr-mobile-icons button{background:var(--sf);border:1.5px solid var(--bd);border-radius:50%;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--dim);flex-shrink:0;padding:0}
-  .hdr-mobile-icons button:hover{border-color:var(--royal);color:var(--royal)}
-  .hdr-mobile-icons button.on{border-color:var(--green);color:var(--green);background:var(--gs)}
-  .hdr-mobile-icons button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  /* Pro / Simple badge next to brand title */
-  .brand-badge{display:inline-flex;align-items:center;padding:.1rem .5rem;border-radius:100px;background:var(--s2);color:var(--mu);font-family:var(--sa);font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--bd);min-height:22px;line-height:1;white-space:nowrap}
-  body.pro-mode .brand-badge{background:var(--rs);color:var(--royal);border-color:var(--royal)}
-  /* Bottom tab nav */
-  .btmnav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--sf);border-top:1px solid var(--bd);z-index:299;box-shadow:0 -1px 4px rgba(0,0,0,.05);padding-bottom:env(safe-area-inset-bottom)}
-  .btmnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.12rem;padding:.3rem .25rem;min-height:var(--btmnav-h);background:none;border:none;cursor:pointer;color:var(--mu);font-family:var(--sa);font-size:.6rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
-  .btmnav button.active{color:var(--royal)}
-  .btmnav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-  /* Simple mode hides Form Reference + Tools in bottom bar; Pro mode restores them */
-  .btmnav button[data-pg="ref"],.btmnav button[data-pg="tools"]{display:none}
-  body.pro-mode .btmnav button[data-pg="ref"],body.pro-mode .btmnav button[data-pg="tools"]{display:flex}
-  /* Global body padding so content clears the bottom bar */
-  body{padding-bottom:var(--btmnav-h)}
-  /* Calc content: reserve extra room for sticky summary above the bottom bar */
-  #pgCalc.vis main.mn{padding-bottom:calc(var(--btmnav-h) + 16px)}
+  /* Layout */
+  --hdr-h:       60px;
+  --sidebar-w:   240px;
 }
-/* ══ MOBILE STICKY CALCULATOR DRAWER (≤480px) ══ */
-.cr-mob-bar{display:none}
-@media(max-width:480px){
-  #pgCalc.vis main.mn{padding-bottom:calc(var(--btmnav-h) + 80px)}
-  .calc-grid{grid-template-columns:1fr}
-  .calc-right{
-    position:fixed !important;left:0;right:0;bottom:var(--btmnav-h);top:auto;
-    z-index:300;border:none;border-top:1px solid var(--bd);
-    border-radius:14px 14px 0 0;background:var(--sf);
-    box-shadow:0 -4px 18px rgba(0,0,0,.14);
-    max-height:64px;overflow:hidden;
-    padding:0;transition:max-height .3s cubic-bezier(.4,0,.2,1);
+
+/* ═══════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--sa);
+  background: var(--bg);
+  color: var(--ch);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--royal);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════
+   HEADER  .hdr
+   Sticky white bar, app brand left, user controls right.
+═══════════════════════════════════════════════════ */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: var(--hdr-h);
+  background: var(--sf);
+  border-bottom: 1px solid var(--bd);
+  box-shadow: var(--shs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  gap: 1rem;
+}
+
+.hdr-brand { display: flex; flex-direction: column; gap: .05rem; }
+
+.hdr-brand h1 {
+  font-family: var(--se);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.025em;
+  line-height: 1.1;
+}
+
+.hdr-brand h1 .dot { color: var(--royal); }
+
+.hdr-tagline {
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+
+.hdr-right {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-shrink: 0;
+}
+
+.hdr-user {
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--dim);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════
+   CARD  .card
+═══════════════════════════════════════════════════ */
+.card {
+  background: var(--sf);
+  border-radius: var(--r);
+  box-shadow: var(--shs);
+  padding: 1rem;
+}
+
+.card-hover {
+  transition: box-shadow .18s, transform .18s;
+  cursor: pointer;
+}
+
+.card-hover:hover {
+  box-shadow: var(--sh);
+  transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════
+   BUTTONS  .btn-primary  .btn-ghost
+═══════════════════════════════════════════════════ */
+.btn-primary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  font-family: var(--sa);
+  font-size: .82rem;
+  font-weight: 700;
+  padding: .55rem 1.25rem;
+  border-radius: 100px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, box-shadow .18s, transform .15s;
+  white-space: nowrap;
+  min-height: 36px;
+  text-decoration: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Primary — royal blue fill */
+.btn-primary {
+  background: var(--royal);
+  color: #fff;
+  border-color: var(--royal);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #3558c8;
+  border-color: #3558c8;
+  box-shadow: 0 4px 14px rgba(65,105,225,.32);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active:not(:disabled) { transform: none; box-shadow: none; }
+
+.btn-primary:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* Ghost — border only */
+.btn-ghost {
+  background: transparent;
+  color: var(--royal);
+  border-color: var(--royal);
+}
+
+.btn-ghost:hover:not(:disabled) { background: var(--rs); }
+
+.btn-ghost:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Danger ghost */
+.btn-ghost-danger {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.btn-ghost-danger:hover:not(:disabled) { background: var(--rds); }
+
+/* Size modifiers */
+.btn-sm  { font-size: .74rem; padding: .38rem .9rem;   min-height: 30px; }
+.btn-lg  { font-size: .9rem;  padding: .7rem  1.75rem; min-height: 44px; }
+.btn-full { width: 100%; }
+
+/* ═══════════════════════════════════════════════════
+   FORM FIELDS  .fld
+   Vertical label → input stack. Compose inside .fg grid.
+═══════════════════════════════════════════════════ */
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: .28rem;
+}
+
+.fld label {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--ch);
+  letter-spacing: .01em;
+}
+
+.fld .req { color: var(--red); }
+.fld .hint { font-size: .7rem; color: var(--mu); font-weight: 400; }
+
+.fld input,
+.fld select,
+.fld textarea {
+  font-family: var(--sa);
+  font-size: .88rem;
+  font-weight: 500;
+  padding: .52rem .75rem;
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rr);
+  background: var(--sf);
+  color: var(--ink);
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+  width: 100%;
+}
+
+.fld input:focus,
+.fld select:focus,
+.fld textarea:focus {
+  border-color: var(--royal);
+  box-shadow: 0 0 0 3px var(--rs);
+}
+
+.fld input::placeholder,
+.fld textarea::placeholder {
+  color: var(--lt);
+  font-weight: 400;
+}
+
+.fld textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.55;
+}
+
+/* Form grid — auto-fit columns */
+.fg {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .9rem;
+}
+
+.fg .fld.span2 { grid-column: 1 / -1; }
+
+/* Inline error text below field */
+.fld-error {
+  font-size: .74rem;
+  color: var(--red);
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   BOTTOM SHEET  .sheet-ov  .sheet-card  .sheet-hdr
+   Slides up from the bottom on mobile; centered dialog
+   on screens >= 600 px.
+═══════════════════════════════════════════════════ */
+.sheet-ov {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.46);
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* hidden by default — toggle .sheet-ov--open */
+}
+
+.sheet-ov--open { /* applied by JS */ }
+
+@keyframes _sheetUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.sheet-card {
+  background: var(--sf);
+  border-radius: 14px 14px 0 0;
+  width: 100%;
+  max-width: 540px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -8px 48px rgba(0,0,0,.18);
+  animation: _sheetUp .22s cubic-bezier(.4,0,.2,1);
+}
+
+@media (min-width: 600px) {
+  .sheet-ov  { align-items: center; padding: 1.5rem; }
+  .sheet-card { border-radius: 14px; }
+}
+
+.sheet-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .9rem 1.25rem;
+  border-bottom: 1px solid var(--bd);
+  flex-shrink: 0;
+  gap: .75rem;
+}
+
+.sheet-title {
+  font-family: var(--se);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  flex: 1;
+}
+
+.sheet-meta {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--mu);
+}
+
+.sheet-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: var(--dim);
+  cursor: pointer;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+
+.sheet-close:hover { background: var(--s2); color: var(--ink); }
+
+.sheet-body {
+  padding: 1rem 1.25rem 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1.25rem;
+  border-top: 1px solid var(--bd);
+  flex-shrink: 0;
+  gap: .75rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   STATUS BADGES  .badge-*
+   Small pill labels. Use inside cards and list rows.
+═══════════════════════════════════════════════════ */
+.badge-red,
+.badge-amber,
+.badge-green,
+.badge-blue,
+.badge-dim {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--sa);
+  font-size: .67rem;
+  font-weight: 700;
+  padding: .15rem .52rem;
+  border-radius: 100px;
+  white-space: nowrap;
+  letter-spacing: .01em;
+  line-height: 1.4;
+}
+
+.badge-red   { background: var(--rds); color: var(--red);   }
+.badge-amber { background: var(--as);  color: var(--amber); }
+.badge-green { background: var(--gs);  color: var(--green); }
+.badge-blue  { background: var(--rs);  color: var(--royal); }
+.badge-dim   { background: var(--s2);  color: var(--mu);    }
+
+/* ═══════════════════════════════════════════════════
+   APP SHELL  .app-shell  .sidebar  .main-content
+   Two-column layout: 240 px sidebar | flexible content.
+   Below 768 px the sidebar becomes a horizontal strip
+   pinned above the scrollable main content.
+═══════════════════════════════════════════════════ */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: calc(100vh - var(--hdr-h));
+}
+
+.sidebar {
+  background: var(--sf);
+  border-right: 1px solid var(--bd);
+  padding: 1.25rem 1rem;
+  position: sticky;
+  top: var(--hdr-h);
+  height: calc(100vh - var(--hdr-h));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--bd) transparent;
+}
+
+.sidebar::-webkit-scrollbar       { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 4px; }
+
+.main-content {
+  min-width: 0;
+  padding: 1.5rem 2rem;
+}
+
+/* Sidebar typography helpers */
+.sidebar-label {
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--mu);
+  margin-bottom: .5rem;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  font-family: var(--sa);
+  font-size: .82rem;
+  font-weight: 600;
+  padding: .45rem .72rem;
+  border-radius: var(--rr);
+  border: none;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  transition: background .14s, color .14s;
+  text-align: left;
+  width: 100%;
+}
+
+.sidebar-nav-item:hover             { background: var(--s2); color: var(--ch); }
+.sidebar-nav-item.active            { background: var(--rs); color: var(--royal); }
+.sidebar-nav-item .nav-badge {
+  font-size: .67rem;
+  font-weight: 700;
+  background: var(--s3);
+  color: var(--mu);
+  padding: .1rem .42rem;
+  border-radius: 100px;
+  flex-shrink: 0;
+}
+.sidebar-nav-item.active .nav-badge { background: var(--royal); color: #fff; }
+
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
-/* ══ ROSTER / CLIENT FEATURE ══ */
-.hidden{display:none!important}
-.client-card{background:var(--sf);border-radius:var(--r);box-shadow:var(--shs);padding:.75rem .9rem;margin-bottom:.4rem;border-left:3px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:.75rem;cursor:pointer;transition:box-shadow .15s}
-.client-card:hover{box-shadow:var(--sh)}
-.client-card[data-status="overdue"]{border-left-color:var(--red)}.client-card[data-status="urgent"]{border-left-color:var(--amber)}.client-card[data-status="done"]{border-left-color:var(--green)}
-.cc-left{min-width:0}.cc-name{font-family:var(--se);font-size:.9rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cc-tin{font-size:.72rem;color:var(--mu);margin-top:.1rem}
-.cc-right{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0}
-.cc-status[data-status="overdue"]{font-size:.72rem;font-weight:700;color:var(--red)}.cc-status[data-status="urgent"]{font-size:.72rem;font-weight:700;color:var(--amber)}.cc-status[data-status="done"]{font-size:.72rem;font-weight:700;color:var(--green)}.cc-status[data-status="pending"]{font-size:.72rem;font-weight:700;color:var(--dim)}
-.roster-summary{font-size:.78rem;color:var(--dim);padding:.5rem 2rem;max-width:1200px;margin:0 auto}
-.notes-saved{border-color:var(--green)!important;box-shadow:0 0 0 3px var(--gs)!important}
-.inline-form{background:var(--s2);border-radius:var(--rr);padding:.65rem .75rem;margin-top:.4rem;border-top:1px solid var(--bd)}
-.inline-form label{font-size:.72rem;font-weight:600;color:var(--ch);display:block;margin-bottom:.15rem}
-.inline-form input,.inline-form select{font-family:var(--sa);font-size:.82rem;font-weight:600;padding:.4rem .6rem;border:1.5px solid var(--bd);border-radius:var(--rr);background:var(--bg);color:var(--ink);outline:none;transition:border-color .2s;width:100%;margin-bottom:.5rem}
-.inline-form input:focus,.inline-form select:focus{border-color:var(--royal);box-shadow:0 0 0 3px var(--rs)}
-.inline-form-btns{display:flex;gap:.4rem;margin-top:.3rem;align-items:center}
-.rs-section{margin-bottom:.5rem;border-radius:var(--r);background:var(--sf);box-shadow:var(--shs);border-left:3px solid var(--bd)}
-.rs-section.overdue{border-left-color:var(--red)}.rs-section.urgent{border-left-color:var(--amber)}
-.rs-section-hdr{padding:.5rem .85rem;font-weight:700;font-size:.8rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
-.rs-section-hdr .rs-chv{font-size:.55rem;color:var(--lt);transition:transform .3s}.rs-section.open .rs-chv{transform:rotate(180deg)}
-.rs-section-body{display:none}.rs-section.open .rs-section-body{display:block}
-.rs-row{padding:.4rem .85rem .4rem 1.2rem;font-size:.78rem;border-top:1px solid var(--s2);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
-.rs-row:hover{background:var(--s2)}
-.rs-all-clear{background:var(--gs);border-left:3px solid var(--green);border-radius:var(--r);padding:.65rem .9rem;font-size:.82rem;color:var(--green);font-weight:700;margin-bottom:.75rem}
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--bd);
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    padding: .5rem .75rem;
+    gap: .4rem;
+    overflow-y: visible;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
 
+  .sidebar::-webkit-scrollbar { display: none; }
+
+  .sidebar-label { display: none; }
+
+  .sidebar-nav {
+    flex-direction: row;
+    gap: .3rem;
+    flex-wrap: nowrap;
+  }
+
+  .sidebar-nav-item {
+    white-space: nowrap;
+    padding: .38rem .75rem;
+    font-size: .76rem;
+  }
+
+  .main-content { padding: 1rem; }
+}
+
+/* ═══════════════════════════════════════════════════
+   LOGIN VIEW
+   Centered card over a tinted gradient background.
+   Shown when there is no active session.
+═══════════════════════════════════════════════════ */
+.login-view {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: linear-gradient(145deg, #eef2ff 0%, #f9f9fa 60%);
+}
+
+.login-card {
+  background: var(--sf);
+  border-radius: 16px;
+  box-shadow:
+    0 2px 8px  rgba(0,0,0,.05),
+    0 12px 48px rgba(65,105,225,.1);
+  padding: 2.25rem 2rem;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login-logo { display: flex; flex-direction: column; gap: .25rem; }
+
+.login-logo h1 {
+  font-family: var(--se);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.035em;
+  line-height: 1.1;
+}
+
+.login-logo h1 .dot { color: var(--royal); }
+
+.login-logo p {
+  font-family: var(--se);
+  font-size: .9rem;
+  color: var(--dim);
+  line-height: 1.45;
+}
+
+/* Inline message (success / error) */
+.login-msg {
+  font-size: .82rem;
+  padding: .6rem .8rem;
+  border-radius: var(--rr);
+  line-height: 1.45;
+  display: none;
+}
+
+.login-msg.success { background: var(--gs); color: var(--green); }
+.login-msg.error   { background: var(--rds); color: var(--red);  }
+
+/* ═══════════════════════════════════════════════════
+   DIVIDERS & MISC
+═══════════════════════════════════════════════════ */
+.divider {
+  border: none;
+  border-top: 1px solid var(--bd);
+  margin: 1rem 0;
+}
+
+.page-title {
+  font-family: var(--se);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.02em;
+  margin-bottom: 1rem;
+}
+
+.empty-state {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  border: 1.5px dashed var(--bd);
+  border-radius: var(--r);
+  font-family: var(--se);
+  font-size: .88rem;
+  color: var(--mu);
+  line-height: 1.55;
+}
+
+/* ═══════════════════════════════════════════════════
+   UTILITY
+═══════════════════════════════════════════════════ */
+.hidden   { display: none !important; }
+.dimmed   { opacity: .4; pointer-events: none; }
+.mono     { font-family: 'Menlo', 'Consolas', monospace; font-size: .82em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
 </style>
 </head>
 <body>
-<header class="hdr" role="banner">
-  <div class="hdr-i">
-    <div class="brand">
-      <div class="brand-row"><h1>The Present Value<span style="color:var(--royal)">.</span></h1></div>
-      <div class="tl">Practice Manager</div>
-    </div>
-    <div class="hdr-r">
-      <button type="button" class="cbtn" id="signInBtn" onclick="openSheet('loginSheet')" style="display:none;">Sign In</button>
-      <span id="userEmail" style="font-size:.78rem;color:var(--mu);display:none;"></span>
-    </div>
-  </div>
-</header>
 
-<nav class="btmnav" aria-label="Primary mobile">
-  <button type="button" class="active" data-pg="roster" onclick="showPg('roster',this)" aria-label="Clients"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Clients</span></button>
-</nav>
-
-<!-- ═══ PAGE 5: ROSTER ═══ -->
-<div class="page" id="pgRoster" role="region">
-<div class="tbar">
-  <div class="tbar-i" style="justify-content:space-between;">
-    <span style="font-family:var(--se);font-size:1.1rem;font-weight:700;color:var(--ink);">My Clients</span>
-    <button type="button" class="cbtn" id="addClientBtn">+ Add Client</button>
-  </div>
-</div>
-<div id="rosterSummary"></div>
-<div class="tbar" style="border-top:none;">
-  <div class="tbar-i">
-    <div class="vt" role="tablist" aria-label="Filter clients">
-      <button type="button" class="act" role="tab" aria-selected="true"  data-filter="all">All</button>
-      <button type="button"             role="tab" aria-selected="false" data-filter="urgent">Urgent</button>
-      <button type="button"             role="tab" aria-selected="false" data-filter="overdue">Overdue</button>
-      <button type="button"             role="tab" aria-selected="false" data-filter="active">Active</button>
+<!-- ═══════════════════════════════════════════════
+     LOGIN VIEW  (shown when no active session)
+═══════════════════════════════════════════════════ -->
+<div id="loginView" class="login-view">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>The Present Value<span class="dot">.</span></h1>
+      <p>Compliance tracking for Filipino<br>tax practitioners</p>
     </div>
-  </div>
-</div>
-<main class="mn">
-  <input type="search" class="sb" id="rosterSearch" placeholder="Search clients…" aria-label="Search clients" style="width:100%;max-width:340px;">
-  <div id="clientList" style="margin-top:.75rem;">
-    <div id="rosterEmpty" class="cr-empty">No clients yet. Add your first client to get started.</div>
-  </div>
-</main>
-</div>
 
-<!-- ═══ PAGE 6: CLIENT DETAIL ═══ -->
-<div class="page" id="pgClient" role="region">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;background:var(--sf);border-bottom:1px solid var(--bd);">
-    <button type="button" onclick="backToRoster()" style="background:none;border:none;font-family:var(--sa);font-size:.8rem;font-weight:700;color:var(--royal);cursor:pointer;padding:.2rem 0;min-height:32px;">← Clients</button>
-    <span id="clientDetailName" style="font-family:var(--se);font-size:.9rem;font-weight:600;color:var(--ink);"></span>
-  </div>
-  <div style="padding:.4rem 1rem .3rem;background:var(--sf);border-bottom:1px solid var(--bd);">
-    <span id="clientDetailMeta" style="font-size:.72rem;color:var(--mu);"></span>
-  </div>
-  <div style="padding:.5rem 1rem 0;background:var(--sf);border-bottom:1px solid var(--bd);">
-    <div class="vt" role="tablist" aria-label="Client sections">
-      <button type="button" class="act" role="tab" aria-selected="true"  data-subtab="obligations" onclick="showSubtab(this)">Obligations</button>
-      <button type="button"             role="tab" aria-selected="false" data-subtab="history"     onclick="showSubtab(this)">History</button>
-      <button type="button"             role="tab" aria-selected="false" data-subtab="notes"       onclick="showSubtab(this)">Notes</button>
+    <div id="loginMsg" class="login-msg" role="alert" aria-live="polite"></div>
+
+    <div class="fld">
+      <label for="loginEmail">Email address</label>
+      <input
+        type="email"
+        id="loginEmail"
+        placeholder="you@yourfirm.com"
+        autocomplete="email"
+        inputmode="email"
+      >
     </div>
-  </div>
-  <div id="obligationsPanel" style="padding:.75rem 1rem;"></div>
-  <div id="historyPanel"     style="display:none;padding:.75rem 1rem;"></div>
-  <div id="notesPanel"       style="display:none;padding:.75rem 1rem;">
-    <textarea id="clientNotes" placeholder="Add notes about this client…"
-      style="font-family:var(--se);font-size:.85rem;min-height:180px;width:100%;border:1.5px solid var(--bd);border-radius:var(--r);padding:.75rem;color:var(--ch);background:var(--sf);outline:none;resize:vertical;line-height:1.6;transition:border-color .2s;"
-      onfocus="this.style.borderColor='var(--royal)'"
-      onblur="this.style.borderColor='var(--bd)';saveClientNotes()"></textarea>
+
+    <button class="btn-primary btn-lg btn-full" id="loginBtn" onclick="handleLogin()">
+      Send sign-in link
+    </button>
   </div>
 </div>
 
-<!-- ═══ LOGIN SHEET ═══ -->
-<div class="sheet-ov" id="loginSheet" role="dialog" aria-modal="true" aria-labelledby="loginSheetTitle" onclick="if(event.target===this)closeSheet('loginSheet')">
-  <div class="sheet-card">
-    <div class="sheet-hdr">
-      <span class="sheet-title" id="loginSheetTitle">Sign in to manage clients</span>
-      <button type="button" class="sheet-x" onclick="closeSheet('loginSheet')" aria-label="Close">×</button>
-    </div>
-    <div style="padding:1.25rem 1.1rem;display:flex;flex-direction:column;gap:1rem;">
-      <p style="font-family:var(--se);font-size:.85rem;color:var(--dim);line-height:1.5;">We'll send a sign-in link to your email. No password needed.</p>
-      <div class="fld">
-        <label for="loginEmail">Email address</label>
-        <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
-      </div>
-      <div id="loginMsg" style="font-size:.82rem;display:none;"></div>
-      <button type="button" class="cbtn" id="loginSubmit" onclick="handleLoginSubmit()">Send sign-in link</button>
-    </div>
-  </div>
-</div>
+<!-- ═══════════════════════════════════════════════
+     AUTHENTICATED APP SHELL
+     (hidden until session confirmed)
+═══════════════════════════════════════════════════ -->
+<div id="appView" class="hidden">
 
-<!-- ═══ ADD CLIENT SHEET ═══ -->
-<div class="sheet-ov" id="addClientSheet" role="dialog" aria-modal="true" aria-labelledby="addClientTitle" onclick="if(event.target===this)closeSheet('addClientSheet')">
-  <div class="sheet-card">
-    <div class="sheet-hdr">
-      <span class="sheet-title" id="addClientTitle">Add Client</span>
-      <button type="button" class="sheet-x" onclick="closeSheet('addClientSheet')" aria-label="Close">×</button>
+  <!-- Sticky header -->
+  <header class="hdr" role="banner">
+    <div class="hdr-brand">
+      <h1>The Present Value<span class="dot">.</span></h1>
+      <div class="hdr-tagline">Practitioner Suite</div>
     </div>
-    <div class="sheet-body">
-      <!-- STEP 1: Identity -->
-      <div id="addStep1">
-        <p style="font-size:.72rem;color:var(--mu);margin-bottom:.85rem;font-weight:600;">Step 1 of 2 — Identity</p>
-        <div class="fg">
-          <div class="fld" style="grid-column:1/-1">
-            <label for="ac_display_name">Client Name <span style="color:var(--red)">*</span></label>
-            <input type="text" id="ac_display_name" placeholder="e.g. Juan dela Cruz" autocomplete="off">
-          </div>
-          <div class="fld">
-            <label for="ac_tin">TIN <span class="hn">(optional)</span></label>
-            <input type="text" id="ac_tin" placeholder="000-000-000-000" autocomplete="off">
-            <span class="hn">Found on BIR Certificate of Registration</span>
-          </div>
-          <div class="fld">
-            <label for="ac_rdo_code">RDO Code <span class="hn">(optional)</span></label>
-            <input type="text" id="ac_rdo_code" placeholder="e.g. 040" autocomplete="off">
-          </div>
-          <div class="fld" style="grid-column:1/-1">
-            <label for="ac_industry">Industry <span class="hn">(optional)</span></label>
-            <select id="ac_industry">
-              <option value="">— Select —</option>
-              <option value="Professional Services">Professional Services</option>
-              <option value="Retail">Retail</option>
-              <option value="Trading">Trading</option>
-              <option value="Real Estate">Real Estate</option>
-              <option value="Construction">Construction</option>
-              <option value="Manufacturing">Manufacturing</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-        </div>
-        <div style="margin-top:1.1rem;display:flex;justify-content:flex-end;">
-          <button type="button" class="cbtn" onclick="goAddStep2()">Next →</button>
-        </div>
-      </div>
-      <!-- STEP 2: Tax Profile -->
-      <div id="addStep2" style="display:none">
-        <p style="font-size:.72rem;color:var(--mu);margin-bottom:.85rem;font-weight:600;">Step 2 of 2 — Tax Profile</p>
-        <div class="fg">
-          <div class="fld">
-            <label for="ac_taxpayer_type">Taxpayer Type</label>
-            <select id="ac_taxpayer_type">
-              <option value="Self-Employed">Self-Employed</option>
-              <option value="Corporation">Corporation</option>
-              <option value="Mixed Income">Mixed Income</option>
-              <option value="Employee">Employee</option>
-            </select>
-          </div>
-          <div class="fld">
-            <label for="ac_vat_status">VAT Status</label>
-            <select id="ac_vat_status">
-              <option value="VAT-Registered">VAT-Registered</option>
-              <option value="Non-VAT (8% Option)">Non-VAT (8% Option)</option>
-              <option value="Non-VAT (Percentage Tax)">Non-VAT (Percentage Tax)</option>
-              <option value="Non-VAT (Graduated)">Non-VAT (Graduated)</option>
-            </select>
-          </div>
-          <div class="fld">
-            <label for="ac_fiscal_start_month">Fiscal Start Month</label>
-            <select id="ac_fiscal_start_month">
-              <option value="1" selected>January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
-            </select>
-          </div>
-        </div>
-        <div id="addClientError" style="display:none;color:var(--red);font-size:.78rem;margin-top:.75rem;"></div>
-        <div style="margin-top:1.1rem;display:flex;justify-content:space-between;align-items:center;">
-          <button type="button" onclick="goAddStep1()" style="background:none;border:none;font-family:var(--sa);font-size:.82rem;font-weight:600;color:var(--dim);cursor:pointer;padding:.25rem 0;min-height:32px;">← Back</button>
-          <button type="button" class="cbtn" onclick="saveClient()">Save Client</button>
-        </div>
-      </div>
+    <div class="hdr-right">
+      <span class="hdr-user" id="hdrUser"></span>
+      <button class="btn-ghost btn-sm" onclick="signOut()">Sign out</button>
     </div>
+  </header>
+
+  <!-- ── ROSTER VIEW ── -->
+  <div id="rosterView" class="app-shell">
+    <aside class="sidebar" role="complementary" aria-label="Roster controls">
+      <!-- Populated by roster module -->
+    </aside>
+    <main class="main-content" id="rosterMain" role="main">
+      <!-- Populated by roster module -->
+    </main>
   </div>
-</div>
+
+  <!-- ── CLIENT DETAIL VIEW ── -->
+  <div id="clientView" class="hidden">
+    <!-- Populated by client detail module -->
+  </div>
+
+</div><!-- #appView -->
+
 
 <script>
-function showPg(p, btn) {
-  const map = {roster:'pgRoster', client:'pgClient'};
-  const pageId = map[p];
-  if (!pageId) return;
-  document.querySelectorAll('.page').forEach(e => e.classList.remove('vis'));
-  const pg = document.getElementById(pageId);
-  if (pg) pg.classList.add('vis');
-  document.querySelectorAll('.btmnav button').forEach(b => {
-    b.classList.toggle('active', b === btn);
-    if (b === btn) b.setAttribute('aria-current','page');
-    else b.removeAttribute('aria-current');
-  });
+/*
+ * ══════════════════════════════════════════════════════════════
+ * SQL MIGRATION
+ * Run once in the Supabase SQL editor before going live.
+ * ══════════════════════════════════════════════════════════════
+ *
+ * ── 1. PRACTITIONERS ──────────────────────────────────────────
+ *
+ * create table if not exists practitioners (
+ *   id          uuid primary key default gen_random_uuid(),
+ *   auth_id     uuid unique not null
+ *                 references auth.users(id) on delete cascade,
+ *   email       text,
+ *   name        text,
+ *   firm_name   text,
+ *   plan        text not null default 'pro',
+ *   created_at  timestamptz not null default now()
+ * );
+ *
+ * alter table practitioners enable row level security;
+ *
+ * create policy "practitioners: own row"
+ *   on practitioners for all
+ *   using     (auth_id = auth.uid())
+ *   with check (auth_id = auth.uid());
+ *
+ *
+ * ── 2. CLIENTS ────────────────────────────────────────────────
+ *
+ * create table if not exists clients (
+ *   id                  uuid primary key default gen_random_uuid(),
+ *   practitioner_id     uuid not null
+ *                         references practitioners(id) on delete cascade,
+ *   display_name        text not null,
+ *   tin                 text,
+ *   rdo_code            text,
+ *   taxpayer_type       text,
+ *     -- 'Self-Employed' | 'Corporation' | 'Mixed Income' | 'Employee'
+ *   vat_status          text,
+ *     -- 'VAT-Registered' | 'Non-VAT (8% Option)'
+ *     -- | 'Non-VAT (Percentage Tax)' | 'Non-VAT (Graduated)'
+ *   regime              text,           -- display alias for vat_status
+ *   fiscal_start_month  int not null default 1,   -- 1 = January
+ *   industry            text,
+ *   notes               text,
+ *   is_active           boolean not null default true,
+ *   created_at          timestamptz not null default now(),
+ *   updated_at          timestamptz not null default now()
+ * );
+ *
+ * alter table clients enable row level security;
+ *
+ * create policy "clients: own practitioner"
+ *   on clients for all
+ *   using (
+ *     practitioner_id in (
+ *       select id from practitioners where auth_id = auth.uid()
+ *     )
+ *   )
+ *   with check (
+ *     practitioner_id in (
+ *       select id from practitioners where auth_id = auth.uid()
+ *     )
+ *   );
+ *
+ *
+ * ── 3. COMPLIANCE RECORDS ─────────────────────────────────────
+ *
+ * create table if not exists compliance_records (
+ *   id                uuid primary key default gen_random_uuid(),
+ *   client_id         uuid not null
+ *                       references clients(id) on delete cascade,
+ *   obligation_id     text,          -- e.g. '2025-2550M-jan'
+ *   form              text,          -- e.g. 'BIR Form 2550M'
+ *   period            text,          -- e.g. 'January 2025 VAT'
+ *   due_date          date,
+ *
+ *   -- Step 1: Filing
+ *   filed_date        date,
+ *   filing_reference  text,          -- eBIRForms confirmation no.
+ *
+ *   -- Step 2: TRRC
+ *   trrc_saved        boolean not null default false,
+ *   trrc_date         date,
+ *   trrc_reference    text,
+ *
+ *   -- Step 3: Payment
+ *   has_tax_due       boolean not null default false,
+ *   tax_due           numeric(12,2),
+ *   payment_status    text not null default 'n/a',
+ *     -- 'n/a' | 'unpaid' | 'paid'
+ *   amount_paid       numeric(12,2),
+ *   payment_date      date,
+ *   payment_reference text,
+ *   payment_mode      text,
+ *     -- 'eFPS' | 'GCash' | 'Bank (AAB)' | 'Over-the-counter (RDO)'
+ *
+ *   notes             text,
+ *   created_at        timestamptz not null default now(),
+ *   updated_at        timestamptz not null default now()
+ * );
+ *
+ * alter table compliance_records enable row level security;
+ *
+ * create policy "records: own clients"
+ *   on compliance_records for all
+ *   using (
+ *     client_id in (
+ *       select c.id from clients c
+ *       join practitioners p on p.id = c.practitioner_id
+ *       where p.auth_id = auth.uid()
+ *     )
+ *   )
+ *   with check (
+ *     client_id in (
+ *       select c.id from clients c
+ *       join practitioners p on p.id = c.practitioner_id
+ *       where p.auth_id = auth.uid()
+ *     )
+ *   );
+ *
+ *
+ * ── 4. TRIGGERS  (auto-update updated_at) ────────────────────
+ *
+ * create or replace function _touch_updated_at()
+ * returns trigger language plpgsql as $$
+ * begin
+ *   new.updated_at = now();
+ *   return new;
+ * end;
+ * $$;
+ *
+ * create trigger clients_updated_at
+ *   before update on clients
+ *   for each row execute function _touch_updated_at();
+ *
+ * create trigger records_updated_at
+ *   before update on compliance_records
+ *   for each row execute function _touch_updated_at();
+ *
+ * ══════════════════════════════════════════════════════════════
+ */
+
+
+// ── SUPABASE ──────────────────────────────────────────────────
+const SUPA_URL = 'YOUR_URL'
+const SUPA_KEY = 'YOUR_ANON_KEY'
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY)
+
+
+// ── GLOBALS ───────────────────────────────────────────────────
+let currentPractitioner = null
+let activeClientId      = null
+
+
+// ── HELPERS ───────────────────────────────────────────────────
+const $  = id  => document.getElementById(id)
+const qs = sel => document.querySelector(sel)
+
+/** Escape a string for safe HTML insertion */
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
-function generateObligations(profile) {
-  const { taxpayer_type, vat_status } = profile;
-  const year = new Date().getFullYear();
-  const obs = [];
 
-  // dueDate defaults to `year`; pass `yr` override for cross-year deadlines
-  const ob = (localId, form, period, m, d, yr) => ({
-    id: `${year}-${localId}`,
-    form,
-    period,
-    dueDate: new Date(yr || year, m - 1, d)
-  });
-
-  const isBusiness = ['Self-Employed', 'Mixed Income', 'Corporation'].includes(taxpayer_type);
-  const isCorp     = taxpayer_type === 'Corporation';
-  const is8pct     = vat_status === 'Non-VAT (8% Option)';
-  const isVAT      = vat_status === 'VAT-Registered';
-  const isPCT      = vat_status === 'Non-VAT (Percentage Tax)';
-
-  // ── INCOME TAX ─────────────────────────────────────────────
-
-  if (taxpayer_type === 'Employee') {
-    obs.push(ob('1700', 'BIR Form 1700', `CY ${year - 1} Annual ITR (Compensation)`, 4, 15));
-  }
-
-  if (taxpayer_type === 'Self-Employed' || taxpayer_type === 'Mixed Income') {
-    if (!is8pct) {
-      obs.push(ob('1701Q-q1', 'BIR Form 1701Q', `${year} Q1 (Jan–Mar) Quarterly ITR`, 4, 15));
-      obs.push(ob('1701Q-q2', 'BIR Form 1701Q', `${year} Q2 (Jan–Jun) Quarterly ITR`, 8, 15));
-      obs.push(ob('1701Q-q3', 'BIR Form 1701Q', `${year} Q3 (Jan–Sep) Quarterly ITR`, 11, 15));
-    }
-    const annualForm = is8pct ? 'BIR Form 1701A' : 'BIR Form 1701';
-    obs.push(ob('annual-itr', annualForm, `CY ${year - 1} Annual ITR`, 4, 15));
-  }
-
-  if (isCorp) {
-    // 60 days after quarter end: Q1=May 29, Q2=Aug 29, Q3=Nov 29
-    obs.push(ob('1702Q-q1', 'BIR Form 1702Q', `${year} Q1 (Jan–Mar) Corp Quarterly ITR`, 5, 29));
-    obs.push(ob('1702Q-q2', 'BIR Form 1702Q', `${year} Q2 (Apr–Jun) Corp Quarterly ITR`, 8, 29));
-    obs.push(ob('1702Q-q3', 'BIR Form 1702Q', `${year} Q3 (Jul–Sep) Corp Quarterly ITR`, 11, 29));
-    obs.push(ob('1702RT', 'BIR Form 1702-RT', `FY ${year - 1} Annual Corporate ITR`, 4, 15));
-  }
-
-  // ── VAT / PERCENTAGE TAX ───────────────────────────────────
-
-  if (isVAT) {
-    [['jan','January',2],['feb','February',3],['apr','April',5],['may','May',6],
-     ['jul','July',8],['aug','August',9],['oct','October',11],['nov','November',12]]
-      .forEach(([mid, mname, m]) =>
-        obs.push(ob(`2550M-${mid}`, 'BIR Form 2550M', `${mname} ${year} Monthly VAT`, m, 20))
-      );
-    obs.push(ob('2550Q-q1', 'BIR Form 2550Q', `${year} Q1 (Jan–Mar) Quarterly VAT`, 4, 25));
-    obs.push(ob('2550Q-q2', 'BIR Form 2550Q', `${year} Q2 (Apr–Jun) Quarterly VAT`, 7, 25));
-    obs.push(ob('2550Q-q3', 'BIR Form 2550Q', `${year} Q3 (Jul–Sep) Quarterly VAT`, 10, 25));
-    obs.push(ob('2550Q-q4', 'BIR Form 2550Q', `${year} Q4 (Oct–Dec) Quarterly VAT`, 1, 25, year + 1));
-  }
-
-  if (isPCT) {
-    obs.push(ob('2551Q-q1', 'BIR Form 2551Q', `${year} Q1 (Jan–Mar) Percentage Tax`, 4, 25));
-    obs.push(ob('2551Q-q2', 'BIR Form 2551Q', `${year} Q2 (Apr–Jun) Percentage Tax`, 7, 25));
-    obs.push(ob('2551Q-q3', 'BIR Form 2551Q', `${year} Q3 (Jul–Sep) Percentage Tax`, 10, 25));
-    obs.push(ob('2551Q-q4', 'BIR Form 2551Q', `${year} Q4 (Oct–Dec) Percentage Tax`, 1, 25, year + 1));
-  }
-
-  // ── WITHHOLDING TAX ────────────────────────────────────────
-
-  if (isBusiness) {
-    // 0619-E: monthly EWT for non-quarter-end months (due 10th of following month)
-    [['jan','January',2],['feb','February',3],['apr','April',5],['may','May',6],
-     ['jul','July',8],['aug','August',9],['oct','October',11],['nov','November',12]]
-      .forEach(([mid, mname, m]) =>
-        obs.push(ob(`0619E-${mid}`, 'BIR Form 0619-E', `${mname} ${year} Monthly EWT`, m, 10))
-      );
-    // 1601-EQ: quarterly EWT (due last day of month after quarter end)
-    obs.push(ob('1601EQ-q1', 'BIR Form 1601-EQ', `${year} Q1 (Jan–Mar) Quarterly EWT`, 4, 30));
-    obs.push(ob('1601EQ-q2', 'BIR Form 1601-EQ', `${year} Q2 (Apr–Jun) Quarterly EWT`, 7, 31));
-    obs.push(ob('1601EQ-q3', 'BIR Form 1601-EQ', `${year} Q3 (Jul–Sep) Quarterly EWT`, 10, 31));
-    obs.push(ob('1601EQ-q4', 'BIR Form 1601-EQ', `${year} Q4 (Oct–Dec) Quarterly EWT`, 1, 31, year + 1));
-    // 1604-E: annual EWT information return (due March 1 of following year)
-    obs.push(ob('1604E', 'BIR Form 1604-E', `CY ${year} Annual EWT Info Return`, 3, 1, year + 1));
-  }
-
-  if (isCorp) {
-    // 1601-C: monthly compensation withholding (due 10th of following month)
-    [['jan','January',2],['feb','February',3],['mar','March',4],['apr','April',5],
-     ['may','May',6],['jun','June',7],['jul','July',8],['aug','August',9],
-     ['sep','September',10],['oct','October',11],['nov','November',12]]
-      .forEach(([mid, mname, m]) =>
-        obs.push(ob(`1601C-${mid}`, 'BIR Form 1601-C', `${mname} ${year} Compensation Withholding`, m, 10))
-      );
-    obs.push(ob('1601C-dec', 'BIR Form 1601-C', `December ${year} Compensation Withholding`, 1, 10, year + 1));
-    // 1604-C: annual compensation information return (due January 31 of following year)
-    obs.push(ob('1604C', 'BIR Form 1604-C', `CY ${year} Annual Compensation Info Return`, 1, 31, year + 1));
-  }
-
-  return obs;
+// ── VIEW SWITCHER ─────────────────────────────────────────────
+function showLoginView() {
+  $('loginView').classList.remove('hidden')
+  $('appView').classList.add('hidden')
 }
 
-// ══════════ SUPABASE HELPERS ══════════
-const _today = () => new Date().toISOString().split('T')[0];
-const _iq = id => document.getElementById(id);
-const _cancelForm = id => { const el = _iq('form_' + id); if (el) el.style.display = 'none'; };
-const _inlineBtn = (id, label, oc) =>
-  `<button class="cbtn" style="padding:.4rem .9rem;font-size:.75rem;" onclick="${oc}">${label}</button>`;
-const _cancelBtn = id =>
-  `<button style="background:none;border:none;font-size:.75rem;color:var(--mu);cursor:pointer;" onclick="_cancelForm('${id}')">Cancel</button>`;
-
-// ══════════ STATUS HELPERS ══════════
-function getCardStatus(record) {
-  const t = _today();
-  if (!record.filed_date) return (record.due_date && record.due_date < t) ? 'overdue' : 'pending';
-  if (!record.trrc_saved) return 'trrc_missing';
-  if (record.has_tax_due && record.payment_status !== 'paid') return 'unpaid';
-  return 'done';
-}
-function getStatusLabel(status) {
-  return ({pending:'Not yet filed',overdue:'Overdue — not filed',trrc_missing:'Filed — TRRC needed',unpaid:'Filed — payment pending',done:'Complete'})[status] ?? status;
-}
-function getStatusColor(status) {
-  return ({pending:'var(--mu)',overdue:'var(--red)',trrc_missing:'var(--amber)',unpaid:'var(--amber)',done:'var(--green)'})[status] ?? 'var(--mu)';
+function showRosterView() {
+  $('loginView').classList.add('hidden')
+  $('appView').classList.remove('hidden')
+  $('rosterView').classList.remove('hidden')
+  $('clientView').classList.add('hidden')
+  activeClientId = null
 }
 
-// ══════════ SUPABASE DATA FUNCTIONS ══════════
-async function recordFiling(recordId, filedDate, reference) {
-  const { error } = await supa.from('compliance_records')
-    .update({ filed_date: filedDate, filing_reference: reference, updated_at: new Date().toISOString() })
-    .eq('id', recordId);
-  return { error };
-}
-async function recordTRRC(recordId, trrcDate, trrcReference) {
-  const { error } = await supa.from('compliance_records')
-    .update({ trrc_saved: true, trrc_date: trrcDate, trrc_reference: trrcReference, updated_at: new Date().toISOString() })
-    .eq('id', recordId);
-  return { error };
-}
-async function recordPayment(recordId, hasTaxDue, taxDue, amountPaid, paymentDate, paymentRef, paymentMode) {
-  const { error } = await supa.from('compliance_records')
-    .update({ has_tax_due: hasTaxDue, tax_due: taxDue, payment_status: 'paid', amount_paid: amountPaid,
-              payment_date: paymentDate, payment_reference: paymentRef, payment_mode: paymentMode,
-              updated_at: new Date().toISOString() })
-    .eq('id', recordId);
-  return { error };
-}
-async function seedComplianceRecords(clientId, profile) {
-  const year = new Date().getFullYear();
-  // Include all obligations the generator produces — Q4 returns are due in the
-  // following year but still belong to the current compliance cycle.
-  const obligations = (generateObligations(profile) || [])
-    .filter(o => o.dueDate instanceof Date);
-  if (!obligations.length) return { inserted: 0, skipped: 0 };
-  const { data: existing } = await supa.from('compliance_records').select('obligation_id').eq('client_id', clientId);
-  const existingIds = new Set((existing || []).map(r => r.obligation_id));
-  const toInsert = obligations.filter(o => !existingIds.has(o.id)).map(o => ({
-    client_id: clientId, obligation_id: o.id, form: o.form, period: o.period,
-    due_date: o.dueDate.toISOString().split('T')[0], payment_status: 'n/a'
-  }));
-  if (toInsert.length) await supa.from('compliance_records').insert(toInsert);
-  return { inserted: toInsert.length, skipped: obligations.length - toInsert.length };
+function showClientDetail(clientId) {
+  activeClientId = clientId
+  $('loginView').classList.add('hidden')
+  $('appView').classList.remove('hidden')
+  $('rosterView').classList.add('hidden')
+  $('clientView').classList.remove('hidden')
 }
 
-// ══════════ CLIENT CARD ══════════
-function buildClientCard(client, stats) {
-  const { pending, overdue, urgent } = stats;
-  let statusKey, statusLabel;
-  if (overdue > 0)        { statusKey = 'overdue'; statusLabel = 'overdue'; }
-  else if (urgent > 0)    { statusKey = 'urgent';  statusLabel = 'due soon'; }
-  else if (pending === 0) { statusKey = 'done';    statusLabel = 'on track'; }
-  else                    { statusKey = 'pending'; statusLabel = pending + ' pending'; }
-  const tin   = client.tin          ? `<div class="cc-tin">TIN ${client.tin}</div>` : '';
-  const badge = client.taxpayer_type ? `<span class="obf">${client.taxpayer_type}</span>` : '';
-  return `<div class="client-card" data-status="${statusKey}" data-id="${client.id}" onclick="showClientDetail('${client.id}')">
-  <div class="cc-left"><div class="cc-name">${client.display_name}</div>${tin}</div>
-  <div class="cc-right">${badge}<span class="cc-status" data-status="${statusKey}">${statusLabel}</span></div>
-</div>`;
+
+// ── AUTH ──────────────────────────────────────────────────────
+/**
+ * Returns the practitioners row for the current user,
+ * creating one automatically on first login.
+ */
+async function getCurrentPractitioner() {
+  const { data: { user } } = await supa.auth.getUser()
+  if (!user) return null
+
+  const { data: existing } = await supa
+    .from('practitioners')
+    .select('*')
+    .eq('auth_id', user.id)
+    .maybeSingle()
+
+  if (existing) return existing
+
+  const { data: created, error } = await supa
+    .from('practitioners')
+    .insert({ auth_id: user.id, email: user.email })
+    .select()
+    .single()
+
+  if (error) { console.error('Could not create practitioner row:', error); return null }
+  return created
 }
 
-// ══════════ ROSTER ══════════
-let activeFilter = 'all';
+/** Send a magic-link OTP to the entered email address */
+async function handleLogin() {
+  const email = ($('loginEmail').value ?? '').trim()
+  const btn   = $('loginBtn')
+  const msg   = $('loginMsg')
 
-async function loadRoster() {
-  const practitioner = await getCurrentPractitioner();
-  if (!practitioner) return;
-  const today = _today();
-  const week  = new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0];
-  const { data: clients } = await supa.from('clients').select('*')
-    .eq('practitioner_id', practitioner.id).eq('is_active', true).order('display_name');
-  if (!clients) return;
+  if (!email) { _setLoginMsg('Please enter your email address.', 'error'); return }
 
-  const summary = { overdue: [], urgent: [], trrc: [], unpaid: [] };
-  let totalUrgent = 0, totalOverdue = 0;
+  btn.disabled    = true
+  btn.textContent = 'Sending…'
+  _setLoginMsg('', '')
 
-  const cards = await Promise.all(clients.map(async c => {
-    const { data: recs } = await supa.from('compliance_records').select('*').eq('client_id', c.id);
-    const r = recs || [];
-    const stats = {
-      total:   r.length,
-      pending: r.filter(x => !x.filed_date).length,
-      overdue: r.filter(x => !x.filed_date && x.due_date && x.due_date < today).length,
-      urgent:  r.filter(x => !x.filed_date && x.due_date && x.due_date >= today && x.due_date <= week).length
-    };
-    r.forEach(x => {
-      const lbl = `${c.display_name} · ${x.form || ''} · ${x.period || ''}`;
-      if (!x.filed_date && x.due_date && x.due_date < today)
-        summary.overdue.push({ lbl, clientId: c.id, note: 'Not filed' });
-      if (!x.filed_date && x.due_date && x.due_date >= today && x.due_date <= week) {
-        const days = Math.ceil((new Date(x.due_date) - new Date(today)) / 864e5);
-        summary.urgent.push({ lbl, clientId: c.id, note: days === 0 ? 'Due today' : `${days}d left` });
-      }
-      if (x.filed_date && !x.trrc_saved)
-        summary.trrc.push({ lbl, clientId: c.id, note: 'Save TRRC' });
-      if (x.filed_date && x.has_tax_due && x.payment_status !== 'paid')
-        summary.unpaid.push({ lbl, clientId: c.id, note: x.tax_due ? '₱' + Number(x.tax_due).toLocaleString('en-PH') : 'Unpaid' });
-    });
-    totalOverdue += stats.overdue > 0 ? 1 : 0;
-    totalUrgent  += stats.urgent  > 0 ? 1 : 0;
-    return buildClientCard(c, stats);
-  }));
+  const { error } = await supa.auth.signInWithOtp({ email })
 
-  const mkSection = (cls, title, items) => {
-    if (!items.length) return '';
-    const rows = items.map(i =>
-      `<div class="rs-row" onclick="showClientDetail('${i.clientId}')">
-        <span>${i.lbl}</span>
-        <span style="color:var(--${cls === 'overdue' ? 'red' : 'amber'});font-weight:700;font-size:.72rem;">${i.note}</span>
-      </div>`).join('');
-    return `<div class="rs-section ${cls} open">
-      <div class="rs-section-hdr" onclick="this.parentElement.classList.toggle('open')">
-        <span>${title} <span style="font-weight:400;color:var(--mu);">(${items.length})</span></span>
-        <span class="rs-chv">▾</span>
-      </div><div class="rs-section-body">${rows}</div></div>`;
-  };
+  btn.disabled    = false
+  btn.textContent = 'Send sign-in link'
 
-  const sumEl = _iq('rosterSummary');
-  if (sumEl) {
-    const html = mkSection('overdue', 'Overdue', summary.overdue)
-               + mkSection('urgent',  'Due this week', summary.urgent)
-               + mkSection('urgent',  'TRRC Needed', summary.trrc)
-               + mkSection('urgent',  'Payment Pending', summary.unpaid);
-    sumEl.innerHTML = `<div style="padding:.6rem 1rem 0;max-width:1200px;margin:0 auto;">
-      ${html || '<div class="rs-all-clear">All clients are on track ✓</div>'}
-      <div class="roster-summary">${clients.length} client${clients.length !== 1 ? 's' : ''} · ${totalUrgent} due this week · ${totalOverdue} overdue</div>
-    </div>`;
-  }
-
-  const list  = _iq('clientList');
-  const empty = _iq('rosterEmpty');
-  if (list && clients.length > 0) {
-    if (empty) empty.style.display = 'none';
-    list.innerHTML = cards.join('');
-  }
-}
-
-function filterRoster(filterValue, searchValue) {
-  const q = (searchValue || '').toLowerCase();
-  document.querySelectorAll('#clientList .client-card').forEach(card => {
-    const status = card.dataset.status || '';
-    const name   = (card.querySelector('.cc-name')?.textContent || '').toLowerCase();
-    const tin    = (card.querySelector('.cc-tin')?.textContent  || '').toLowerCase();
-    const matchFilter =
-      filterValue === 'overdue' ? status === 'overdue' :
-      filterValue === 'urgent'  ? status === 'urgent'  :
-      filterValue === 'active'  ? status !== 'overdue' : true;
-    card.classList.toggle('hidden', !(matchFilter && (!q || name.includes(q) || tin.includes(q))));
-  });
-}
-
-(function wireRosterControls() {
-  const search = _iq('rosterSearch');
-  if (search) search.addEventListener('input', function() { filterRoster(activeFilter, this.value); });
-  document.querySelectorAll('#pgRoster .vt button').forEach(btn => {
-    btn.addEventListener('click', function() {
-      activeFilter = this.dataset.filter || 'all';
-      document.querySelectorAll('#pgRoster .vt button').forEach(b => {
-        b.classList.remove('act'); b.setAttribute('aria-selected', 'false');
-      });
-      this.classList.add('act'); this.setAttribute('aria-selected', 'true');
-      filterRoster(activeFilter, search ? search.value : '');
-    });
-  });
-})();
-
-// ══════════ ADD CLIENT ══════════
-function openAddClient() {
-  const sheet = _iq('addClientSheet');
-  if (!sheet) return;
-  ['ac_display_name','ac_tin','ac_rdo_code','ac_industry','ac_taxpayer_type','ac_vat_status']
-    .forEach(id => { const el = _iq(id); if (el) el.value = el.tagName === 'SELECT' ? el.options[0].value : ''; });
-  _iq('ac_fiscal_start_month').value = '1';
-  _iq('addStep1').style.display = '';
-  _iq('addStep2').style.display = 'none';
-  const err = _iq('addClientError');
-  if (err) { err.style.display = 'none'; err.textContent = ''; }
-  sheet.classList.add('vis');
-  setTimeout(() => { try { _iq('ac_display_name').focus(); } catch(e) {} }, 40);
-}
-function goAddStep2() {
-  const name = (_iq('ac_display_name').value || '').trim();
-  const err  = _iq('addClientError');
-  if (!name) { err.textContent = 'Client name is required.'; err.style.display = 'block'; return; }
-  err.style.display = 'none';
-  _iq('addStep1').style.display = 'none';
-  _iq('addStep2').style.display = '';
-}
-function goAddStep1() {
-  _iq('addStep2').style.display = 'none';
-  _iq('addStep1').style.display = '';
-}
-async function saveClient() {
-  const btn = document.querySelector('#addStep2 .cbtn');
-  const err = _iq('addClientError');
-  const val = id => (_iq(id).value || '').trim();
-  const practitioner = await getCurrentPractitioner();
-  if (!practitioner) { err.textContent = 'Not signed in.'; err.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = 'Saving…'; err.style.display = 'none';
-  const taxpayer_type      = val('ac_taxpayer_type');
-  const vat_status         = val('ac_vat_status');
-  const fiscal_start_month = parseInt(_iq('ac_fiscal_start_month').value);
-  const { data: newClient, error } = await supa.from('clients').insert({
-    practitioner_id: practitioner.id,
-    display_name:    val('ac_display_name'),
-    tin:             val('ac_tin')      || null,
-    rdo_code:        val('ac_rdo_code') || null,
-    industry:        val('ac_industry') || null,
-    taxpayer_type, vat_status, fiscal_start_month, is_active: true
-  }).select().single();
-  btn.disabled = false; btn.textContent = 'Save Client';
-  if (error) { err.textContent = error.message; err.style.display = 'block'; return; }
-  await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status, fiscal_start_month, regime: vat_status });
-  _iq('addClientSheet').classList.remove('vis');
-  loadRoster();
-}
-(function wireAddClient() {
-  const addBtn = _iq('addClientBtn');
-  if (addBtn) addBtn.onclick = openAddClient;
-})();
-
-// ══════════ CLIENT DETAIL ══════════
-let activeClientId = null;
-
-async function showClientDetail(clientId) {
-  activeClientId = clientId;
-  showPg('client', null);
-  const { data: client } = await supa.from('clients').select('*').eq('id', clientId).single();
-  if (!client) return;
-  const nameEl = _iq('clientDetailName');
-  if (nameEl) nameEl.textContent = client.display_name;
-  const metaParts = [];
-  if (client.tin)        metaParts.push('TIN: ' + client.tin);
-  if (client.rdo_code)   metaParts.push('RDO: ' + client.rdo_code);
-  if (client.vat_status) metaParts.push(client.vat_status);
-  const metaEl = _iq('clientDetailMeta');
-  if (metaEl) metaEl.textContent = metaParts.join(' · ');
-  loadObligations(clientId);
-  loadClientNotes();
-}
-
-async function loadObligations(clientId) {
-  const panel = _iq('obligationsPanel');
-  if (!panel) return;
-  const { data: records } = await supa.from('compliance_records').select('*')
-    .eq('client_id', clientId).order('due_date', { ascending: true });
-  if (!records || !records.length) {
-    panel.innerHTML = '<div class="cr-empty">No obligations on record.</div>';
-    return;
-  }
-  panel.innerHTML = records.map(buildObligationCard).join('');
-}
-
-function buildObligationCard(r) {
-  const status = getCardStatus(r);
-  const color  = getStatusColor(status);
-  const label  = getStatusLabel(status);
-  const chk  = '<span style="color:var(--green);font-size:.85rem;">✓</span>';
-  const circ = '<span style="color:var(--bl);font-size:.85rem;">○</span>';
-  const dim  = 'opacity:.4;pointer-events:none;';
-  const filedRow = `<div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;padding:.18rem 0;">
-    ${r.filed_date ? chk : circ}<span style="color:var(--ch);">Filed</span>
-    ${r.filed_date ? `<span style="color:var(--mu);">${r.filed_date}${r.filing_reference ? ' · ' + r.filing_reference : ''}</span>` : ''}
-  </div>`;
-  const trrcRow = `<div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;padding:.18rem 0;${r.filed_date ? '' : dim}">
-    ${r.trrc_saved ? chk : circ}<span style="color:var(--ch);">TRRC</span>
-    ${r.trrc_saved ? `<span style="color:var(--mu);">${r.trrc_date || ''}${r.trrc_reference ? ' · ' + r.trrc_reference : ''}</span>` : ''}
-  </div>`;
-  const payNA  = !r.has_tax_due || r.payment_status === 'n/a';
-  const payRow = `<div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;padding:.18rem 0;${r.filed_date ? '' : dim}">
-    ${payNA ? '<span style="color:var(--mu);">—</span>' : r.payment_status === 'paid' ? chk : circ}
-    <span style="color:var(--ch);">Payment</span>
-    ${payNA ? '<span style="color:var(--mu);">N/A</span>'
-            : r.payment_status === 'paid'
-              ? `<span style="color:var(--mu);">${r.payment_date || ''}${r.amount_paid ? ' · ₱' + Number(r.amount_paid).toLocaleString('en-PH') : ''}</span>`
-              : `<span style="color:var(--mu);">${r.tax_due ? '₱' + Number(r.tax_due).toLocaleString('en-PH') + ' due' : ''}</span>`}
-  </div>`;
-  const actions = {
-    pending:      `<button class="cbtn" style="font-size:.72rem;padding:.35rem .9rem;margin-top:.5rem;" onclick="openFilingForm('${r.id}')">Mark as Filed</button>`,
-    overdue:      `<button class="cbtn" style="font-size:.72rem;padding:.35rem .9rem;margin-top:.5rem;background:var(--red);" onclick="openFilingForm('${r.id}')">Mark as Filed</button>`,
-    trrc_missing: `<button class="cbtn" style="font-size:.72rem;padding:.35rem .9rem;margin-top:.5rem;background:var(--amber);" onclick="openTRRCForm('${r.id}')">Save TRRC</button>`,
-    unpaid:       `<button class="cbtn" style="font-size:.72rem;padding:.35rem .9rem;margin-top:.5rem;background:var(--amber);" onclick="openPaymentForm('${r.id}')">Record Payment</button>`,
-    done: ''
-  };
-  return `<div class="ob" style="border-left-color:${color};margin-bottom:.5rem;">
-  <div class="obt">
-    <div><span class="obn">${r.form || ''}</span> <span class="obds">${r.period || ''}</span></div>
-    <span style="font-size:.72rem;font-weight:700;color:${color};">${label}</span>
-  </div>
-  <div style="margin-top:.4rem;">${filedRow}${trrcRow}${payRow}</div>
-  ${actions[status] || ''}
-  <div id="form_${r.id}" style="display:none;"></div>
-</div>`;
-}
-
-function backToRoster() {
-  showPg('roster', document.querySelector('.pnav button[data-pg="roster"]') ||
-                   document.querySelector('.btmnav button[data-pg="roster"]'));
-}
-function showSubtab(btn) {
-  ['obligations','history','notes'].forEach(id => {
-    const panel = _iq(id + 'Panel');
-    if (panel) panel.style.display = id === btn.dataset.subtab ? '' : 'none';
-  });
-  document.querySelectorAll('#pgClient .vt button').forEach(b => {
-    b.classList.toggle('act', b === btn);
-    b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
-  });
-  if (btn.dataset.subtab === 'notes')   loadClientNotes();
-  if (btn.dataset.subtab === 'history') loadHistory();
-}
-
-// ══════════ INLINE FILING FORMS ══════════
-function _showInlineForm(recordId, html) {
-  document.querySelectorAll('[id^="form_"]').forEach(el => {
-    if (el.id !== 'form_' + recordId) el.style.display = 'none';
-  });
-  const el = _iq('form_' + recordId);
-  if (!el) return;
-  el.innerHTML = html;
-  el.style.display = 'block';
-}
-async function _saveFilingForm(recordId) {
-  const noTax = _iq('ff_notax_' + recordId).checked;
-  await recordFiling(recordId, _iq('ff_date_' + recordId).value, _iq('ff_ref_' + recordId).value);
-  if (noTax) await recordPayment(recordId, false, 0, 0, null, null, null);
-  await loadObligations(activeClientId);
-}
-async function _saveTRRCForm(recordId) {
-  await recordTRRC(recordId, _iq('tf_date_' + recordId).value, _iq('tf_ref_' + recordId).value);
-  await loadObligations(activeClientId);
-}
-async function _savePaymentForm(recordId) {
-  const amt = parseFloat(_iq('pf_amt_' + recordId).value) || 0;
-  await recordPayment(recordId, true, amt, amt, _iq('pf_date_' + recordId).value,
-    _iq('pf_ref_' + recordId).value, _iq('pf_mode_' + recordId).value);
-  await loadObligations(activeClientId);
-}
-function openFilingForm(recordId) {
-  const t = _today();
-  _showInlineForm(recordId, `<div class="inline-form">
-    <label>Date Filed</label><input type="date" id="ff_date_${recordId}" value="${t}">
-    <label>Confirmation No.</label><input type="text" id="ff_ref_${recordId}" placeholder="eBIRForms confirmation no.">
-    <label style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem;cursor:pointer;">
-      <input type="checkbox" id="ff_notax_${recordId}" style="width:auto;margin:0;"
-        onchange="_iq('ff_taxwrap_${recordId}').style.display=this.checked?'none':''">
-      No tax due
-    </label>
-    <div id="ff_taxwrap_${recordId}">
-      <label>Tax Due (₱)</label><input type="number" id="ff_taxdue_${recordId}" placeholder="0.00" min="0" step="0.01">
-    </div>
-    <div class="inline-form-btns">
-      ${_inlineBtn(recordId, 'Save', `_saveFilingForm('${recordId}')`)}
-      ${_cancelBtn(recordId)}
-    </div>
-  </div>`);
-}
-function openTRRCForm(recordId) {
-  _showInlineForm(recordId, `<div class="inline-form">
-    <label>TRRC Date</label><input type="date" id="tf_date_${recordId}" value="${_today()}">
-    <label>TRRC Reference</label><input type="text" id="tf_ref_${recordId}" placeholder="TRRC number or filename">
-    <div class="inline-form-btns">
-      ${_inlineBtn(recordId, 'Save', `_saveTRRCForm('${recordId}')`)}
-      ${_cancelBtn(recordId)}
-    </div>
-  </div>`);
-}
-function openPaymentForm(recordId) {
-  _showInlineForm(recordId, `<div class="inline-form">
-    <label>Amount Paid (₱)</label><input type="number" id="pf_amt_${recordId}" placeholder="0.00" min="0" step="0.01">
-    <label>Payment Date</label><input type="date" id="pf_date_${recordId}" value="${_today()}">
-    <label>Reference No.</label><input type="text" id="pf_ref_${recordId}" placeholder="GCash ref, bank ref, AAB receipt no.">
-    <label>Payment Mode</label>
-    <select id="pf_mode_${recordId}">
-      <option>eFPS</option><option>GCash</option><option>Bank (AAB)</option><option>Over-the-counter (RDO)</option>
-    </select>
-    <div class="inline-form-btns">
-      ${_inlineBtn(recordId, 'Save', `_savePaymentForm('${recordId}')`)}
-      ${_cancelBtn(recordId)}
-    </div>
-  </div>`);
-}
-
-// ══════════ NOTES & HISTORY ══════════
-async function loadClientNotes() {
-  const { data } = await supa.from('clients').select('notes').eq('id', activeClientId).single();
-  const el = _iq('clientNotes');
-  if (el) el.value = data?.notes ?? '';
-}
-async function saveClientNotes() {
-  const el = _iq('clientNotes');
-  if (!el || !activeClientId) return;
-  await supa.from('clients').update({ notes: el.value, updated_at: new Date().toISOString() }).eq('id', activeClientId);
-  el.classList.add('notes-saved');
-  setTimeout(() => el.classList.remove('notes-saved'), 800);
-}
-async function loadHistory() {
-  const panel = _iq('historyPanel');
-  if (!panel) return;
-  const { data: records } = await supa.from('compliance_records')
-    .select('form,period,filed_date,trrc_saved,payment_status,amount_paid')
-    .eq('client_id', activeClientId).not('filed_date', 'is', null)
-    .order('filed_date', { ascending: false });
-  if (!records?.length) { panel.innerHTML = '<div class="cr-empty">No filed returns yet.</div>'; return; }
-  panel.innerHTML = `<table class="ct"><thead><tr>
-    <th>Form</th><th>Period</th><th>Filed Date</th><th>TRRC</th><th>Payment</th><th>Amount Paid</th>
-  </tr></thead><tbody>${records.map(r => `<tr>
-    <td>${r.form||'—'}</td><td>${r.period||'—'}</td><td>${r.filed_date||'—'}</td>
-    <td>${r.trrc_saved?'✓':'—'}</td><td>${r.payment_status||'—'}</td>
-    <td>${r.amount_paid!=null?'₱'+Number(r.amount_paid).toLocaleString('en-PH'):'—'}</td>
-  </tr>`).join('')}</tbody></table>`;
-}
-
-// ══════════ AUTH SHEET ══════════
-function openSheet(id) {
-  const ov = _iq(id);
-  if (!ov) return;
-  ov.classList.add('vis');
-  document.addEventListener('keydown', _loginSheetKeyHandler);
-  setTimeout(() => { const f = ov.querySelector('.sheet-x'); if (f) try { f.focus(); } catch(e) {} }, 40);
-}
-function closeSheet(id) {
-  const ov = _iq(id);
-  if (!ov) return;
-  ov.classList.remove('vis');
-  document.removeEventListener('keydown', _loginSheetKeyHandler);
-}
-function _loginSheetKeyHandler(e) { if (e.key === 'Escape') closeSheet('loginSheet'); }
-
-async function handleLoginSubmit() {
-  const emailEl = _iq('loginEmail');
-  const msgEl   = _iq('loginMsg');
-  const btn     = _iq('loginSubmit');
-  const email   = (emailEl.value || '').trim();
-  if (!email) return;
-  btn.disabled = true; btn.textContent = 'Sending…'; msgEl.style.display = 'none';
-  const { error } = await supa.auth.signInWithOtp({ email });
-  btn.disabled = false; btn.textContent = 'Send sign-in link';
-  msgEl.style.display = 'block';
   if (error) {
-    msgEl.style.color = 'var(--red)';
-    msgEl.textContent = error.message || 'Something went wrong. Please try again.';
+    _setLoginMsg(error.message || 'Something went wrong. Please try again.', 'error')
   } else {
-    msgEl.style.color = 'var(--green)';
-    msgEl.textContent = 'Check your email for the link.';
-    emailEl.value = '';
+    _setLoginMsg(`Link sent to ${email} — check your inbox.`, 'success')
+    $('loginEmail').value = ''
   }
 }
 
-function updateAuthUI(session) {
-  document.querySelectorAll('.pnav button[data-pg="roster"],.btmnav button[data-pg="roster"]').forEach(b => {
-    b.classList.toggle('hidden', !session);
-  });
-  if (session) loadRoster();
+function _setLoginMsg(text, type) {
+  const el = $('loginMsg')
+  el.textContent   = text
+  el.className     = 'login-msg' + (type ? ' ' + type : '')
+  el.style.display = text ? 'block' : 'none'
 }
 
-supa.auth.onAuthStateChange((event, session) => {
-  if (session) closeSheet('loginSheet');
-  updateAuthUI(session);
-});
-supa.auth.getSession().then(({ data: { session } }) => updateAuthUI(session));
+/** Sign the current user out */
+async function signOut() {
+  await supa.auth.signOut()
+  // onAuthStateChange fires and calls showLoginView()
+}
+
+/** Called whenever the Supabase auth state changes */
+async function _onSessionChange(session) {
+  if (session) {
+    currentPractitioner = await getCurrentPractitioner()
+
+    // Populate header user indicator
+    const hdrUser = $('hdrUser')
+    if (hdrUser && currentPractitioner) {
+      hdrUser.textContent =
+        currentPractitioner.firm_name ||
+        currentPractitioner.name      ||
+        currentPractitioner.email     || ''
+    }
+
+    showRosterView()
+    // Roster content is populated by the roster module (loaded later)
+  } else {
+    currentPractitioner = null
+    activeClientId      = null
+    showLoginView()
+  }
+}
 
 
-// Show sign-in button if not logged in
+// ── BOOT ──────────────────────────────────────────────────────
+// Listen for future sign-in / sign-out events
+supa.auth.onAuthStateChange((_event, session) => {
+  _onSessionChange(session)
+})
+
+// Check whether there is already an active session on page load
 supa.auth.getSession().then(({ data: { session } }) => {
-  const btn = document.getElementById('signInBtn');
-  const emailEl = document.getElementById('userEmail');
-  if (!session) {
-    if (btn) btn.style.display = '';
-  } else {
-    if (emailEl) { emailEl.textContent = session.user.email; emailEl.style.display = ''; }
-  }
-});
+  _onSessionChange(session)
+})
 
-// Show roster page by default
-(function init() {
-  const pg = document.getElementById('pgRoster');
-  if (pg) pg.classList.add('vis');
-})();
+// Allow Enter key to submit the login form
+$('loginEmail').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin()
+})
 </script>
 </body>
 </html>
