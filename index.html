@@ -1236,7 +1236,7 @@ body {
       <!-- Top bar: heading + add button -->
       <div class="roster-topbar">
         <h2>My Clients</h2>
-        <button class="btn-primary btn-sm" onclick="openAddClient()">+ Add Client</button>
+        <button class="btn-primary btn-sm" onclick="openClientSheet('add')">+ Add Client</button>
       </div>
 
       <!-- Summary strip -->
@@ -1298,6 +1298,8 @@ body {
     <div class="detail-back-bar">
       <button class="btn-back" onclick="showRosterView()">← Clients</button>
       <span id="detailClientName"></span>
+      <button class="btn-ghost btn-sm" style="margin-left:auto"
+        onclick="openClientSheet('edit', activeClientId)">Edit</button>
     </div>
 
     <div class="detail-meta-strip">
@@ -1445,10 +1447,15 @@ body {
 
     </div><!-- .sheet-body -->
 
-    <div class="sheet-footer">
-      <button id="addBackBtn" class="btn-ghost btn-sm hidden" onclick="_goAddStep(1)">← Back</button>
-      <button id="addNextBtn" class="btn-primary btn-sm" style="margin-left:auto"
-        onclick="_goAddStep(2)">Next →</button>
+    <div class="sheet-footer" style="flex-direction:column;align-items:stretch;gap:.5rem">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <button id="addBackBtn" class="btn-ghost btn-sm hidden" onclick="_goAddStep(1)">← Back</button>
+        <button id="addNextBtn" class="btn-primary btn-sm" style="margin-left:auto"
+          onclick="_goAddStep(2)">Next →</button>
+      </div>
+      <div id="archiveRow" class="hidden" style="text-align:center">
+        <button class="btn-ghost btn-ghost-danger btn-sm" onclick="archiveClient()">Archive client</button>
+      </div>
     </div>
 
   </div><!-- .sheet-card -->
@@ -1665,6 +1672,8 @@ let activeClientId      = null
 let _currentClient      = null
 let _historyLoaded      = false
 let _today              = null
+let _clientSheetMode    = 'add'
+let _editingClientId    = null
 
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -2120,15 +2129,30 @@ function _applyRosterFilter() {
 
 // ── ADD CLIENT SHEET ──────────────────────────────────────────
 
-function openAddClient() {
-  // Clear all fields
-  ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
-  $('ac_industry').value = ''
-  $('ac_type').value     = 'Self-Employed'
-  $('ac_vat').value      = 'VAT-Registered'
-  $('ac_fiscal').value   = '1'
+function openClientSheet(mode, clientId) {
+  _clientSheetMode = mode || 'add'
+  _editingClientId = clientId || null
+
   $('step1Err').style.display = 'none'
   $('step2Err').style.display = 'none'
+
+  if (_clientSheetMode === 'edit' && _currentClient) {
+    $('ac_name').value     = _currentClient.display_name        || ''
+    $('ac_tin').value      = _currentClient.tin                 || ''
+    $('ac_rdo').value      = _currentClient.rdo_code            || ''
+    $('ac_industry').value = _currentClient.industry            || ''
+    $('ac_type').value     = _currentClient.taxpayer_type       || 'Self-Employed'
+    $('ac_vat').value      = _currentClient.vat_status          || 'VAT-Registered'
+    $('ac_fiscal').value   = String(_currentClient.fiscal_start_month || 1)
+    $('archiveRow').classList.remove('hidden')
+  } else {
+    ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
+    $('ac_industry').value = ''
+    $('ac_type').value     = 'Self-Employed'
+    $('ac_vat').value      = 'VAT-Registered'
+    $('ac_fiscal').value   = '1'
+    $('archiveRow').classList.add('hidden')
+  }
 
   _renderStep(1)
   $('addClientSheet').classList.remove('hidden')
@@ -2156,17 +2180,20 @@ function _goAddStep(n) {
 
 /** Swap the visible step panel and update footer buttons */
 function _renderStep(n) {
-  const onStep1 = n === 1
+  const onStep1  = n === 1
+  const isEdit   = _clientSheetMode === 'edit'
   $('addStep1').style.display   = onStep1 ? '' : 'none'
   $('addStep2').style.display   = onStep1 ? 'none' : ''
   $('stepDot1').classList.toggle('active', onStep1)
   $('stepDot2').classList.toggle('active', !onStep1)
-  $('addSheetTitle').textContent = onStep1 ? 'Add Client' : 'Tax Profile'
+  $('addSheetTitle').textContent = onStep1
+    ? (isEdit ? 'Edit Client' : 'Add Client')
+    : 'Tax Profile'
 
   const backBtn = $('addBackBtn')
   const nextBtn = $('addNextBtn')
   backBtn.classList.toggle('hidden', onStep1)
-  nextBtn.textContent = onStep1 ? 'Next →' : 'Save client'
+  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : 'Save client')
   nextBtn.onclick     = onStep1 ? () => _goAddStep(2) : saveClient
 }
 
@@ -2176,7 +2203,8 @@ async function saveClient() {
   const name = ($('ac_name').value || '').trim()
   if (!name) { _goAddStep(1); return }
 
-  const btn = $('addNextBtn')
+  const btn    = $('addNextBtn')
+  const isEdit = _clientSheetMode === 'edit'
   btn.disabled    = true
   btn.textContent = 'Saving…'
   $('step2Err').style.display = 'none'
@@ -2185,25 +2213,37 @@ async function saveClient() {
   const vat_status         = $('ac_vat').value
   const fiscal_start_month = parseInt($('ac_fiscal').value, 10)
 
-  const { data: newClient, error } = await supa
-    .from('clients')
-    .insert({
-      practitioner_id:   currentPractitioner.id,
-      display_name:      name,
-      tin:               $('ac_tin').value.trim()      || null,
-      rdo_code:          $('ac_rdo').value.trim()      || null,
-      industry:          $('ac_industry').value        || null,
-      taxpayer_type,
-      vat_status,
-      regime:            vat_status,
-      fiscal_start_month,
-      is_active:         true,
-    })
-    .select()
-    .single()
+  const payload = {
+    display_name:      name,
+    tin:               $('ac_tin').value.trim()  || null,
+    rdo_code:          $('ac_rdo').value.trim()  || null,
+    industry:          $('ac_industry').value    || null,
+    taxpayer_type,
+    vat_status,
+    regime:            vat_status,
+    fiscal_start_month,
+  }
+
+  let error
+
+  if (isEdit) {
+    const { error: upErr } = await supa
+      .from('clients')
+      .update(payload)
+      .eq('id', _editingClientId)
+    error = upErr
+  } else {
+    const { data: newClient, error: insErr } = await supa
+      .from('clients')
+      .insert({ ...payload, practitioner_id: currentPractitioner.id, is_active: true })
+      .select()
+      .single()
+    error = insErr
+    if (!insErr) await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status })
+  }
 
   btn.disabled    = false
-  btn.textContent = 'Save client'
+  btn.textContent = isEdit ? 'Save changes' : 'Save client'
 
   if (error) {
     $('step2Err').textContent   = error.message
@@ -2211,8 +2251,32 @@ async function saveClient() {
     return
   }
 
-  await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status })
   closeAddClient()
+  if (isEdit) {
+    await showClientDetail(_editingClientId)
+  } else {
+    loadRoster()
+  }
+}
+
+
+async function archiveClient() {
+  if (!_editingClientId || !_currentClient) return
+  const name = _currentClient.display_name
+  if (!confirm(`Archive ${name}? They will be hidden from your client list.`)) return
+
+  const { error } = await supa
+    .from('clients')
+    .update({ is_active: false })
+    .eq('id', _editingClientId)
+
+  if (error) {
+    alert('Archive failed: ' + error.message)
+    return
+  }
+
+  closeAddClient()
+  showRosterView()
   loadRoster()
 }
 
