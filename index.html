@@ -1771,15 +1771,21 @@ async function _onSessionChange(session) {
 
 
 // ── BOOT ──────────────────────────────────────────────────────
-// Listen for future sign-in / sign-out events
-supa.auth.onAuthStateChange((_event, session) => {
-  _onSessionChange(session)
-})
-
-// Check whether there is already an active session on page load
-supa.auth.getSession().then(({ data: { session } }) => {
-  _onSessionChange(session)
-})
+if (new URLSearchParams(location.search).has('dev')) {
+  // DEV BYPASS — remove before shipping to production
+  currentPractitioner = { id: null, name: 'Dev User', email: 'dev@local', firm_name: 'Dev Mode' }
+  const _sp = $('sidebarPractName');  if (_sp) _sp.textContent = 'Dev Mode'
+  const _se = $('sidebarPractEmail'); if (_se) _se.textContent = 'dev@local'
+  const _hu = $('hdrUser');           if (_hu) _hu.textContent = 'Dev Mode'
+  showRosterView()
+} else {
+  supa.auth.onAuthStateChange((_event, session) => {
+    _onSessionChange(session)
+  })
+  supa.auth.getSession().then(({ data: { session } }) => {
+    _onSessionChange(session)
+  })
+}
 
 // Allow Enter key to submit the login form
 $('loginEmail').addEventListener('keydown', e => {
