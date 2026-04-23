@@ -1608,24 +1608,46 @@ const supa     = _IS_DEV ? _mkDevSupa() : supabase.createClient(SUPA_URL, SUPA_K
 
 // Stub Supabase client used when ?dev is in the URL so the real
 // credentials are never needed and the script never crashes.
+// Uses an in-memory store so inserts, filters, and updates all work.
 function _mkDevSupa() {
-  const ok = v => Promise.resolve({ data: v, error: null })
-  function chain(v) {
+  const ok    = v  => Promise.resolve({ data: v, error: null })
+  const newId = () => 'dev-' + Math.random().toString(36).slice(2, 10)
+  const store = {}
+  const tbl   = n  => (store[n] = store[n] || [])
+
+  function q(name, rows, patch) {
     const node = {
-      select:      () => chain(Array.isArray(v) ? v : []),
-      eq:          () => chain(v),
-      not:         () => chain(v),
-      order:       () => ok(Array.isArray(v) ? v : []),
-      single:      () => ok(null),
-      maybeSingle: () => ok(null),
-      insert:      () => chain(null),
-      update:      () => chain(null),
+      select:      ()             => q(name, rows),
+      eq:          (col, val)     => {
+        const arr = Array.isArray(rows) ? rows : []
+        const hit = arr.filter(r => r[col] == val)   // == catches null==null
+        if (patch) hit.forEach(r => Object.assign(r, patch))
+        return q(name, hit)
+      },
+      not:         (col, _op, val) => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] !== val)),
+      order:       (col, opts)    => {
+        const asc = opts?.ascending !== false
+        const arr = [...(Array.isArray(rows) ? rows : [])]
+        arr.sort((a, b) => a[col] < b[col] ? (asc ? -1 : 1) : a[col] > b[col] ? (asc ? 1 : -1) : 0)
+        return ok(arr)
+      },
+      single:      () => ok(Array.isArray(rows) ? (rows[0] ?? null) : (rows ?? null)),
+      maybeSingle: () => ok(Array.isArray(rows) ? (rows[0] ?? null) : (rows ?? null)),
+      insert: (payload) => {
+        const multi   = Array.isArray(payload)
+        const items   = (multi ? payload : [payload])
+          .map(r => ({ ...r, id: r.id ?? newId(), created_at: new Date().toISOString() }))
+        tbl(name).push(...items)
+        return q(name, multi ? items : items[0])
+      },
+      update: (p)   => q(name, rows, p),
     }
-    node.then = (res, rej) => ok(v).then(res, rej)
+    node.then = (res, rej) => ok(rows).then(res, rej)
     return node
   }
+
   return {
-    from: () => chain([]),
+    from: name => q(name, tbl(name)),
     auth: {
       onAuthStateChange: () => {},
       getSession:        () => Promise.resolve({ data: { session: null } }),
