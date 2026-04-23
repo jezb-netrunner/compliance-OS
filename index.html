@@ -1596,6 +1596,27 @@ table.ct tfoot td {
   border-bottom: none;
   color: var(--ink);
 }
+table.ct td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.report-month-hdr td {
+  background: var(--s3);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--mu);
+  padding: .4rem .6rem;
+}
+.report-subtotal td {
+  background: var(--s2);
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--ink);
+  padding: .35rem .6rem;
+  border-top: 1px solid var(--bd);
+}
 
 .rpt-table-wrap {
   overflow-x: auto;
@@ -4020,19 +4041,31 @@ async function generateReport1() {
     html += `<p style="font-size:.8rem;color:var(--mu);margin-bottom:1.5rem">${metaParts.join(' · ')}</p>`
   }
 
-  // Month sections
+  // Single continuous table with month group header rows
+  html += `<div class="rpt-table-wrap"><table class="ct">
+    <colgroup>
+      <col style="width:140px">
+      <col style="width:130px">
+      <col style="width:100px">
+      <col style="width:100px">
+      <col style="width:60px">
+      <col style="width:90px">
+      <col style="width:100px">
+      <col style="width:75px">
+      <col style="width:100px">
+    </colgroup>
+    <thead style="position:sticky;top:0;background:var(--s2);z-index:1"><tr>
+      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
+      <th>TRRC</th><th>Payment</th><th>Amount Paid</th><th>Days Late</th><th>Status</th>
+    </tr></thead><tbody>`
+
   Object.keys(byMonth).sort().forEach(mo => {
     const recs    = byMonth[mo]
     const moLabel = new Date(mo + '-15').toLocaleDateString('en-PH', {month:'long', year:'numeric'})
     let moTotPaid = 0
     recs.forEach(r => { if (r.payment_status === 'paid') moTotPaid += +(r.amount_paid || 0) })
 
-    html += `<div class="rpt-month-section">`
-    html += `<div class="rpt-section-hd">${esc(moLabel)}</div>`
-    html += `<div class="rpt-table-wrap"><table class="ct"><thead><tr>
-      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
-      <th>TRRC</th><th>Payment</th><th>Amount Paid</th><th>Days Late</th><th>Status</th>
-    </tr></thead><tbody>`
+    html += `<tr class="report-month-hdr"><td colspan="9">${esc(moLabel)}</td></tr>`
 
     recs.forEach(r => {
       const dl = _daysLate(r)
@@ -4049,12 +4082,14 @@ async function generateReport1() {
       </tr>`
     })
 
-    html += `</tbody><tfoot><tr>
-      <td colspan="6" style="text-align:right;color:var(--mu)">Month total paid</td>
+    html += `<tr class="report-subtotal">
+      <td colspan="6" style="text-align:right">Month total paid</td>
       <td>${_rptFmtAmt(moTotPaid)}</td>
       <td colspan="2"></td>
-    </tr></tfoot></table></div></div>`
+    </tr>`
   })
+
+  html += `</tbody></table></div>`
 
   $('rptContent').innerHTML = html
 }
