@@ -2790,12 +2790,20 @@ table.ct td {
  *
  *   -- Step 1: Filing
  *   filed_date        date,
- *   filing_reference  text,          -- eBIRForms confirmation no.
+ *   filing_reference  text,          -- deprecated; kept for legacy rows only.
  *
- *   -- Step 2: TRRC
+ *   -- Step 2: TRRC (Tax Return Receipt Confirmation — the only official
+ *   -- proof of filing alongside the BIR Filing app popup screenshot)
  *   trrc_saved        boolean not null default false,
  *   trrc_date         date,
  *   trrc_reference    text,
+ *
+ *   -- Step 2a: Alphalist / DAT submission (forms 1604-C/E/F, 1601-EQ/FQ,
+ *   -- and any return carrying a SAWT). BIR eSubmission validates the DAT
+ *   -- files and replies by email; practitioners must retain both.
+ *   dat_files_saved      boolean not null default false,
+ *   validation_email     boolean not null default false,
+ *   validation_email_date date,
  *
  *   -- Step 3: Payment
  *   has_tax_due       boolean not null default false,
@@ -2812,6 +2820,12 @@ table.ct td {
  *   created_at        timestamptz not null default now(),
  *   updated_at        timestamptz not null default now()
  * );
+ *
+ * -- Schema migration for existing deployments:
+ * -- alter table compliance_records
+ * --   add column if not exists dat_files_saved       boolean not null default false,
+ * --   add column if not exists validation_email      boolean not null default false,
+ * --   add column if not exists validation_email_date date;
  *
  * alter table compliance_records enable row level security;
  *
@@ -4012,9 +4026,24 @@ async function archiveClient() {
 
 // ── CLIENT DETAIL: STATUS LOGIC ───────────────────────────────
 
+/**
+ * Returns true for returns that require DAT files to be e-submitted and
+ * validated by BIR — currently 1604-C/E/F (Alphalist) and 1601-EQ/FQ (QAP).
+ * SAWT-bearing returns would be added here once the form model tracks them.
+ */
+function requiresDatSubmission(form) {
+  const f = String(form || '')
+  return /1604-?[CEF]\b/i.test(f) || /1601-?[EF]Q\b/i.test(f)
+}
+
+function datStepDone(r) {
+  return !requiresDatSubmission(r.form) || (r.dat_files_saved && r.validation_email)
+}
+
 function getCardStatus(r) {
   const due = r.due_date ? new Date(r.due_date) : null
   if (r.payment_status === 'paid') return 'done'
+  if (r.filed_date && r.trrc_saved && !datStepDone(r)) return 'dat-missing'
   if (r.filed_date && r.trrc_saved) return 'unpaid'
   if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
   if (!r.filed_date && due && due < _today) return 'overdue'
@@ -4026,6 +4055,7 @@ function _statusMeta(status) {
     pending:        { label: 'Pending filing',   cls: 'badge-dim'   },
     overdue:        { label: 'Overdue',           cls: 'badge-red'   },
     'trrc-missing': { label: 'TRRC needed',       cls: 'badge-amber' },
+    'dat-missing':  { label: 'DAT validation',    cls: 'badge-amber' },
     unpaid:         { label: 'Payment pending',   cls: 'badge-blue'  },
     done:           { label: 'Complete',          cls: 'badge-green' },
   })[status] ?? { label: status, cls: 'badge-dim' }
@@ -4097,12 +4127,18 @@ function buildObligationCard(r) {
 
   const step1Done   = !!r.filed_date
   const step1Detail = step1Done
-    ? `${r.filed_date}${r.filing_reference ? ` · Ref: ${esc(r.filing_reference)}` : ''}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}${editLink('openFilingForm')}`
+    ? `${r.filed_date}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}${editLink('openFilingForm')}`
     : ''
 
   const step2Done   = !!r.trrc_saved
   const step2Detail = step2Done
     ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}${editLink('openTRRCForm')}`
+    : ''
+
+  const needsDat     = requiresDatSubmission(r.form)
+  const stepDatDone  = r.dat_files_saved && r.validation_email
+  const stepDatDetail = stepDatDone
+    ? `DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}${editLink('openDatForm')}`
     : ''
 
   const step3Done   = r.payment_status === 'paid'
@@ -4115,6 +4151,8 @@ function buildObligationCard(r) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">Record filing</button>`
   } else if (!step2Done) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">Record TRRC</button>`
+  } else if (needsDat && !stepDatDone) {
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openDatForm('${r.id}')">Record DAT validation</button>`
   } else if (!step3Done && r.payment_status !== 'n/a') {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openPaymentForm('${r.id}')">Record payment</button>`
   }
@@ -4144,10 +4182,18 @@ function buildObligationCard(r) {
         ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
       </div>
     </div>
-    <div class="ob-step${step3Done ? ' done' : step2Done ? '' : ' dimmed'}">
+    ${needsDat ? `
+    <div class="ob-step${stepDatDone ? ' done' : step2Done ? '' : ' dimmed'}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">3. Payment</div>
+        <div class="ob-step-label">3. DAT files + validation email</div>
+        ${stepDatDetail ? `<div class="ob-step-detail mono">${stepDatDetail}</div>` : ''}
+      </div>
+    </div>` : ''}
+    <div class="ob-step${step3Done ? ' done' : (needsDat ? stepDatDone : step2Done) ? '' : ' dimmed'}">
+      <span class="ob-step-icon"></span>
+      <div class="ob-step-body">
+        <div class="ob-step-label">${needsDat ? '4' : '3'}. Payment</div>
         ${step3Detail ? `<div class="ob-step-detail mono">${step3Detail}</div>` : ''}
       </div>
     </div>
@@ -4177,15 +4223,9 @@ async function openFilingForm(recordId, isEdit = false) {
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
-  <div class="inline-form-row">
-    <div class="fld">
-      <label>Date filed <span class="req">*</span></label>
-      <input type="date" id="ff_date_${recordId}" value="${r?.filed_date ?? ''}">
-    </div>
-    <div class="fld">
-      <label>eBIRForms confirmation no.</label>
-      <input type="text" id="ff_ref_${recordId}" placeholder="e.g. 202401-…" value="${esc(r?.filing_reference ?? '')}">
-    </div>
+  <div class="fld">
+    <label>Date filed <span class="req">*</span></label>
+    <input type="date" id="ff_date_${recordId}" value="${r?.filed_date ?? ''}">
   </div>
   <label class="check-inline">
     <input type="checkbox" id="ff_taxdue_${recordId}" ${r?.has_tax_due ? 'checked' : ''} onchange="_toggleTaxDue('${recordId}')">
@@ -4233,9 +4273,46 @@ async function openTRRCForm(recordId, isEdit = false) {
       <input type="text" id="tf_ref_${recordId}" placeholder="TRRC-…" value="${esc(r?.trrc_reference ?? '')}">
     </div>
   </div>
+  <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
+    Keep the TRRC email (or BIR Filing app popup screenshot) on file — it is the only official proof of filing.
+  </div>
   <div id="tf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
     <button class="btn-primary btn-sm" onclick="saveTRRC('${recordId}')">Save</button>
+    <button class="btn-cancel-inline" onclick="_closeAllInlineForms()">Cancel</button>
+  </div>
+</div>`
+  el.classList.remove('hidden')
+}
+
+async function openDatForm(recordId, isEdit = false) {
+  _closeAllInlineForms()
+  let r = null
+  if (isEdit) {
+    const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
+    r = data
+  }
+  const el = $(`form_${recordId}`)
+  el.innerHTML = `
+<div class="inline-form">
+  <label class="check-inline">
+    <input type="checkbox" id="df_saved_${recordId}" ${r?.dat_files_saved ? 'checked' : ''}>
+    DAT files saved to local archive
+  </label>
+  <label class="check-inline">
+    <input type="checkbox" id="df_email_${recordId}" ${r?.validation_email ? 'checked' : ''}>
+    Validation email received from BIR eSubmission
+  </label>
+  <div class="fld">
+    <label>Validation email date</label>
+    <input type="date" id="df_date_${recordId}" value="${r?.validation_email_date ?? ''}">
+  </div>
+  <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
+    Required for Alphalist-bearing returns (1604-C/E/F) and QAP attachments (1601-EQ/FQ). Retain both the DAT files and the BIR validation email as proof.
+  </div>
+  <div id="df_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
+  <div class="inline-form-actions">
+    <button class="btn-primary btn-sm" onclick="saveDat('${recordId}')">Save</button>
     <button class="btn-cancel-inline" onclick="_closeAllInlineForms()">Cancel</button>
   </div>
 </div>`
@@ -4290,7 +4367,6 @@ async function openPaymentForm(recordId, isEdit = false) {
 
 async function saveFiling(recordId) {
   const filedDate = $(`ff_date_${recordId}`).value
-  const reference = $(`ff_ref_${recordId}`).value.trim()
   const hasTaxDue = $(`ff_taxdue_${recordId}`).checked
   const taxDue    = hasTaxDue ? parseFloat($(`ff_taxamt_${recordId}`).value || '0') : null
   const errEl     = $(`ff_err_${recordId}`)
@@ -4299,11 +4375,10 @@ async function saveFiling(recordId) {
   errEl.style.display = 'none'
 
   const { error } = await supa.from('compliance_records').update({
-    filed_date:       filedDate,
-    filing_reference: reference || null,
-    has_tax_due:      hasTaxDue,
-    tax_due:          taxDue,
-    payment_status:   hasTaxDue ? 'pending' : 'n/a',
+    filed_date:     filedDate,
+    has_tax_due:    hasTaxDue,
+    tax_due:        taxDue,
+    payment_status: hasTaxDue ? 'pending' : 'n/a',
   }).eq('id', recordId)
 
   if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
@@ -4322,6 +4397,29 @@ async function saveTRRC(recordId) {
     trrc_saved:      true,
     trrc_date:       trrcDate,
     trrc_reference:  trrcRef || null,
+  }).eq('id', recordId)
+
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  await loadObligations(activeClientId)
+}
+
+async function saveDat(recordId) {
+  const datSaved  = $(`df_saved_${recordId}`).checked
+  const emailRcvd = $(`df_email_${recordId}`).checked
+  const emailDate = $(`df_date_${recordId}`).value || null
+  const errEl     = $(`df_err_${recordId}`)
+
+  if (!datSaved && !emailRcvd) {
+    errEl.textContent = 'Tick at least one item to record partial progress.'
+    errEl.style.display = 'block'
+    return
+  }
+  errEl.style.display = 'none'
+
+  const { error } = await supa.from('compliance_records').update({
+    dat_files_saved:       datSaved,
+    validation_email:      emailRcvd,
+    validation_email_date: emailRcvd ? emailDate : null,
   }).eq('id', recordId)
 
   if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
@@ -4357,7 +4455,7 @@ async function savePayment(recordId) {
 async function loadHistory() {
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('form,period,filed_date,filing_reference,trrc_saved,payment_status,amount_paid')
+    .select('form,period,filed_date,trrc_saved,trrc_reference,dat_files_saved,validation_email,payment_status,amount_paid')
     .eq('client_id', activeClientId)
     .not('filed_date', 'is', null)
     .order('filed_date', { ascending: false })
@@ -4372,15 +4470,21 @@ async function loadHistory() {
     return
   }
 
-  const rows = records.map(r => `
+  const rows = records.map(r => {
+    const needsDat = requiresDatSubmission(r.form)
+    const datCell  = needsDat
+      ? (r.dat_files_saved && r.validation_email ? '✅' : '⚠️')
+      : '—'
+    return `
 <tr>
   <td class="mono">${esc(r.form)}</td>
   <td>${esc(r.period ?? '—')}</td>
   <td class="mono">${r.filed_date ?? '—'}</td>
-  <td class="mono">${esc(r.filing_reference ?? '—')}</td>
-  <td>${r.trrc_saved ? '✅' : '—'}</td>
+  <td class="mono">${r.trrc_saved ? esc(r.trrc_reference ?? '✅') : '—'}</td>
+  <td>${datCell}</td>
   <td>${r.payment_status === 'paid' ? `₱${Number(r.amount_paid||0).toLocaleString()}` : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
-</tr>`).join('')
+</tr>`
+  }).join('')
 
   $('historyPanel').innerHTML = `
 <div class="hist-wrap">
@@ -4390,8 +4494,8 @@ async function loadHistory() {
         <th>Form</th>
         <th>Period</th>
         <th>Filed</th>
-        <th>Confirmation</th>
         <th>TRRC</th>
+        <th>DAT</th>
         <th>Payment</th>
       </tr>
     </thead>
@@ -4951,20 +5055,26 @@ async function generateReport4() {
     </colgroup>
     <thead style="position:sticky;top:0;background:var(--s2);z-index:1"><tr>
       <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
-      <th>Filing Ref</th><th>TRRC Date</th><th>TRRC Ref</th>
+      <th>TRRC Date</th><th>TRRC Ref</th><th>DAT Valid.</th>
       <th>Payment Date</th><th>Mode</th><th>Payment Ref</th>
       <th>Amount Paid</th><th>Status</th>
     </tr></thead><tbody>`
 
   records.forEach(r => {
+    const needsDat = requiresDatSubmission(r.form)
+    const datCell  = needsDat
+      ? (r.dat_files_saved && r.validation_email
+          ? `DAT ✓${r.validation_email_date ? ` · ${_rptFmtDate(r.validation_email_date)}` : ''}`
+          : 'Pending')
+      : 'n/a'
     html += `<tr>
       <td>${esc(r.form || '—')}</td>
       <td>${esc(r.period || '—')}</td>
       <td>${_rptFmtDate(r.due_date)}</td>
       <td>${_rptFmtDate(r.filed_date)}</td>
-      <td>${dash(r.filing_reference)}</td>
       <td>${_rptFmtDate(r.trrc_date)}</td>
       <td>${dash(r.trrc_reference)}</td>
+      <td>${esc(datCell)}</td>
       <td>${_rptFmtDate(r.payment_date)}</td>
       <td>${dash(r.payment_mode)}</td>
       <td>${dash(r.payment_reference)}</td>
@@ -5150,8 +5260,6 @@ function openBulkFilingSheet(records) {
     </p>
     <div class="fg">
       <div class="fld"><label>Filed date</label><input type="date" id="bfDate" value="${today}"></div>
-      <div class="fld"><label>Filing reference</label>
-        <input type="text" id="bfRef" placeholder="Leave blank to fill individually later"></div>
     </div>
     <label class="check-inline" style="margin-top:.75rem">
       <input type="checkbox" id="bfHasTax"
@@ -5176,7 +5284,6 @@ async function _saveBulkFiling() {
   const ids = ($('bulkFilingSheet').dataset.ids || '').split(',').filter(Boolean)
   if (!ids.length) return
   const filedDate = $('bfDate').value
-  const ref       = $('bfRef').value.trim() || null
   const hasTax    = $('bfHasTax').checked
   const prog      = $('bfProgress')
   if (!filedDate) { prog.style.color = 'var(--red)'; prog.textContent = 'Filed date is required.'; return }
@@ -5190,11 +5297,10 @@ async function _saveBulkFiling() {
   prog.textContent = `Saving 0 of ${ids.length}…`
   await Promise.all(ids.map(id =>
     supa.from('compliance_records').update({
-      filed_date:       filedDate,
-      filing_reference: ref,
-      has_tax_due:      hasTax,
-      tax_due:          hasTax ? taxByRow[id] : null,
-      payment_status:   hasTax ? 'pending' : 'n/a',
+      filed_date:     filedDate,
+      has_tax_due:    hasTax,
+      tax_due:        hasTax ? taxByRow[id] : null,
+      payment_status: hasTax ? 'pending' : 'n/a',
     }).eq('id', id).then(() => {
       done++; prog.textContent = `Saving ${done} of ${ids.length}…`
     })
