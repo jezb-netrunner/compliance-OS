@@ -1139,6 +1139,82 @@ body {
   resize: vertical;
   min-height: 160px;
 }
+
+/* ═══════════════════════════════════════════════════
+   DASHBOARD  .db-grid  .db-row  .db-stat-grid
+═══════════════════════════════════════════════════ */
+.db-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .db-grid { grid-template-columns: 1fr; }
+}
+
+.db-section-title {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--mu);
+  margin-bottom: .75rem;
+}
+
+.db-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .5rem;
+  border-radius: var(--rr);
+  font-size: .82rem;
+  cursor: pointer;
+  transition: background .14s;
+}
+.db-row:hover { background: var(--s2); }
+.db-row + .db-row { border-top: 1px solid var(--bd); }
+
+.db-row-client {
+  font-weight: 600;
+  color: var(--ch);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.db-row-meta {
+  color: var(--mu);
+  font-size: .76rem;
+  flex-shrink: 0;
+}
+
+.db-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .6rem;
+}
+
+.db-stat {
+  background: var(--s2);
+  border-radius: var(--rr);
+  padding: .65rem .75rem;
+}
+
+.db-stat-n {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.db-stat-l {
+  font-size: .65rem;
+  color: var(--mu);
+  margin-top: .2rem;
+}
 </style>
 </head>
 <body>
@@ -1209,10 +1285,8 @@ body {
             <span>Clients</span>
             <span class="nav-badge" id="navBadgeClients">—</span>
           </button>
-          <button class="sidebar-nav-item" disabled aria-disabled="true"
-            style="opacity:.38;cursor:not-allowed;">
-            <span>Deadlines</span>
-            <span style="font-size:.62rem;color:var(--mu)">Soon</span>
+          <button class="sidebar-nav-item" onclick="showDashboard()">
+            <span>Dashboard</span>
           </button>
           <button class="sidebar-nav-item" disabled aria-disabled="true"
             style="opacity:.38;cursor:not-allowed;">
@@ -1236,7 +1310,7 @@ body {
       <!-- Top bar: heading + add button -->
       <div class="roster-topbar">
         <h2>My Clients</h2>
-        <button class="btn-primary btn-sm" onclick="openAddClient()">+ Add Client</button>
+        <button class="btn-primary btn-sm" onclick="openClientSheet('add')">+ Add Client</button>
       </div>
 
       <!-- Summary strip -->
@@ -1298,6 +1372,8 @@ body {
     <div class="detail-back-bar">
       <button class="btn-back" onclick="showRosterView()">← Clients</button>
       <span id="detailClientName"></span>
+      <button class="btn-ghost btn-sm" style="margin-left:auto"
+        onclick="openClientSheet('edit', activeClientId)">Edit</button>
     </div>
 
     <div class="detail-meta-strip">
@@ -1334,6 +1410,92 @@ body {
     </div>
 
   </div>
+
+  <!-- ── DASHBOARD VIEW ── -->
+  <div id="pgDashboard" class="app-shell hidden">
+
+    <aside class="sidebar" role="complementary" aria-label="Dashboard navigation">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">The Present Value<span class="dot">.</span></div>
+        <div class="sidebar-brand-sub">Practitioner Suite</div>
+      </div>
+      <div>
+        <div class="sidebar-label">Navigation</div>
+        <nav class="sidebar-nav" aria-label="Primary">
+          <button class="sidebar-nav-item" onclick="showRosterView()">
+            <span>Clients</span>
+          </button>
+          <button class="sidebar-nav-item active" onclick="showDashboard()" aria-current="page">
+            <span>Dashboard</span>
+          </button>
+          <button class="sidebar-nav-item" disabled aria-disabled="true"
+            style="opacity:.38;cursor:not-allowed;">
+            <span>Reports</span>
+            <span style="font-size:.62rem;color:var(--mu)">Soon</span>
+          </button>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-pract-name" id="dbSidebarName"></div>
+        <div class="sidebar-pract-email" id="dbSidebarEmail"></div>
+        <button class="btn-ghost btn-sm btn-full" onclick="signOut()">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main-content" role="main">
+      <div class="roster-topbar">
+        <h2>Dashboard</h2>
+      </div>
+      <div class="db-grid">
+
+        <!-- Left column: deadlines -->
+        <div>
+          <div class="card" style="margin-bottom:1.25rem">
+            <div class="db-section-title">This Week</div>
+            <div id="dbThisWeekList"></div>
+          </div>
+          <div class="card" style="border-left:3px solid var(--red)">
+            <div class="db-section-title">Overdue</div>
+            <div id="dbOverdueList"></div>
+          </div>
+        </div>
+
+        <!-- Right column: stats + action lists -->
+        <div>
+          <div class="card" style="margin-bottom:1.25rem">
+            <div class="db-section-title">Compliance — <span id="dbStatYear"></span></div>
+            <div class="db-stat-grid">
+              <div class="db-stat">
+                <div class="db-stat-n" id="dbStatTotal">—</div>
+                <div class="db-stat-l">Total this year</div>
+              </div>
+              <div class="db-stat">
+                <div class="db-stat-n" id="dbStatFiled" style="color:var(--green)">—</div>
+                <div class="db-stat-l">Filed</div>
+              </div>
+              <div class="db-stat">
+                <div class="db-stat-n" id="dbStatPending">—</div>
+                <div class="db-stat-l">Pending</div>
+              </div>
+              <div class="db-stat">
+                <div class="db-stat-n" id="dbStatOverdue" style="color:var(--red)">—</div>
+                <div class="db-stat-l">Overdue</div>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:1.25rem">
+            <div class="db-section-title">TRRC Needed</div>
+            <div id="dbTrrcList"></div>
+          </div>
+          <div class="card">
+            <div class="db-section-title">Payment Pending</div>
+            <div id="dbPaymentList"></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div><!-- #pgDashboard -->
 
 </div><!-- #appView -->
 
@@ -1445,10 +1607,15 @@ body {
 
     </div><!-- .sheet-body -->
 
-    <div class="sheet-footer">
-      <button id="addBackBtn" class="btn-ghost btn-sm hidden" onclick="_goAddStep(1)">← Back</button>
-      <button id="addNextBtn" class="btn-primary btn-sm" style="margin-left:auto"
-        onclick="_goAddStep(2)">Next →</button>
+    <div class="sheet-footer" style="flex-direction:column;align-items:stretch;gap:.5rem">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <button id="addBackBtn" class="btn-ghost btn-sm hidden" onclick="_goAddStep(1)">← Back</button>
+        <button id="addNextBtn" class="btn-primary btn-sm" style="margin-left:auto"
+          onclick="_goAddStep(2)">Next →</button>
+      </div>
+      <div id="archiveRow" class="hidden" style="text-align:center">
+        <button class="btn-ghost btn-ghost-danger btn-sm" onclick="archiveClient()">Archive client</button>
+      </div>
     </div>
 
   </div><!-- .sheet-card -->
@@ -1665,6 +1832,8 @@ let activeClientId      = null
 let _currentClient      = null
 let _historyLoaded      = false
 let _today              = null
+let _clientSheetMode    = 'add'
+let _editingClientId    = null
 
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -1692,9 +1861,117 @@ function showRosterView() {
   $('appView').classList.remove('hidden')
   $('rosterView').classList.remove('hidden')
   $('clientView').classList.add('hidden')
+  $('pgDashboard').classList.add('hidden')
   activeClientId = null
   loadRoster()   // refresh data whenever returning to the roster
 }
+
+function showDashboard() {
+  $('loginView').classList.add('hidden')
+  $('appView').classList.remove('hidden')
+  $('rosterView').classList.add('hidden')
+  $('clientView').classList.add('hidden')
+  $('pgDashboard').classList.remove('hidden')
+  const n = $('dbSidebarName'), e = $('dbSidebarEmail')
+  if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
+  if (e) e.textContent = currentPractitioner?.email || ''
+  loadDashboard()
+}
+
+async function loadDashboard() {
+  const loading = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">Loading…</p>'
+  ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList']
+    .forEach(id => { $(id).innerHTML = loading })
+  ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue']
+    .forEach(id => { $(id).textContent = '—' })
+
+  const yr       = new Date().getFullYear()
+  const now      = new Date(); now.setHours(0,0,0,0)
+  const todayStr = now.toISOString().slice(0,10)
+  const in7Str   = new Date(now.getTime() + 7*86400000).toISOString().slice(0,10)
+  $('dbStatYear').textContent = yr
+
+  const { data: clients, error: cErr } = await supa
+    .from('clients')
+    .select('id, display_name')
+    .eq('practitioner_id', currentPractitioner.id)
+    .eq('is_active', true)
+
+  if (cErr || !clients?.length) {
+    const msg = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">No client data.</p>'
+    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue'].forEach(id => { $(id).textContent = '0' })
+    return
+  }
+
+  const clientMap = {}
+  clients.forEach(c => { clientMap[c.id] = c.display_name })
+
+  const { data: recs, error: rErr } = await supa
+    .from('compliance_records')
+    .select('id, client_id, form, period, due_date, filed_date, trrc_saved, has_tax_due, payment_status')
+    .in('client_id', clients.map(c => c.id))
+
+  if (rErr) {
+    const msg = `<p style="color:var(--red);font-size:.82rem">${esc(rErr.message)}</p>`
+    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    return
+  }
+
+  const yearStart = `${yr}-01-01`, yearEnd = `${yr}-12-31`
+  const thisWeek = [], overdue = [], trrcNeeded = [], paymentPending = []
+  let totalYear = 0, filed = 0, pending = 0, overdueCount = 0
+
+  ;(recs || []).forEach(r => {
+    const due = r.due_date || ''
+    if (due >= yearStart && due <= yearEnd) {
+      totalYear++
+      if (r.filed_date)        { filed++ }
+      else if (due < todayStr) { overdueCount++; pending++ }
+      else                     { pending++ }
+    }
+    if (!r.filed_date && due >= todayStr && due <= in7Str) thisWeek.push(r)
+    if (!r.filed_date && due && due < todayStr)            overdue.push(r)
+    if (r.filed_date && !r.trrc_saved)                     trrcNeeded.push(r)
+    if (r.filed_date && r.has_tax_due && r.payment_status !== 'paid') paymentPending.push(r)
+  })
+
+  thisWeek.sort((a,b) => a.due_date.localeCompare(b.due_date))
+  overdue.sort((a,b)  => a.due_date.localeCompare(b.due_date))
+
+  $('dbStatTotal').textContent   = totalYear
+  $('dbStatFiled').textContent   = filed
+  $('dbStatPending').textContent = pending
+  $('dbStatOverdue').textContent = overdueCount
+
+  const _row = (r, badge) => {
+    const name = esc(clientMap[r.client_id] || '—')
+    const due  = r.due_date
+      ? new Date(r.due_date).toLocaleDateString('en-PH', {month:'short', day:'numeric'})
+      : '—'
+    return `<div class="db-row" onclick="showClientDetail('${r.client_id}')">
+      <div class="db-row-client">${name}</div>
+      <div class="db-row-meta">${esc(r.form||'')}${r.period ? ` · ${esc(r.period)}` : ''}</div>
+      <div class="db-row-meta" style="margin-left:auto">Due ${due}</div>
+      ${badge}
+    </div>`
+  }
+  const _empty = t => `<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">${t}</p>`
+
+  $('dbThisWeekList').innerHTML = thisWeek.length
+    ? thisWeek.map(r => _row(r, '<span class="badge badge-dim">Pending</span>')).join('')
+    : _empty('No obligations due this week.')
+  $('dbOverdueList').innerHTML = overdue.length
+    ? overdue.map(r => _row(r, '<span class="badge badge-red">Overdue</span>')).join('')
+    : _empty('No overdue obligations — nice work.')
+  $('dbTrrcList').innerHTML = trrcNeeded.length
+    ? trrcNeeded.map(r => _row(r, '<span class="badge badge-blue">TRRC</span>')).join('')
+    : _empty('All filed returns have TRRC saved.')
+  $('dbPaymentList').innerHTML = paymentPending.length
+    ? paymentPending.map(r => _row(r, '<span class="badge badge-amber">Unpaid</span>')).join('')
+    : _empty('No outstanding payments.')
+}
+
 
 async function showClientDetail(clientId) {
   activeClientId  = clientId
@@ -1703,6 +1980,7 @@ async function showClientDetail(clientId) {
   $('loginView').classList.add('hidden')
   $('appView').classList.remove('hidden')
   $('rosterView').classList.add('hidden')
+  $('pgDashboard').classList.add('hidden')
   $('clientView').classList.remove('hidden')
 
   _switchSubtab('obligations')
@@ -2120,15 +2398,30 @@ function _applyRosterFilter() {
 
 // ── ADD CLIENT SHEET ──────────────────────────────────────────
 
-function openAddClient() {
-  // Clear all fields
-  ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
-  $('ac_industry').value = ''
-  $('ac_type').value     = 'Self-Employed'
-  $('ac_vat').value      = 'VAT-Registered'
-  $('ac_fiscal').value   = '1'
+function openClientSheet(mode, clientId) {
+  _clientSheetMode = mode || 'add'
+  _editingClientId = clientId || null
+
   $('step1Err').style.display = 'none'
   $('step2Err').style.display = 'none'
+
+  if (_clientSheetMode === 'edit' && _currentClient) {
+    $('ac_name').value     = _currentClient.display_name        || ''
+    $('ac_tin').value      = _currentClient.tin                 || ''
+    $('ac_rdo').value      = _currentClient.rdo_code            || ''
+    $('ac_industry').value = _currentClient.industry            || ''
+    $('ac_type').value     = _currentClient.taxpayer_type       || 'Self-Employed'
+    $('ac_vat').value      = _currentClient.vat_status          || 'VAT-Registered'
+    $('ac_fiscal').value   = String(_currentClient.fiscal_start_month || 1)
+    $('archiveRow').classList.remove('hidden')
+  } else {
+    ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
+    $('ac_industry').value = ''
+    $('ac_type').value     = 'Self-Employed'
+    $('ac_vat').value      = 'VAT-Registered'
+    $('ac_fiscal').value   = '1'
+    $('archiveRow').classList.add('hidden')
+  }
 
   _renderStep(1)
   $('addClientSheet').classList.remove('hidden')
@@ -2156,17 +2449,20 @@ function _goAddStep(n) {
 
 /** Swap the visible step panel and update footer buttons */
 function _renderStep(n) {
-  const onStep1 = n === 1
+  const onStep1  = n === 1
+  const isEdit   = _clientSheetMode === 'edit'
   $('addStep1').style.display   = onStep1 ? '' : 'none'
   $('addStep2').style.display   = onStep1 ? 'none' : ''
   $('stepDot1').classList.toggle('active', onStep1)
   $('stepDot2').classList.toggle('active', !onStep1)
-  $('addSheetTitle').textContent = onStep1 ? 'Add Client' : 'Tax Profile'
+  $('addSheetTitle').textContent = onStep1
+    ? (isEdit ? 'Edit Client' : 'Add Client')
+    : 'Tax Profile'
 
   const backBtn = $('addBackBtn')
   const nextBtn = $('addNextBtn')
   backBtn.classList.toggle('hidden', onStep1)
-  nextBtn.textContent = onStep1 ? 'Next →' : 'Save client'
+  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : 'Save client')
   nextBtn.onclick     = onStep1 ? () => _goAddStep(2) : saveClient
 }
 
@@ -2176,7 +2472,8 @@ async function saveClient() {
   const name = ($('ac_name').value || '').trim()
   if (!name) { _goAddStep(1); return }
 
-  const btn = $('addNextBtn')
+  const btn    = $('addNextBtn')
+  const isEdit = _clientSheetMode === 'edit'
   btn.disabled    = true
   btn.textContent = 'Saving…'
   $('step2Err').style.display = 'none'
@@ -2185,25 +2482,37 @@ async function saveClient() {
   const vat_status         = $('ac_vat').value
   const fiscal_start_month = parseInt($('ac_fiscal').value, 10)
 
-  const { data: newClient, error } = await supa
-    .from('clients')
-    .insert({
-      practitioner_id:   currentPractitioner.id,
-      display_name:      name,
-      tin:               $('ac_tin').value.trim()      || null,
-      rdo_code:          $('ac_rdo').value.trim()      || null,
-      industry:          $('ac_industry').value        || null,
-      taxpayer_type,
-      vat_status,
-      regime:            vat_status,
-      fiscal_start_month,
-      is_active:         true,
-    })
-    .select()
-    .single()
+  const payload = {
+    display_name:      name,
+    tin:               $('ac_tin').value.trim()  || null,
+    rdo_code:          $('ac_rdo').value.trim()  || null,
+    industry:          $('ac_industry').value    || null,
+    taxpayer_type,
+    vat_status,
+    regime:            vat_status,
+    fiscal_start_month,
+  }
+
+  let error
+
+  if (isEdit) {
+    const { error: upErr } = await supa
+      .from('clients')
+      .update(payload)
+      .eq('id', _editingClientId)
+    error = upErr
+  } else {
+    const { data: newClient, error: insErr } = await supa
+      .from('clients')
+      .insert({ ...payload, practitioner_id: currentPractitioner.id, is_active: true })
+      .select()
+      .single()
+    error = insErr
+    if (!insErr) await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status })
+  }
 
   btn.disabled    = false
-  btn.textContent = 'Save client'
+  btn.textContent = isEdit ? 'Save changes' : 'Save client'
 
   if (error) {
     $('step2Err').textContent   = error.message
@@ -2211,8 +2520,32 @@ async function saveClient() {
     return
   }
 
-  await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status })
   closeAddClient()
+  if (isEdit) {
+    await showClientDetail(_editingClientId)
+  } else {
+    loadRoster()
+  }
+}
+
+
+async function archiveClient() {
+  if (!_editingClientId || !_currentClient) return
+  const name = _currentClient.display_name
+  if (!confirm(`Archive ${name}? They will be hidden from your client list.`)) return
+
+  const { error } = await supa
+    .from('clients')
+    .update({ is_active: false })
+    .eq('id', _editingClientId)
+
+  if (error) {
+    alert('Archive failed: ' + error.message)
+    return
+  }
+
+  closeAddClient()
+  showRosterView()
   loadRoster()
 }
 
@@ -2270,6 +2603,18 @@ function buildObligationCard(r) {
   const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
   const isDueOver       = due && due < _today && !r.filed_date
 
+  let penaltyLine = ''
+  if (status === 'overdue' && due) {
+    const daysLate = Math.floor((_today - due) / 86400000)
+    const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
+    if (taxDue) {
+      const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
+      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+    } else {
+      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+    }
+  }
+
   const step1Done   = !!r.filed_date
   const step1Icon   = step1Done ? '✅' : '⬜'
   const step1Detail = step1Done
@@ -2303,7 +2648,7 @@ function buildObligationCard(r) {
     <div class="ob-left">
       <div class="ob-form">${esc(r.form)}</div>
       <div class="ob-name">${esc(r.period ?? '')}</div>
-      <div class="ob-period"><span class="ob-due${isDueOver ? ' overdue' : ''}">Due ${dueTxt}</span></div>
+      <div class="ob-period"><span class="ob-due${isDueOver ? ' overdue' : ''}">Due ${dueTxt}</span>${penaltyLine}</div>
     </div>
     <span class="badge ${cls}">${label}</span>
   </div>
