@@ -3337,33 +3337,38 @@ async function signOut() {
 
 /** Called whenever the Supabase auth state changes */
 async function _onSessionChange(session) {
-  if (session) {
-    currentPractitioner = await getCurrentPractitioner()
-
-    // Populate header user indicator
-    const hdrUser = $('hdrUser')
-    if (hdrUser && currentPractitioner) {
-      hdrUser.textContent =
-        currentPractitioner.firm_name ||
-        currentPractitioner.name      ||
-        currentPractitioner.email     || ''
-    }
-
-    // Populate sidebar identity (desktop)
-    const sp = $('sidebarPractName');  if (sp) sp.textContent  = currentPractitioner?.firm_name || currentPractitioner?.name  || ''
-    const se = $('sidebarPractEmail'); if (se) se.textContent  = currentPractitioner?.email || ''
-
-    // One-off: apply RMC 30-2026 extension to CY 2025 annual ITRs.
-    // Safe to run every session; only updates matching rows that still
-    // carry the obsolete 2026-04-15 due date and have not been filed.
-    applyRMC30_2026Override()
-
-    showRosterView()   // also calls loadRoster()
-  } else {
+  if (!session) {
     currentPractitioner = null
     activeClientId      = null
     showLoginView()
+    return
   }
+
+  currentPractitioner = await getCurrentPractitioner()
+
+  // Populate header user indicator
+  const hdrUser = $('hdrUser')
+  if (hdrUser && currentPractitioner) {
+    hdrUser.textContent =
+      currentPractitioner.firm_name ||
+      currentPractitioner.name      ||
+      currentPractitioner.email     || ''
+  }
+
+  // Populate sidebar identity (desktop)
+  const sp = $('sidebarPractName');  if (sp) sp.textContent  = currentPractitioner?.firm_name || currentPractitioner?.name  || ''
+  const se = $('sidebarPractEmail'); if (se) se.textContent  = currentPractitioner?.email || ''
+
+  // Only navigate to the roster on the *initial* sign-in.
+  // If the user is already inside the app (any page other than login),
+  // leave them where they are — this prevents tab-refocus auth events
+  // from kicking them back to the client list.
+  const stillOnLogin = !$('loginView').classList.contains('hidden')
+  if (!stillOnLogin) return
+
+  // One-off: apply RMC 30-2026 extension to CY 2025 annual ITRs.
+  applyRMC30_2026Override()
+  showRosterView()
 }
 
 
