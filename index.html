@@ -2822,10 +2822,12 @@ table.ct td {
  *   payment_status    text not null default 'n/a',
  *     -- 'n/a' | 'unpaid' | 'paid'
  *   amount_paid       numeric(12,2),
+ *   transaction_fee   numeric(12,2),   -- gateway / AAB convenience fee
  *   payment_date      date,
  *   payment_reference text,
  *   payment_mode      text,
- *     -- 'eFPS' | 'GCash' | 'Bank (AAB)' | 'Over-the-counter (RDO)'
+ *     -- 'Online banking' | 'Over-the-counter' | 'GCash' | 'Maya'
+ *     -- | 'MyEG PH' | 'Check' | 'Others'
  *
  *   notes             text,
  *   created_at        timestamptz not null default now(),
@@ -2837,7 +2839,8 @@ table.ct td {
  * --   add column if not exists claims_cwt            boolean not null default false,
  * --   add column if not exists dat_files_saved       boolean not null default false,
  * --   add column if not exists validation_email      boolean not null default false,
- * --   add column if not exists validation_email_date date;
+ * --   add column if not exists validation_email_date date,
+ * --   add column if not exists transaction_fee       numeric(12,2);
  *
  * alter table compliance_records enable row level security;
  *
@@ -4164,7 +4167,7 @@ function buildObligationCard(r) {
 
   const step2Done   = !!r.trrc_saved
   const step2Detail = step2Done
-    ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}${editLink('openTRRCForm')}`
+    ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · File: ${esc(r.trrc_reference)}` : ''}${editLink('openTRRCForm')}`
     : ''
 
   const datAttach    = datAttachments(r)
@@ -4176,8 +4179,10 @@ function buildObligationCard(r) {
     : (needsDat ? `Pending: ${datAttach.join(', ')} DAT + validation${editLink('openDatForm')}` : '')
 
   const step3Done   = r.payment_status === 'paid'
+  const feeTxt      = r.transaction_fee != null && +r.transaction_fee > 0
+    ? ` · Fee: ₱${Number(r.transaction_fee).toLocaleString()}` : ''
   const step3Detail = step3Done
-    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${editLink('openPaymentForm')}`
+    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
     : (r.payment_status === 'n/a' ? 'No tax due — no payment needed' : '')
 
   let actionBtn = ''
@@ -4309,8 +4314,8 @@ async function openTRRCForm(recordId, isEdit = false) {
       <input type="date" id="tf_date_${recordId}" value="${r?.trrc_date ?? ''}">
     </div>
     <div class="fld">
-      <label>TRRC reference</label>
-      <input type="text" id="tf_ref_${recordId}" placeholder="TRRC-…" value="${esc(r?.trrc_reference ?? '')}">
+      <label>TRRC file name</label>
+      <input type="text" id="tf_ref_${recordId}" placeholder="e.g. TRRC_2550Q_2026Q1.pdf" value="${esc(r?.trrc_reference ?? '')}">
     </div>
   </div>
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
@@ -4367,7 +4372,7 @@ async function openPaymentForm(recordId, isEdit = false) {
     const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
     r = data
   }
-  const modes = ['Online banking','Over-the-counter','GCash','Maya','Check','Others']
+  const modes = ['Online banking','Over-the-counter','GCash','Maya','MyEG PH','Check','Others']
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
@@ -4393,6 +4398,10 @@ async function openPaymentForm(recordId, isEdit = false) {
         ${modes.map(m => `<option value="${m}"${r?.payment_mode === m ? ' selected' : ''}>${m}</option>`).join('')}
       </select>
     </div>
+  </div>
+  <div class="fld">
+    <label>Transaction fee (₱)</label>
+    <input type="number" id="pf_fee_${recordId}" min="0" step="0.01" placeholder="0.00" value="${r?.transaction_fee ?? ''}">
   </div>
   <div id="pf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
@@ -4476,15 +4485,19 @@ async function savePayment(recordId) {
   const payDate    = $(`pf_date_${recordId}`).value
   const payRef     = $(`pf_ref_${recordId}`).value.trim()
   const payMode    = $(`pf_mode_${recordId}`).value
+  const feeRaw     = $(`pf_fee_${recordId}`).value
+  const txnFee     = feeRaw === '' ? null : parseFloat(feeRaw)
   const errEl      = $(`pf_err_${recordId}`)
 
   if (!amountPaid || amountPaid <= 0) { errEl.textContent = 'Amount paid is required.'; errEl.style.display = 'block'; return }
   if (!payDate) { errEl.textContent = 'Payment date is required.'; errEl.style.display = 'block'; return }
+  if (txnFee != null && (Number.isNaN(txnFee) || txnFee < 0)) { errEl.textContent = 'Transaction fee must be zero or positive.'; errEl.style.display = 'block'; return }
   errEl.style.display = 'none'
 
   const { error } = await supa.from('compliance_records').update({
     payment_status:    'paid',
     amount_paid:       amountPaid,
+    transaction_fee:   txnFee,
     payment_date:      payDate,
     payment_reference: payRef || null,
     payment_mode:      payMode || null,
@@ -5165,12 +5178,13 @@ async function generateReport4() {
   const firmName = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   const dash     = v => v ? esc(v) : '—'
 
-  let totObl = 0, totComplete = 0, totOutstanding = 0, totRemitted = 0
+  let totObl = 0, totComplete = 0, totOutstanding = 0, totRemitted = 0, totFees = 0
   ;(records || []).forEach(r => {
     totObl++
     if (r.filed_date && r.payment_status === 'paid') totComplete++
     else totOutstanding++
     if (r.payment_status === 'paid') totRemitted += +(r.amount_paid || 0)
+    if (r.transaction_fee != null) totFees += +r.transaction_fee
   })
 
   let html = `<div class="rpt-audit-hd">
@@ -5189,13 +5203,13 @@ async function generateReport4() {
     <colgroup>
       <col style="width:130px"><col style="width:120px"><col style="width:95px"><col style="width:95px">
       <col style="width:140px"><col style="width:95px"><col style="width:140px"><col style="width:95px">
-      <col style="width:80px"><col style="width:140px"><col style="width:100px"><col style="width:110px">
+      <col style="width:80px"><col style="width:140px"><col style="width:100px"><col style="width:90px"><col style="width:110px">
     </colgroup>
     <thead style="position:sticky;top:0;background:var(--s2);z-index:1"><tr>
       <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
-      <th>TRRC Date</th><th>TRRC Ref</th><th>DAT Valid.</th>
+      <th>TRRC Date</th><th>TRRC File</th><th>DAT Valid.</th>
       <th>Payment Date</th><th>Mode</th><th>Payment Ref</th>
-      <th>Amount Paid</th><th>Status</th>
+      <th>Amount Paid</th><th>Txn Fee</th><th>Status</th>
     </tr></thead><tbody>`
 
   records.forEach(r => {
@@ -5217,6 +5231,7 @@ async function generateReport4() {
       <td>${dash(r.payment_mode)}</td>
       <td>${dash(r.payment_reference)}</td>
       <td>${r.payment_status === 'paid' ? _rptFmtAmt(r.amount_paid) : '—'}</td>
+      <td>${r.transaction_fee != null ? _rptFmtAmt(r.transaction_fee) : '—'}</td>
       <td>${_rptStatusBadge(r)}</td>
     </tr>`
   })
@@ -5227,6 +5242,7 @@ async function generateReport4() {
       <span>Complete: <strong>${totComplete}</strong></span>
       <span>Outstanding: <strong>${totOutstanding}</strong></span>
       <span>Total remitted: <strong>${_rptFmtAmt(totRemitted)}</strong></span>
+      <span>Total transaction fees: <strong>${_rptFmtAmt(totFees)}</strong></span>
     </div>
     <p class="rpt-audit-disclaimer">This audit trail reflects reference numbers logged in The Present Value Practitioner Suite. Original confirmation documents are retained by the practitioner.</p>
     <div class="rpt-print-footer">Generated on ${esc(genTs)} · The Present Value Practitioner Suite · ${esc(firmName)}</div>`
