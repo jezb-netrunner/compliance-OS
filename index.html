@@ -1328,7 +1328,44 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+}
+
+#pgDashboard .main-content {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: calc(100vh - var(--hdr-h));
+  overflow-y: auto;
+}
+
+.db-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.db-grid > div > .card {
+  min-height: 200px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#dbThisWeekList,
+#dbOverdueList,
+#dbTrrcList,
+#dbPaymentList {
+  flex: 1;
+}
+
+.db-empty {
+  color: var(--green);
+  font-size: .82rem;
+  font-style: italic;
+  text-align: center;
+  padding: .75rem 0;
+  margin: 0;
 }
 @media (max-width: 860px) {
   .db-grid { grid-template-columns: 1fr; }
@@ -1631,7 +1668,7 @@ body {
 
         <!-- Left column: deadlines -->
         <div>
-          <div class="card" style="margin-bottom:1.25rem">
+          <div class="card">
             <div class="db-section-title">This Week</div>
             <div id="dbThisWeekList"></div>
           </div>
@@ -1643,7 +1680,7 @@ body {
 
         <!-- Right column: stats + action lists -->
         <div>
-          <div class="card" style="margin-bottom:1.25rem">
+          <div class="card">
             <div class="db-section-title">Compliance — <span id="dbStatYear"></span></div>
             <div class="db-stat-grid">
               <div class="db-stat">
@@ -1664,7 +1701,7 @@ body {
               </div>
             </div>
           </div>
-          <div class="card" style="margin-bottom:1.25rem">
+          <div class="card">
             <div class="db-section-title">TRRC Needed</div>
             <div id="dbTrrcList"></div>
           </div>
@@ -2129,24 +2166,34 @@ async function loadDashboard() {
   const in7Str   = new Date(now.getTime() + 7*86400000).toISOString().slice(0,10)
   $('dbStatYear').textContent = yr
 
+  const { data: clients, error: cErr } = await supa
+    .from('clients')
+    .select('id, display_name')
+    .eq('practitioner_id', practitioner.id)
+    .eq('is_active', true)
+
+  console.log('clients:', clients, 'error:', cErr)
+
+  if (cErr || !clients?.length) {
+    const msg = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">No active clients found.</p>'
+    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue'].forEach(id => { $(id).textContent = '0' })
+    return
+  }
+
+  const clientMap = {}
+  clients.forEach(c => { clientMap[c.id] = c.display_name })
+
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('*, clients!inner(display_name, is_active)')
-    .eq('clients.practitioner_id', practitioner.id)
-    .eq('clients.is_active', true)
+    .select('*')
+    .in('client_id', clients.map(c => c.id))
 
   console.log('records:', records, 'error:', error)
 
   if (error) {
     const msg = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
     ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
-    return
-  }
-
-  if (!records?.length) {
-    const msg = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">No client data.</p>'
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
-    ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue'].forEach(id => { $(id).textContent = '0' })
     return
   }
 
@@ -2179,7 +2226,7 @@ async function loadDashboard() {
   $('dbStatOverdue').textContent = overdueCount
 
   const _row = (r, badge) => {
-    const name = esc(r.clients?.display_name || '—')
+    const name = esc(clientMap[r.client_id] || '—')
     const due  = r.due_date
       ? new Date(r.due_date).toLocaleDateString('en-PH', {month:'short', day:'numeric'})
       : '—'
@@ -2190,20 +2237,20 @@ async function loadDashboard() {
       ${badge}
     </div>`
   }
-  const _empty = t => `<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">${t}</p>`
+  const _empty = t => `<p class="db-empty">${t}</p>`
 
   $('dbThisWeekList').innerHTML = thisWeek.length
     ? thisWeek.map(r => _row(r, '<span class="badge badge-dim">Pending</span>')).join('')
-    : _empty('No obligations due this week.')
+    : _empty('No filings due this week ✓')
   $('dbOverdueList').innerHTML = overdue.length
     ? overdue.map(r => _row(r, '<span class="badge badge-red">Overdue</span>')).join('')
-    : _empty('No overdue obligations — nice work.')
+    : _empty('Nothing overdue ✓')
   $('dbTrrcList').innerHTML = trrcNeeded.length
     ? trrcNeeded.map(r => _row(r, '<span class="badge badge-blue">TRRC</span>')).join('')
-    : _empty('All filed returns have TRRC saved.')
+    : _empty('No TRRC pending ✓')
   $('dbPaymentList').innerHTML = paymentPending.length
     ? paymentPending.map(r => _row(r, '<span class="badge badge-amber">Unpaid</span>')).join('')
-    : _empty('No outstanding payments.')
+    : _empty('No payments pending ✓')
 }
 
 
