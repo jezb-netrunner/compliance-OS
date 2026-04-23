@@ -1757,6 +1757,55 @@ table.ct td {
   line-height: 1.45;
 }
 
+.modal-ov {
+  position: fixed; inset: 0;
+  background: rgba(17, 17, 17, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.modal-ov.hidden { display: none; }
+.modal-card {
+  background: var(--sf);
+  border-radius: var(--r);
+  box-shadow: var(--sh);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+}
+.modal-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .9rem 1.15rem;
+  border-bottom: 1px solid var(--bd);
+}
+.modal-title {
+  font-family: var(--se);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.modal-body { padding: 1.15rem; }
+.enroll-link-row {
+  display: flex;
+  gap: .5rem;
+  align-items: stretch;
+}
+.enroll-link-row input {
+  flex: 1;
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: var(--rr);
+  padding: .5rem .65rem;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: .78rem;
+  color: var(--ink);
+}
+.enroll-link-row input:focus { outline: 2px solid var(--royal); border-color: var(--royal); }
+
 /* ═══════════════════════════════════════════════════
    PRINT STYLES
 ═══════════════════════════════════════════════════ */
@@ -2025,6 +2074,8 @@ table.ct td {
       <span id="detailClientName"></span>
       <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
         onclick="generateYearObligations()">Generate Obligations</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
+        onclick="shareEnrollmentLink()">Share Enrollment Link</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
     </div>
@@ -2499,6 +2550,32 @@ table.ct td {
 </div><!-- #addClientSheet -->
 
 
+<!-- ═══════════════════════════════════════════════
+     ENROLLMENT LINK MODAL
+═══════════════════════════════════════════════════ -->
+<div id="enrollLinkModal" class="modal-ov hidden"
+  onclick="if(event.target===this)closeEnrollLink()"
+  role="dialog" aria-modal="true" aria-labelledby="enrollLinkTitle">
+  <div class="modal-card">
+    <div class="modal-hdr">
+      <span class="modal-title" id="enrollLinkTitle">Share enrollment link</span>
+      <button class="sheet-close" onclick="closeEnrollLink()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="enrollLinkHint" style="font-size:.8rem;color:var(--mu);margin-bottom:.75rem"></p>
+      <div class="enroll-link-row">
+        <input type="text" id="enrollLinkUrl" readonly>
+        <button class="btn-primary btn-sm" onclick="copyEnrollLink()" id="enrollLinkCopyBtn">Copy link</button>
+      </div>
+      <p style="font-size:.75rem;color:var(--mu);margin-top:.9rem;line-height:1.5">
+        Link expires in 7 days. Client does not need to create an account.
+      </p>
+      <p id="enrollLinkErr" style="font-size:.78rem;color:var(--red);margin-top:.5rem;display:none"></p>
+    </div>
+  </div>
+</div>
+
+
 <script>
 /*
  * ══════════════════════════════════════════════════════════════
@@ -2638,6 +2715,64 @@ table.ct td {
  *       where p.auth_id = auth.uid()
  *     )
  *   );
+ *
+ *
+ * ── 3b. ENROLLMENT TOKENS ────────────────────────────────────
+ *
+ * create table if not exists enrollment_tokens (
+ *   id                uuid primary key default gen_random_uuid(),
+ *   practitioner_id   uuid not null
+ *                       references practitioners(id) on delete cascade,
+ *   token             text unique not null default gen_random_uuid()::text,
+ *   client_name_hint  text,
+ *   used              boolean     not null default false,
+ *   created_at        timestamptz not null default now(),
+ *   expires_at        timestamptz not null default (now() + interval '7 days')
+ * );
+ *
+ * create index if not exists enrollment_tokens_token_idx
+ *   on enrollment_tokens (token);
+ *
+ * alter table enrollment_tokens enable row level security;
+ *
+ * -- Practitioner can read/write their own tokens.
+ * create policy "enrollment_tokens: own practitioner"
+ *   on enrollment_tokens for all
+ *   to authenticated
+ *   using (
+ *     practitioner_id in (
+ *       select id from practitioners where auth_id = auth.uid()
+ *     )
+ *   )
+ *   with check (
+ *     practitioner_id in (
+ *       select id from practitioners where auth_id = auth.uid()
+ *     )
+ *   );
+ *
+ * -- Anonymous enrollment page: read a live token only.
+ * create policy "enrollment_tokens: public lookup"
+ *   on enrollment_tokens for select
+ *   to anon
+ *   using (used = false and expires_at > now());
+ *
+ * -- Anonymous enrollment page: insert the client row.
+ * create policy "clients: public enrollment insert"
+ *   on clients for insert
+ *   to anon
+ *   with check (
+ *     practitioner_id in (
+ *       select practitioner_id from enrollment_tokens
+ *       where used = false and expires_at > now()
+ *     )
+ *   );
+ *
+ * -- Anonymous enrollment page: mark the token used.
+ * create policy "enrollment_tokens: public consume"
+ *   on enrollment_tokens for update
+ *   to anon
+ *   using (used = false and expires_at > now())
+ *   with check (used = true);
  *
  *
  * ── 4. TRIGGERS  (auto-update updated_at) ────────────────────
@@ -4713,6 +4848,60 @@ async function saveSettings() {
   msg.style.color = 'var(--green)'
   msg.textContent = 'Saved ✓'
   setTimeout(() => { msg.textContent = '' }, 2000)
+}
+
+// ── ENROLLMENT LINK ───────────────────────────────────────────
+
+async function shareEnrollmentLink() {
+  if (!currentPractitioner || !activeClientId || !_currentClient) return
+  const modal    = $('enrollLinkModal')
+  const urlInput = $('enrollLinkUrl')
+  const hint     = $('enrollLinkHint')
+  const err      = $('enrollLinkErr')
+  err.style.display = 'none'
+  hint.textContent = `Generating link for ${_currentClient.display_name}…`
+  urlInput.value   = ''
+  modal.classList.remove('hidden')
+
+  const { data, error } = await supa
+    .from('enrollment_tokens')
+    .insert({
+      practitioner_id:  currentPractitioner.id,
+      client_name_hint: _currentClient.display_name,
+    })
+    .select('token')
+    .single()
+
+  if (error || !data) {
+    err.style.display = 'block'
+    err.textContent   = error?.message || 'Could not create link.'
+    hint.textContent  = ''
+    return
+  }
+
+  const base = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}enroll.html`
+  urlInput.value   = `${base}?token=${encodeURIComponent(data.token)}`
+  hint.textContent = `Send this link to ${_currentClient.display_name} to collect their details.`
+  urlInput.focus(); urlInput.select()
+}
+
+function closeEnrollLink() {
+  $('enrollLinkModal').classList.add('hidden')
+}
+
+async function copyEnrollLink() {
+  const input = $('enrollLinkUrl')
+  const btn   = $('enrollLinkCopyBtn')
+  if (!input.value) return
+  try {
+    await navigator.clipboard.writeText(input.value)
+  } catch {
+    input.select()
+    document.execCommand('copy')
+  }
+  const prev = btn.textContent
+  btn.textContent = 'Copied ✓'
+  setTimeout(() => { btn.textContent = prev }, 1500)
 }
 </script>
 </body>

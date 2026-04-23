@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Enrollment — The Present Value</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<style>
+:root {
+  --royal:#4169e1; --rs:rgba(65,105,225,.07); --rm:rgba(65,105,225,.14);
+  --green:#2d8a4e; --red:#c0392b;
+  --bg:#f9f9fa; --sf:#fff; --s2:#f0f1f3; --s3:#e8e9ec; --bd:#e0e2e6;
+  --ink:#111; --ch:#333; --mu:#707070; --lt:#9a9a9a;
+  --r:8px; --rr:5px;
+  --sh:0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --se:'Source Serif 4',Georgia,serif;
+  --sa:'Inter',system-ui,sans-serif;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family:var(--sa);
+  background:var(--bg);
+  color:var(--ch);
+  min-height:100vh;
+  padding:2.5rem 1rem;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.brand {
+  font-family:var(--se);
+  font-size:1.35rem;
+  font-weight:700;
+  color:var(--ink);
+  text-align:center;
+  margin-bottom:.35rem;
+}
+.brand .dot { color:var(--royal); }
+.brand-sub {
+  text-align:center;
+  font-size:.78rem;
+  color:var(--mu);
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  margin-bottom:2rem;
+}
+.card {
+  background:var(--sf);
+  border-radius:var(--r);
+  box-shadow:var(--sh);
+  padding:1.75rem;
+  max-width:640px;
+  margin:0 auto;
+}
+h2 {
+  font-family:var(--se);
+  font-size:1.1rem;
+  font-weight:600;
+  color:var(--ink);
+  margin-bottom:.35rem;
+}
+.hint {
+  font-size:.82rem;
+  color:var(--mu);
+  margin-bottom:1.5rem;
+}
+.step-label {
+  font-size:.72rem;
+  color:var(--mu);
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  margin-bottom:.9rem;
+}
+.fg {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.9rem;
+}
+.fld { display:flex; flex-direction:column; }
+.fld.span2 { grid-column:1 / -1; }
+.fld label {
+  font-size:.75rem;
+  font-weight:600;
+  color:var(--ch);
+  margin-bottom:.3rem;
+}
+.fld .req { color:var(--red); }
+.fld input,
+.fld select {
+  font-family:var(--sa);
+  font-size:.88rem;
+  color:var(--ink);
+  background:var(--sf);
+  border:1.5px solid var(--bd);
+  border-radius:var(--rr);
+  padding:.5rem .65rem;
+}
+.fld input:focus,
+.fld select:focus { outline:2px solid var(--royal); border-color:var(--royal); }
+.footer-row {
+  display:flex;
+  gap:.5rem;
+  margin-top:1.5rem;
+  justify-content:flex-end;
+  align-items:center;
+}
+.err {
+  background:rgba(192,57,43,.07);
+  border-left:3px solid var(--red);
+  color:var(--red);
+  font-size:.8rem;
+  padding:.6rem .85rem;
+  border-radius:var(--rr);
+  margin-top:.75rem;
+  display:none;
+}
+.btn {
+  font-family:var(--sa);
+  font-weight:600;
+  font-size:.82rem;
+  padding:.55rem 1.1rem;
+  border-radius:var(--rr);
+  border:1.5px solid transparent;
+  cursor:pointer;
+}
+.btn-primary { background:var(--royal); color:#fff; }
+.btn-primary:disabled { opacity:.6; cursor:not-allowed; }
+.btn-ghost {
+  background:transparent;
+  color:var(--ch);
+  border-color:var(--bd);
+}
+.status { font-size:.85rem; color:var(--mu); text-align:center; padding:1.25rem 0; }
+.status.err-block { color:var(--red); }
+.success h2 { margin-bottom:.75rem; }
+.success p  { color:var(--ch); font-size:.9rem; }
+.hidden { display:none !important; }
+
+@media (max-width:540px) {
+  .fg { grid-template-columns:1fr; }
+  .fld.span2 { grid-column:auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="brand">The Present Value<span class="dot">.</span></div>
+<div class="brand-sub">Client Enrollment</div>
+
+<div class="card" id="card">
+  <div class="status" id="loading">Checking your link…</div>
+</div>
+
+<template id="formTpl">
+  <h2>Welcome<span id="firmSuffix"></span></h2>
+  <p class="hint" id="welcomeHint">Please confirm the details below so your accountant can set up your compliance schedule.</p>
+
+  <!-- Step 1 -->
+  <div id="step1">
+    <div class="step-label">Step 1 of 2 — Identity</div>
+    <div class="fg">
+      <div class="fld span2">
+        <label for="f_name">Client name <span class="req">*</span></label>
+        <input type="text" id="f_name" autocomplete="name">
+      </div>
+      <div class="fld">
+        <label for="f_tin">TIN</label>
+        <input type="text" id="f_tin" placeholder="000-000-000-000">
+      </div>
+      <div class="fld">
+        <label for="f_rdo">RDO code</label>
+        <input type="text" id="f_rdo" placeholder="e.g. 040">
+      </div>
+      <div class="fld span2">
+        <label for="f_industry">Industry</label>
+        <select id="f_industry">
+          <option value="">— Select —</option>
+          <option>Professional Services</option>
+          <option>Retail</option>
+          <option>Trading</option>
+          <option>Real Estate</option>
+          <option>Construction</option>
+          <option>Manufacturing</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="err" id="err1"></div>
+    <div class="footer-row">
+      <button class="btn btn-primary" id="btnNext">Next →</button>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div id="step2" class="hidden">
+    <div class="step-label">Step 2 of 2 — Tax profile</div>
+    <div class="fg">
+      <div class="fld">
+        <label for="f_type">Taxpayer type</label>
+        <select id="f_type">
+          <option value="Self-Employed">Self-Employed</option>
+          <option value="Corporation">Corporation</option>
+          <option value="Mixed Income">Mixed Income</option>
+          <option value="Employee">Employee</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="f_vat">VAT status</label>
+        <select id="f_vat">
+          <option value="VAT-Registered">VAT-Registered</option>
+          <option value="Non-VAT (8% Option)">Non-VAT — 8% Option</option>
+          <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax</option>
+          <option value="Non-VAT (Graduated)">Non-VAT — Graduated</option>
+        </select>
+      </div>
+      <div class="fld span2">
+        <label for="f_fiscal">Fiscal year start</label>
+        <select id="f_fiscal">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+    </div>
+    <div class="err" id="err2"></div>
+    <div class="footer-row">
+      <button class="btn btn-ghost" id="btnBack">← Back</button>
+      <button class="btn btn-primary" id="btnSubmit">Submit</button>
+    </div>
+  </div>
+</template>
+
+<template id="successTpl">
+  <div class="success" style="text-align:center;padding:1rem 0">
+    <h2>Thank you — your information has been submitted.</h2>
+    <p>Your accountant will review and confirm your enrollment.</p>
+  </div>
+</template>
+
+<script>
+// Fill in matching values from the main app (index.html uses the same)
+const SUPA_URL = 'YOUR_URL'
+const SUPA_KEY = 'YOUR_ANON_KEY'
+
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY, {
+  auth: { persistSession: false },
+})
+
+const $ = id => document.getElementById(id)
+
+const token = new URLSearchParams(location.search).get('token')
+
+async function init() {
+  if (!token) {
+    renderInvalid()
+    return
+  }
+  const { data, error } = await supa
+    .from('enrollment_tokens')
+    .select('practitioner_id, client_name_hint, used, expires_at')
+    .eq('token', token)
+    .maybeSingle()
+
+  if (error || !data || data.used || new Date(data.expires_at) <= new Date()) {
+    renderInvalid()
+    return
+  }
+  renderForm(data)
+}
+
+function renderInvalid() {
+  $('card').innerHTML = `
+    <div class="status err-block">
+      This link has expired or already been used.<br>
+      <span style="color:var(--mu);font-size:.8rem">Please ask your accountant for a new one.</span>
+    </div>`
+}
+
+function renderForm(tok) {
+  const tpl = $('formTpl').content.cloneNode(true)
+  $('card').innerHTML = ''
+  $('card').appendChild(tpl)
+
+  if (tok.client_name_hint) $('f_name').value = tok.client_name_hint
+
+  $('btnNext').addEventListener('click', () => {
+    const name = $('f_name').value.trim()
+    const e    = $('err1')
+    if (!name) { e.textContent = 'Please enter your name.'; e.style.display = 'block'; return }
+    e.style.display = 'none'
+    $('step1').classList.add('hidden')
+    $('step2').classList.remove('hidden')
+  })
+
+  $('btnBack').addEventListener('click', () => {
+    $('step2').classList.add('hidden')
+    $('step1').classList.remove('hidden')
+  })
+
+  $('btnSubmit').addEventListener('click', () => submit(tok))
+}
+
+async function submit(tok) {
+  const btn = $('btnSubmit')
+  const err = $('err2')
+  err.style.display = 'none'
+  btn.disabled = true
+  btn.textContent = 'Submitting…'
+
+  const name = $('f_name').value.trim()
+  if (!name) {
+    err.textContent = 'Please enter your name.'; err.style.display = 'block'
+    btn.disabled = false; btn.textContent = 'Submit'
+    return
+  }
+
+  const taxpayer_type      = $('f_type').value
+  const vat_status         = $('f_vat').value
+  const fiscal_start_month = parseInt($('f_fiscal').value, 10)
+
+  const payload = {
+    practitioner_id:    tok.practitioner_id,
+    display_name:       name,
+    tin:                $('f_tin').value.trim() || null,
+    rdo_code:           $('f_rdo').value.trim() || null,
+    industry:           $('f_industry').value   || null,
+    taxpayer_type,
+    vat_status,
+    regime:             vat_status,
+    fiscal_start_month,
+    is_active:          true,
+  }
+
+  const { error: insErr } = await supa.from('clients').insert(payload)
+  if (insErr) {
+    err.textContent = insErr.message
+    err.style.display = 'block'
+    btn.disabled = false
+    btn.textContent = 'Submit'
+    return
+  }
+
+  const { error: updErr } = await supa
+    .from('enrollment_tokens')
+    .update({ used: true })
+    .eq('token', token)
+  if (updErr) console.warn('token update failed:', updErr.message)
+
+  $('card').innerHTML = $('successTpl').innerHTML
+}
+
+init()
+</script>
+</body>
+</html>
