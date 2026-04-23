@@ -2056,6 +2056,7 @@ function _mkDevSupa() {
         return q(name, hit)
       },
       not:         (col, _op, val) => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] !== val)),
+      in:          (col, vals)    => q(name, (Array.isArray(rows) ? rows : []).filter(r => vals.includes(r[col]))),
       order:       (col, opts)    => {
         const asc = opts?.ascending !== false
         const arr = [...(Array.isArray(rows) ? rows : [])]
