@@ -1997,9 +1997,24 @@ table.ct td {
       >
     </div>
 
-    <button class="btn-primary btn-lg btn-full" id="loginBtn" onclick="handleLogin()">
-      Send sign-in link
+    <div class="fld">
+      <label for="loginPassword">Password</label>
+      <input
+        type="password"
+        id="loginPassword"
+        placeholder="At least 8 characters"
+        autocomplete="current-password"
+      >
+    </div>
+
+    <button class="btn-primary btn-lg btn-full" id="loginBtn" onclick="handlePasswordLogin()">
+      Sign in
     </button>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.85rem;font-size:.82rem">
+      <a href="#" onclick="event.preventDefault();handleSignUp()" style="color:var(--royal);text-decoration:none;font-weight:600">Create account</a>
+      <a href="#" onclick="event.preventDefault();handleMagicLink()" style="color:var(--mu);text-decoration:none">Email me a sign-in link instead</a>
+    </div>
   </div>
 </div>
 
@@ -3236,33 +3251,76 @@ async function getCurrentPractitioner() {
   return created
 }
 
-/** Send a magic-link OTP to the entered email address */
-async function handleLogin() {
-  const email = ($('loginEmail').value ?? '').trim()
-  const btn   = $('loginBtn')
-  const msg   = $('loginMsg')
+/** Sign in with email + password (primary login). */
+async function handlePasswordLogin() {
+  const email    = ($('loginEmail').value ?? '').trim()
+  const password = $('loginPassword').value ?? ''
+  const btn      = $('loginBtn')
 
-  if (!email) { _setLoginMsg('Please enter your email address.', 'error'); return }
+  if (!email)    { _setLoginMsg('Please enter your email address.', 'error'); return }
+  if (!password) { _setLoginMsg('Please enter your password.', 'error'); return }
 
-  btn.disabled    = true
-  btn.textContent = 'Sending…'
+  btn.disabled = true
+  btn.textContent = 'Signing in…'
   _setLoginMsg('', '')
 
+  const { error } = await supa.auth.signInWithPassword({ email, password })
+
+  btn.disabled = false
+  btn.textContent = 'Sign in'
+
+  if (error) _setLoginMsg(error.message || 'Could not sign in.', 'error')
+  // Success → onAuthStateChange takes over and shows the app.
+}
+
+/** Create a new account with email + password. */
+async function handleSignUp() {
+  const email    = ($('loginEmail').value ?? '').trim()
+  const password = $('loginPassword').value ?? ''
+  const btn      = $('loginBtn')
+
+  if (!email)             { _setLoginMsg('Please enter your email address.', 'error'); return }
+  if (password.length < 8) { _setLoginMsg('Password must be at least 8 characters.', 'error'); return }
+
+  btn.disabled = true
+  btn.textContent = 'Creating account…'
+  _setLoginMsg('', '')
+
+  const { data, error } = await supa.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: location.origin + location.pathname },
+  })
+
+  btn.disabled = false
+  btn.textContent = 'Sign in'
+
+  if (error) {
+    _setLoginMsg(error.message || 'Could not create account.', 'error')
+    return
+  }
+  if (data.session) {
+    _setLoginMsg('Account created — signing you in…', 'success')
+  } else {
+    _setLoginMsg(`Account created. Check ${email} to confirm your address, then come back and sign in.`, 'success')
+  }
+}
+
+/** Fallback: send a magic-link OTP. */
+async function handleMagicLink() {
+  const email = ($('loginEmail').value ?? '').trim()
+  if (!email) { _setLoginMsg('Please enter your email address.', 'error'); return }
+
+  _setLoginMsg('Sending…', '')
   const { error } = await supa.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: location.origin + location.pathname },
   })
-
-  btn.disabled    = false
-  btn.textContent = 'Send sign-in link'
-
-  if (error) {
-    _setLoginMsg(error.message || 'Something went wrong. Please try again.', 'error')
-  } else {
-    _setLoginMsg(`Link sent to ${email} — check your inbox.`, 'success')
-    $('loginEmail').value = ''
-  }
+  if (error) _setLoginMsg(error.message || 'Something went wrong. Please try again.', 'error')
+  else       _setLoginMsg(`Link sent to ${email} — check your inbox.`, 'success')
 }
+
+// Backwards-compatible alias for any old call sites.
+const handleLogin = handlePasswordLogin
 
 function _setLoginMsg(text, type) {
   const el = $('loginMsg')
@@ -3331,8 +3389,8 @@ if (_IS_DEV) {
 }
 
 // Allow Enter key to submit the login form
-$('loginEmail').addEventListener('keydown', e => {
-  if (e.key === 'Enter') handleLogin()
+;['loginEmail', 'loginPassword'].forEach(id => {
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') handlePasswordLogin() })
 })
 
 
