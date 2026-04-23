@@ -3547,7 +3547,12 @@ function generateObligations(profile, year) {
   }
 
   // ── Non-VAT business: 2551Q quarterly percentage tax ──────────
-  if (isBusiness && !isVAT) {
+  // NIRC Sec. 116 as amended by RA 10963 (TRAIN): individuals who opted
+  // for the 8% income tax rate are EXEMPT from the 3% percentage tax
+  // (and thus do not file 2551Q). The 8% election substitutes both the
+  // graduated income tax and the percentage tax.
+  const isEightPercentOption = vat_status === 'Non-VAT (8% Option)'
+  if (isBusiness && !isVAT && !isEightPercentOption) {
     for (let q = 1; q <= 4; q++) {
       const { y: qy, m: qm } = quarterEndMonth(q)
       const due = addMonths(qm, 25, 1, qy)
