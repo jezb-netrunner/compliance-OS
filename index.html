@@ -2561,7 +2561,7 @@ table.ct td {
         <div class="fg">
           <div class="fld">
             <label for="ac_type">Taxpayer type</label>
-            <select id="ac_type" onchange="_syncVatOptions('ac_type','ac_vat')">
+            <select id="ac_type" onchange="_syncTaxProfileOptions()">
               <optgroup label="Individual">
                 <option value="Self-Employed">Self-Employed / Professional</option>
                 <option value="Mixed Income">Mixed Income</option>
@@ -2580,12 +2580,33 @@ table.ct td {
           </div>
           <div class="fld">
             <label for="ac_vat">VAT status</label>
-            <select id="ac_vat">
+            <select id="ac_vat" onchange="_syncTaxProfileOptions()">
               <option value="VAT-Registered">VAT-Registered</option>
               <option value="Non-VAT (8% Option)">Non-VAT — 8% Option</option>
               <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax</option>
               <option value="Non-VAT (Graduated)">Non-VAT — Graduated</option>
             </select>
+          </div>
+          <div class="fld">
+            <label for="ac_classification">Tax classification (EOPT)</label>
+            <select id="ac_classification">
+              <option value="">— Select —</option>
+              <option value="Micro">Micro (gross sales &lt; ₱3M)</option>
+              <option value="Small">Small (₱3M – &lt;₱20M)</option>
+              <option value="Medium">Medium (₱20M – &lt;₱1B)</option>
+              <option value="Large">Large (≥ ₱1B)</option>
+            </select>
+            <span class="hint">RR 8-2024 — surfaces 1701-MS for Micro/Small individuals.</span>
+          </div>
+          <div class="fld">
+            <label for="ac_deduction">Deduction method</label>
+            <select id="ac_deduction">
+              <option value="">— Select —</option>
+              <option value="Itemized">Itemized Deduction</option>
+              <option value="OSD">Optional Standard Deduction (OSD)</option>
+              <option value="8%">8% Income Tax Rate</option>
+            </select>
+            <span class="hint">OSD or 8% on a pure SE filer routes to 1701A; Itemized routes to 1701.</span>
           </div>
           <div class="fld span2">
             <label for="ac_fiscal">Fiscal year start</label>
@@ -2770,14 +2791,31 @@ table.ct td {
  *     -- Employed / Mixed Income); the 8% election is unavailable to
  *     -- non-individuals under NIRC Sec. 24(A)(2)(b).
  *   regime              text,           -- display alias for vat_status
+ *   tax_classification  text,
+ *     -- EOPT taxpayer classification per RR 8-2024:
+ *     --   'Micro'  (gross sales < ₱3M)
+ *     --   'Small'  (₱3M ≤ gross sales < ₱20M)
+ *     --   'Medium' (₱20M ≤ gross sales < ₱1B)
+ *     --   'Large'  (gross sales ≥ ₱1B)
+ *     -- Surfaces 1701-MS as an optional alternative annual ITR for
+ *     -- Micro/Small individuals (RMC 34-2025).
+ *   deduction_method    text,
+ *     -- 'Itemized' | 'OSD' | '8%'
+ *     -- Drives 1701 vs 1701A: a pure SE filer using OSD or 8% files
+ *     -- 1701A; everyone else on the individual track (Mixed, fiduciary,
+ *     -- SE-Itemized) files 1701. Constrained to '8%' iff vat_status is
+ *     -- 'Non-VAT (8% Option)'.
  *   fiscal_start_month  int not null default 1,   -- 1 = January
  *   industry            text,
  *   -- Compliance-generator flags (used by generateObligations):
  *   has_employees       boolean not null default false,   -- gates 1601-C / 1604-C / 2316
  *   withholds_expanded  boolean not null default false,   -- gates 0619-E / 1601-EQ / 1604-E
+ *                                                         --   (forced false for Employee)
  *   withholds_final     boolean not null default false,   -- gates 0619-F / 1601-FQ / 1604-F
+ *                                                         --   (forced false for Employee)
  *   is_rbe              boolean not null default false,   -- CREATE MORE flag (20% EDR, RBE
- *                                                         --   invoicing system under RR 1-2026)
+ *                                                         --   invoicing system under RR 1-2026;
+ *                                                         --   forced false for Employee)
  *   notes               text,
  *   is_active           boolean not null default true,
  *   created_at          timestamptz not null default now(),
@@ -2789,7 +2827,9 @@ table.ct td {
  * --   add column if not exists has_employees      boolean not null default false,
  * --   add column if not exists withholds_expanded boolean not null default false,
  * --   add column if not exists withholds_final    boolean not null default false,
- * --   add column if not exists is_rbe             boolean not null default false;
+ * --   add column if not exists is_rbe             boolean not null default false,
+ * --   add column if not exists tax_classification text,
+ * --   add column if not exists deduction_method   text;
  *
  * alter table clients enable row level security;
  *
@@ -3488,6 +3528,8 @@ function generateObligations(profile, year) {
   const {
     taxpayer_type,
     vat_status,
+    tax_classification,        // 'Micro' | 'Small' | 'Medium' | 'Large' | null  (RR 8-2024)
+    deduction_method,          // 'Itemized' | 'OSD' | '8%' | null
     has_employees      = false,
     withholds_expanded = false,
     withholds_final    = false,
@@ -3622,15 +3664,20 @@ function generateObligations(profile, year) {
     //   • 1701A — pure SE/professional whose ONLY income is from
     //     business/profession AND who uses the 8% rate or OSD.
     //   • 1701  — Mixed Income earners (compensation + business), or
-    //     SE/professional using Itemized Deduction, or estates/trusts.
-    // The 8% election is the unambiguous trigger for 1701A; for SE
-    // taxpayers on graduated rates we cannot tell Itemized vs OSD from
-    // the current schema, so we default to 1701 (the safer, broader
-    // form). RMC 34-2025 introduced 1701-MS as an OPTIONAL alternative
-    // for micro/small individuals — we don't auto-generate it because
-    // 1701/1701A remain valid (and 1701-MS is not yet on eFPS).
-    const annualForm =
-      (isSelfEmp && isEightPercentOption) ? 'BIR Form 1701A' : 'BIR Form 1701'
+    //     SE/professional using Itemized Deduction, or estates/trusts
+    //     (1701A is for natural persons only).
+    // For micro/small individuals (RR 8-2024 EOPT classification),
+    // RMC 34-2025 introduced 1701-MS as an OPTIONAL alternative form —
+    // 1701/1701A remain valid (and 1701-MS is not yet on eFPS, per
+    // RMC 49-2025), so we keep the primary form and just append the
+    // 1701-MS alias to flag it for the practitioner.
+    const usesShortForm =
+      isSelfEmp && (isEightPercentOption || deduction_method === 'OSD')
+    let annualForm = usesShortForm ? 'BIR Form 1701A' : 'BIR Form 1701'
+    if (!isFiduciary
+        && (tax_classification === 'Micro' || tax_classification === 'Small')) {
+      annualForm += ' (or 1701-MS)'
+    }
     obs.push(ob('1701', annualForm,
       'Annual ITR', `CY ${yr}`,
       annualItrDueDate(yr), 'income'))
@@ -3979,6 +4026,8 @@ function openClientSheet(mode, clientId) {
     $('ac_industry').value      = _currentClient.industry            || ''
     $('ac_type').value          = _currentClient.taxpayer_type       || 'Self-Employed'
     $('ac_vat').value           = _currentClient.vat_status          || 'VAT-Registered'
+    $('ac_classification').value = _currentClient.tax_classification || ''
+    $('ac_deduction').value     = _currentClient.deduction_method    || ''
     $('ac_fiscal').value        = String(_currentClient.fiscal_start_month || 1)
     $('ac_has_employees').checked = !!_currentClient.has_employees
     $('ac_ewt').checked           = !!_currentClient.withholds_expanded
@@ -3990,6 +4039,8 @@ function openClientSheet(mode, clientId) {
     $('ac_industry').value    = ''
     $('ac_type').value        = 'Self-Employed'
     $('ac_vat').value         = 'VAT-Registered'
+    $('ac_classification').value = ''
+    $('ac_deduction').value   = ''
     $('ac_fiscal').value      = '1'
     $('ac_has_employees').checked = false
     $('ac_ewt').checked           = false
@@ -3998,7 +4049,7 @@ function openClientSheet(mode, clientId) {
     $('archiveRow').classList.add('hidden')
   }
 
-  _syncVatOptions('ac_type', 'ac_vat')
+  _syncTaxProfileOptions()
   _renderStep(1)
   $('addClientSheet').classList.remove('hidden')
   setTimeout(() => $('ac_name').focus(), 60)
@@ -4009,19 +4060,38 @@ function closeAddClient() {
 }
 
 /**
- * Disable VAT-status options that are invalid for the chosen taxpayer
- * type. Today the only legal constraint we enforce client-side is that
- * the 8% income tax election (NIRC Sec. 24(A)(2)(b)) is reserved for
- * individuals — Self-Employed/Professional and Mixed Income. If the
- * current selection becomes invalid we fall back to "Non-VAT
- * (Percentage Tax)" so the user is forced to make a deliberate choice.
+ * Cross-field validation for the Step 2 tax profile. Enforces three
+ * rules that come straight from the NIRC and BIR-issued regs:
+ *
+ *   1. The 8% income tax election (Sec. 24(A)(2)(b)) is reserved for
+ *      individual SE/Professional or Mixed-Income taxpayers — disable
+ *      it for everything else and demote the selection if needed.
+ *
+ *   2. Deduction method must agree with VAT status: picking "Non-VAT
+ *      (8% Option)" forces deduction_method = '8%' (and locks the
+ *      field); any other VAT status hides the '8%' choice. Pure
+ *      compensation Employees have no deduction method or EOPT
+ *      classification, so both fields are disabled for them.
+ *
+ *   3. Withholding-agent flags don't apply to a pure-compensation
+ *      Employee — disable EWT, FWT, and the RBE flag (RBE is a
+ *      registered business enterprise, by definition non-Employee).
+ *      `has_employees` stays available because an individual can
+ *      still be a household employer (kasambahay 1601-C).
  */
-function _syncVatOptions(typeSelId, vatSelId) {
-  const typeSel = $(typeSelId)
-  const vatSel  = $(vatSelId)
+function _syncTaxProfileOptions() {
+  const typeSel  = $('ac_type')
+  const vatSel   = $('ac_vat')
+  const classSel = $('ac_classification')
+  const dedSel   = $('ac_deduction')
   if (!typeSel || !vatSel) return
+
   const t = typeSel.value
+  const v = vatSel.value
+  const isEmployee       = t === 'Employee'
   const eightPctEligible = (t === 'Self-Employed' || t === 'Mixed Income')
+
+  // (1) 8% VAT-status option
   ;[...vatSel.options].forEach(opt => {
     if (opt.value === 'Non-VAT (8% Option)') {
       opt.disabled = !eightPctEligible
@@ -4029,9 +4099,37 @@ function _syncVatOptions(typeSelId, vatSelId) {
         '8% income tax option is available only to individual SE/Professional or Mixed Income taxpayers (NIRC Sec. 24(A)(2)(b)).'
     }
   })
-  if (vatSel.value === 'Non-VAT (8% Option)' && !eightPctEligible) {
+  if (v === 'Non-VAT (8% Option)' && !eightPctEligible) {
     vatSel.value = 'Non-VAT (Percentage Tax)'
   }
+
+  // (2) Deduction method + EOPT classification
+  if (dedSel) {
+    const eightPctChosen = vatSel.value === 'Non-VAT (8% Option)'
+    ;[...dedSel.options].forEach(opt => {
+      if (opt.value === '8%') opt.disabled = !eightPctChosen
+    })
+    if (eightPctChosen) {
+      dedSel.value    = '8%'
+      dedSel.disabled = true
+    } else {
+      if (dedSel.value === '8%') dedSel.value = ''
+      dedSel.disabled = isEmployee
+    }
+    if (isEmployee) dedSel.value = ''
+  }
+  if (classSel) {
+    classSel.disabled = isEmployee
+    if (isEmployee) classSel.value = ''
+  }
+
+  // (3) Withholding-agent flags
+  const ewt = $('ac_ewt'), fwt = $('ac_fwt'), rbe = $('ac_rbe')
+  ;[ewt, fwt, rbe].forEach(cb => {
+    if (!cb) return
+    cb.disabled = isEmployee
+    if (isEmployee) cb.checked = false
+  })
 }
 
 /** Called by the sheet's Next / Save button — validates before advancing */
@@ -4082,11 +4180,17 @@ async function saveClient() {
 
   const taxpayer_type      = $('ac_type').value
   const vat_status         = $('ac_vat').value
+  const tax_classification = $('ac_classification').value || null
+  const deduction_method   = $('ac_deduction').value      || null
   const fiscal_start_month = parseInt($('ac_fiscal').value, 10)
+  const isEmployee         = taxpayer_type === 'Employee'
+  // EWT/FWT/RBE are non-applicable to a pure-compensation Employee
+  // (see _syncTaxProfileOptions); persist them as false regardless of
+  // whatever the disabled checkbox happens to read.
   const has_employees      = $('ac_has_employees').checked
-  const withholds_expanded = $('ac_ewt').checked
-  const withholds_final    = $('ac_fwt').checked
-  const is_rbe             = $('ac_rbe').checked
+  const withholds_expanded = !isEmployee && $('ac_ewt').checked
+  const withholds_final    = !isEmployee && $('ac_fwt').checked
+  const is_rbe             = !isEmployee && $('ac_rbe').checked
 
   const payload = {
     display_name:      name,
@@ -4095,6 +4199,8 @@ async function saveClient() {
     industry:          $('ac_industry').value    || null,
     taxpayer_type,
     vat_status,
+    tax_classification,
+    deduction_method,
     regime:            vat_status,
     fiscal_start_month,
     has_employees,
@@ -4121,6 +4227,8 @@ async function saveClient() {
     if (!insErr) await seedComplianceRecords(newClient.id, {
       taxpayer_type,
       vat_status,
+      tax_classification,
+      deduction_method,
       has_employees,
       withholds_expanded,
       withholds_final,
