@@ -258,7 +258,7 @@ body {
 .fld .req { color: var(--red); }
 .fld .hint { font-size: .7rem; color: var(--mu); font-weight: 400; }
 
-.fld input,
+.fld input:not([type=checkbox]):not([type=radio]),
 .fld select,
 .fld textarea {
   font-family: var(--sa);
@@ -274,7 +274,7 @@ body {
   width: 100%;
 }
 
-.fld input:focus,
+.fld input:not([type=checkbox]):not([type=radio]):focus,
 .fld select:focus,
 .fld textarea:focus {
   border-color: var(--royal);
@@ -307,6 +307,151 @@ body {
   font-size: .74rem;
   color: var(--red);
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   CHECKBOXES  .check  .check-list  .check-inline
+   Card-style toggles for a list of options, and an
+   inline toggle for single yes/no fields.
+═══════════════════════════════════════════════════ */
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  padding: .6rem .75rem;
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rr);
+  background: var(--sf);
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--ch);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.check:hover {
+  border-color: var(--royal);
+  background: var(--rs);
+}
+
+.check input[type=checkbox] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 1px 0 0 0;
+  border: 1.5px solid var(--bl);
+  border-radius: 4px;
+  background: var(--sf);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color .15s, background .15s;
+}
+
+.check input[type=checkbox]:hover { border-color: var(--royal); }
+
+.check input[type=checkbox]:checked {
+  background: var(--royal);
+  border-color: var(--royal);
+}
+
+.check input[type=checkbox]:checked::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 4px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.check input[type=checkbox]:focus-visible {
+  outline: 2px solid var(--royal);
+  outline-offset: 2px;
+}
+
+.check:has(input:checked) {
+  border-color: var(--royal);
+  background: var(--rs);
+  color: var(--ink);
+}
+
+.check-text { flex: 1; min-width: 0; }
+.check-hint {
+  display: block;
+  font-size: .7rem;
+  color: var(--mu);
+  font-weight: 400;
+  margin-top: .15rem;
+  font-family: 'Menlo','Consolas',monospace;
+  letter-spacing: .01em;
+}
+
+/* Inline single checkbox — use inside forms for yes/no toggles */
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--ch);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  padding: .35rem 0;
+}
+
+.check-inline input[type=checkbox] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 0;
+  border: 1.5px solid var(--bl);
+  border-radius: 4px;
+  background: var(--sf);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color .15s, background .15s;
+}
+
+.check-inline input[type=checkbox]:hover { border-color: var(--royal); }
+
+.check-inline input[type=checkbox]:checked {
+  background: var(--royal);
+  border-color: var(--royal);
+}
+
+.check-inline input[type=checkbox]:checked::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 4px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.check-inline input[type=checkbox]:focus-visible {
+  outline: 2px solid var(--royal);
+  outline-offset: 2px;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -975,17 +1120,28 @@ body {
   gap: .75rem;
 }
 
+/* Obligations panel — stack of cards */
+#obligationsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
 /* Obligation cards */
 .ob-card {
-  background: var(--bg);
+  background: var(--sf);
   border: 1px solid var(--bd);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   overflow: hidden;
+  box-shadow: var(--shs);
+  transition: box-shadow .2s ease, border-color .2s ease;
 }
+.ob-card:hover { box-shadow: var(--sh); }
 .ob-card.overdue     { border-left: 3px solid var(--red); }
 .ob-card.trrc-missing { border-left: 3px solid var(--amber); }
 .ob-card.unpaid      { border-left: 3px solid #6366f1; }
-.ob-card.done        { opacity: .65; }
+.ob-card.done        { opacity: .7; }
+.ob-card.done:hover  { box-shadow: var(--shs); }
 
 .ob-header {
   display: flex;
@@ -1032,17 +1188,38 @@ body {
 .ob-step {
   display: flex;
   align-items: flex-start;
-  gap: .65rem;
-  padding: .55rem 0;
+  gap: .7rem;
+  padding: .6rem 0;
   border-bottom: 1px solid var(--bd);
 }
 .ob-step:last-child { border-bottom: none; }
-.ob-step.dimmed { opacity: .45; }
+.ob-step.dimmed { opacity: .5; }
 .ob-step-icon {
-  font-size: 1rem;
-  line-height: 1;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bd);
+  background: var(--sf);
   flex-shrink: 0;
-  margin-top: .05rem;
+  margin-top: .15rem;
+  position: relative;
+  transition: background .2s, border-color .2s;
+}
+.ob-step.done .ob-step-icon {
+  background: var(--green);
+  border-color: var(--green);
+}
+.ob-step.done .ob-step-icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 .ob-step-body { flex: 1; min-width: 0; }
 .ob-step-label {
@@ -1060,24 +1237,24 @@ body {
 
 /* Action button row */
 .ob-action {
-  padding: .65rem 1rem;
+  padding: .7rem 1rem;
   border-top: 1px solid var(--bd);
-  background: var(--sl);
+  background: var(--s2);
 }
 
 /* Inline forms */
 .inline-form {
-  padding: .85rem 1rem;
+  padding: 1rem 1.1rem 1.1rem;
   border-top: 1px solid var(--bd);
-  background: #f8faff;
+  background: linear-gradient(180deg, #f5f8ff 0%, #fafbff 100%);
   display: flex;
   flex-direction: column;
-  gap: .65rem;
+  gap: .85rem;
 }
 .inline-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: .65rem;
+  gap: .85rem;
 }
 @media (max-width: 560px) {
   .inline-form-row { grid-template-columns: 1fr; }
@@ -1086,18 +1263,22 @@ body {
   display: flex;
   gap: .5rem;
   align-items: center;
+  padding-top: .1rem;
 }
 .btn-cancel-inline {
   background: none;
-  border: 1px solid var(--bd);
-  padding: .38rem .85rem;
-  border-radius: var(--r-sm);
+  border: 1.5px solid var(--bd);
+  padding: .38rem 1rem;
+  border-radius: 100px;
   font-family: var(--sa);
-  font-size: .82rem;
+  font-size: .74rem;
+  font-weight: 600;
   color: var(--mu);
   cursor: pointer;
+  min-height: 30px;
+  transition: border-color .15s, background .15s, color .15s;
 }
-.btn-cancel-inline:hover { background: var(--sl); }
+.btn-cancel-inline:hover { background: var(--s2); color: var(--ch); border-color: var(--bl); }
 
 /* History table */
 .hist-wrap {
@@ -1603,22 +1784,34 @@ body {
           </div>
           <div class="fld span2">
             <label>Withholding & employer profile</label>
-            <div style="display:flex;flex-direction:column;gap:.35rem">
-              <label style="display:flex;align-items:center;gap:.5rem;font-weight:500;font-size:.8rem">
+            <div class="check-list">
+              <label class="check">
                 <input type="checkbox" id="ac_has_employees">
-                Has employees (1601-C, 1604-C, 2316)
+                <span class="check-text">
+                  Has employees
+                  <span class="check-hint">1601-C · 1604-C · 2316</span>
+                </span>
               </label>
-              <label style="display:flex;align-items:center;gap:.5rem;font-weight:500;font-size:.8rem">
+              <label class="check">
                 <input type="checkbox" id="ac_ewt">
-                Withholds EWT on vendor payments (0619-E, 1601-EQ, 1604-E)
+                <span class="check-text">
+                  Withholds EWT on vendor payments
+                  <span class="check-hint">0619-E · 1601-EQ · 1604-E</span>
+                </span>
               </label>
-              <label style="display:flex;align-items:center;gap:.5rem;font-weight:500;font-size:.8rem">
+              <label class="check">
                 <input type="checkbox" id="ac_fwt">
-                Withholds Final Tax (0619-F, 1601-FQ, 1604-F)
+                <span class="check-text">
+                  Withholds Final Tax
+                  <span class="check-hint">0619-F · 1601-FQ · 1604-F</span>
+                </span>
               </label>
-              <label style="display:flex;align-items:center;gap:.5rem;font-weight:500;font-size:.8rem">
+              <label class="check">
                 <input type="checkbox" id="ac_rbe">
-                Registered Business Enterprise (CREATE MORE — 20% EDR, RR 1-2026 invoicing)
+                <span class="check-text">
+                  Registered Business Enterprise
+                  <span class="check-hint">CREATE MORE — 20% EDR, RR 1-2026 invoicing</span>
+                </span>
               </label>
             </div>
           </div>
@@ -2839,19 +3032,16 @@ function buildObligationCard(r) {
   }
 
   const step1Done   = !!r.filed_date
-  const step1Icon   = step1Done ? '✅' : '⬜'
   const step1Detail = step1Done
     ? `${r.filed_date}${r.filing_reference ? ` · Ref: ${esc(r.filing_reference)}` : ''}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}`
     : ''
 
   const step2Done   = !!r.trrc_saved
-  const step2Icon   = step2Done ? '✅' : '⬜'
   const step2Detail = step2Done
     ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}`
     : ''
 
   const step3Done   = r.payment_status === 'paid'
-  const step3Icon   = step3Done ? '✅' : '⬜'
   const step3Detail = step3Done
     ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}`
     : (r.payment_status === 'n/a' ? 'No tax due — no payment needed' : '')
@@ -2876,22 +3066,22 @@ function buildObligationCard(r) {
     <span class="badge ${cls}">${label}</span>
   </div>
   <div class="ob-steps">
-    <div class="ob-step">
-      <span class="ob-step-icon">${step1Icon}</span>
+    <div class="ob-step${step1Done ? ' done' : ''}">
+      <span class="ob-step-icon"></span>
       <div class="ob-step-body">
         <div class="ob-step-label">1. Filed</div>
         ${step1Detail ? `<div class="ob-step-detail mono">${step1Detail}</div>` : ''}
       </div>
     </div>
-    <div class="ob-step${step1Done ? '' : ' dimmed'}">
-      <span class="ob-step-icon">${step2Icon}</span>
+    <div class="ob-step${step2Done ? ' done' : step1Done ? '' : ' dimmed'}">
+      <span class="ob-step-icon"></span>
       <div class="ob-step-body">
         <div class="ob-step-label">2. TRRC saved</div>
         ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
       </div>
     </div>
-    <div class="ob-step${step2Done ? '' : ' dimmed'}">
-      <span class="ob-step-icon">${step3Icon}</span>
+    <div class="ob-step${step3Done ? ' done' : step2Done ? '' : ' dimmed'}">
+      <span class="ob-step-icon"></span>
       <div class="ob-step-body">
         <div class="ob-step-label">3. Payment</div>
         ${step3Detail ? `<div class="ob-step-detail mono">${step3Detail}</div>` : ''}
@@ -2928,10 +3118,10 @@ function openFilingForm(recordId) {
       <input type="text" id="ff_ref_${recordId}" placeholder="e.g. 202401-…">
     </div>
   </div>
-  <div class="fld" style="flex-direction:row;align-items:center;gap:.5rem">
+  <label class="check-inline">
     <input type="checkbox" id="ff_taxdue_${recordId}" onchange="_toggleTaxDue('${recordId}')">
-    <label for="ff_taxdue_${recordId}" style="margin:0">Has tax due?</label>
-  </div>
+    Has tax due?
+  </label>
   <div class="fld hidden" id="ff_taxdue_wrap_${recordId}">
     <label>Tax due amount (₱)</label>
     <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00">
