@@ -1601,9 +1601,40 @@ body {
 
 
 // ── SUPABASE ──────────────────────────────────────────────────
+const _IS_DEV  = new URLSearchParams(location.search).has('dev')
 const SUPA_URL = 'YOUR_URL'
 const SUPA_KEY = 'YOUR_ANON_KEY'
-const supa = supabase.createClient(SUPA_URL, SUPA_KEY)
+const supa     = _IS_DEV ? _mkDevSupa() : supabase.createClient(SUPA_URL, SUPA_KEY)
+
+// Stub Supabase client used when ?dev is in the URL so the real
+// credentials are never needed and the script never crashes.
+function _mkDevSupa() {
+  const ok = v => Promise.resolve({ data: v, error: null })
+  function chain(v) {
+    const node = {
+      select:      () => chain(Array.isArray(v) ? v : []),
+      eq:          () => chain(v),
+      not:         () => chain(v),
+      order:       () => ok(Array.isArray(v) ? v : []),
+      single:      () => ok(null),
+      maybeSingle: () => ok(null),
+      insert:      () => chain(null),
+      update:      () => chain(null),
+    }
+    node.then = (res, rej) => ok(v).then(res, rej)
+    return node
+  }
+  return {
+    from: () => chain([]),
+    auth: {
+      onAuthStateChange: () => {},
+      getSession:        () => Promise.resolve({ data: { session: null } }),
+      getUser:           () => Promise.resolve({ data: { user: null } }),
+      signInWithOtp:     () => ok(null),
+      signOut:           () => ok(null),
+    }
+  }
+}
 
 
 // ── GLOBALS ───────────────────────────────────────────────────
@@ -1771,7 +1802,7 @@ async function _onSessionChange(session) {
 
 
 // ── BOOT ──────────────────────────────────────────────────────
-if (new URLSearchParams(location.search).has('dev')) {
+if (_IS_DEV) {
   // DEV BYPASS — remove before shipping to production
   currentPractitioner = { id: null, name: 'Dev User', email: 'dev@local', firm_name: 'Dev Mode' }
   const _sp = $('sidebarPractName');  if (_sp) _sp.textContent = 'Dev Mode'
