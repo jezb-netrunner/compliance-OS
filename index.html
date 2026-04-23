@@ -2469,6 +2469,12 @@ function _mkDevSupa() {
       },
       not:         (col, _op, val) => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] !== val)),
       in:          (col, vals)    => q(name, (Array.isArray(rows) ? rows : []).filter(r => vals.includes(r[col]))),
+      gte:         (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] >= val)),
+      lte:         (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] <= val)),
+      gt:          (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] > val)),
+      lt:          (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] < val)),
+      is:          (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r =>
+                                       val === null ? r[col] == null : r[col] === val)),
       order:       (col, opts)    => {
         const asc = opts?.ascending !== false
         const arr = [...(Array.isArray(rows) ? rows : [])]
@@ -3846,47 +3852,61 @@ function showReports() {
 }
 
 async function _initReportControls() {
+  if (!currentPractitioner) return
+
   const yr = new Date().getFullYear()
 
-  // Client dropdown (Report 1) — load once
-  const clientSel = $('rptClient')
-  if (clientSel && !clientSel.dataset.loaded) {
-    clientSel.innerHTML = '<option value="">Loading…</option>'
-    const { data: clients } = await supa
-      .from('clients')
-      .select('id, display_name')
-      .eq('practitioner_id', currentPractitioner.id)
-      .eq('is_active', true)
-      .order('display_name')
-    clientSel.innerHTML = clients?.length
-      ? clients.map(c => `<option value="${c.id}">${esc(c.display_name)}</option>`).join('')
-      : '<option value="">No active clients</option>'
-    clientSel.dataset.loaded = '1'
-  }
-
-  // Year dropdowns — load once
+  // Year dropdowns (static — populate once)
   const yearOpts = Array.from({length: 5}, (_, i) => yr - i)
     .map(y => `<option value="${y}"${y === yr ? ' selected' : ''}>${y}</option>`).join('')
   const ySel  = $('rptYear')
   const y2Sel = $('rptYear2')
-  if (ySel  && !ySel.dataset.loaded)  { ySel.innerHTML  = yearOpts; ySel.dataset.loaded  = '1' }
-  if (y2Sel && !y2Sel.dataset.loaded) { y2Sel.innerHTML = yearOpts; y2Sel.dataset.loaded = '1' }
+  if (ySel  && !ySel.childElementCount) ySel.innerHTML  = yearOpts
+  if (y2Sel && !y2Sel.childElementCount) y2Sel.innerHTML = yearOpts
 
-  // Month dropdown — load once
+  // Month dropdown (static — populate once)
   const mSel = $('rptMonth')
-  if (mSel && !mSel.dataset.loaded) {
+  if (mSel && !mSel.childElementCount) {
     const months = ['January','February','March','April','May','June',
                     'July','August','September','October','November','December']
     const curMo = new Date().getMonth()
     mSel.innerHTML = months.map((m, i) =>
       `<option value="${i + 1}"${i === curMo ? ' selected' : ''}>${m}</option>`
     ).join('')
-    mSel.dataset.loaded = '1'
   }
 
   // As-of date — set to today if blank
   const asOf = $('rptAsOf')
   if (asOf && !asOf.value) asOf.value = new Date().toISOString().slice(0, 10)
+
+  // Client dropdown — always refresh so newly added clients appear
+  const clientSel = $('rptClient')
+  if (!clientSel) return
+  clientSel.innerHTML = '<option value="">Loading…</option>'
+  clientSel.disabled  = true
+
+  const { data: clients, error: cErr } = await supa
+    .from('clients')
+    .select('id, display_name')
+    .eq('practitioner_id', currentPractitioner.id)
+    .eq('is_active', true)
+    .order('display_name')
+
+  clientSel.disabled = false
+
+  if (cErr) {
+    clientSel.innerHTML = `<option value="">Error: ${esc(cErr.message)}</option>`
+    return
+  }
+
+  if (!clients?.length) {
+    clientSel.innerHTML = '<option value="">No active clients found</option>'
+    return
+  }
+
+  clientSel.innerHTML = clients.map(c =>
+    `<option value="${c.id}">${esc(c.display_name)}</option>`
+  ).join('')
 }
 
 function _selectReport(n) {
