@@ -2362,7 +2362,8 @@ table.ct td {
               <select id="rptYear"></select>
             </span>
             <button class="btn-primary btn-sm" onclick="generateReport1()">Generate</button>
-            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
           <!-- Report 2 controls -->
@@ -2377,7 +2378,8 @@ table.ct td {
               <select id="rptYear2"></select>
             </span>
             <button class="btn-primary btn-sm" onclick="generateReport2()">Generate</button>
-            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
           <!-- Report 3 controls -->
@@ -2388,7 +2390,8 @@ table.ct td {
               <input type="date" id="rptAsOf">
             </span>
             <button class="btn-primary btn-sm" onclick="generateReport3()">Generate</button>
-            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
           <!-- Report 4 controls -->
@@ -2408,7 +2411,8 @@ table.ct td {
               </select>
             </span>
             <button class="btn-primary btn-sm" onclick="generateReport4()">Generate</button>
-            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
           <!-- Content area -->
@@ -4687,9 +4691,100 @@ function _rptFmtAmt(v) {
 
 function _rptStatusBadge(r) {
   const s = getCardStatus(r)
-  const cls = {done:'badge-green', unpaid:'badge-blue', 'trrc-missing':'badge-amber', overdue:'badge-red', pending:'badge-dim'}
-  const lbl = {done:'Filed & Paid', unpaid:'Unpaid', 'trrc-missing':'TRRC Missing', overdue:'Overdue', pending:'Pending'}
+  const cls = {done:'badge-green', unpaid:'badge-blue', 'trrc-missing':'badge-amber', 'dat-missing':'badge-amber', overdue:'badge-red', pending:'badge-dim'}
+  const lbl = {done:'Filed & Paid', unpaid:'Unpaid', 'trrc-missing':'TRRC Missing', 'dat-missing':'DAT Validation', overdue:'Overdue', pending:'Pending'}
   return `<span class="${cls[s] || 'badge-dim'}">${lbl[s] || s}</span>`
+}
+
+// ── REPORT: EXPORT TO EXCEL (CSV) ─────────────────────────────
+
+function _csvCellText(el) {
+  // Clone so <br> inside a cell becomes a space separator in the exported
+  // text (otherwise "2550Q" and "2026 Q1" would collide).
+  const clone = el.cloneNode(true)
+  clone.querySelectorAll('br').forEach(br => br.replaceWith(' '))
+  const t = (clone.textContent || '').replace(/\s+/g, ' ').trim()
+  // Strip ₱ + thousands separators so Excel sees a number it can SUM.
+  const m = /^₱\s*(-?[\d,]+(?:\.\d+)?)$/.exec(t)
+  return m ? m[1].replace(/,/g, '') : t
+}
+
+function _csvEscape(v) {
+  const s = String(v ?? '')
+  if (s === '') return ''
+  if (/^-?\d+(?:\.\d+)?$/.test(s)) return s
+  return '"' + s.replace(/"/g, '""') + '"'
+}
+
+function _csvEmitTable(tbl, lines) {
+  const rows = [...tbl.querySelectorAll('tr')]
+  const totalCols = Math.max(1, ...rows.map(tr =>
+    [...tr.cells].reduce((s, c) => s + (c.colSpan || 1), 0)
+  ))
+  rows.forEach(tr => {
+    const row = new Array(totalCols).fill('')
+    let col = 0
+    for (const cell of tr.cells) {
+      row[col] = _csvCellText(cell)
+      col += (cell.colSpan || 1)
+    }
+    lines.push(row)
+  })
+}
+
+/** Generates a CSV of the currently-rendered report and triggers a download. */
+function exportCurrentReportToCsv() {
+  const content = $('rptContent')
+  if (!content || !content.querySelector('table')) {
+    alert('Generate a report first.')
+    return
+  }
+  const title = document.querySelector('.rpt-controls:not(.hidden) .rpt-controls-title')
+    ?.textContent?.trim() || 'Report'
+
+  const lines = [[title], []]
+  const selector = [
+    '.rpt-summary-strip', '.rpt-audit-hd', '.rpt-audit-summary',
+    '.rpt-grand-total',   '.rpt-client-hd', 'table',
+    '.rpt-warning',       '.rpt-audit-disclaimer', '.rpt-print-footer',
+  ].join(',')
+
+  content.querySelectorAll(selector).forEach(node => {
+    if (node.matches('table')) {
+      _csvEmitTable(node, lines)
+      lines.push([])
+    } else if (node.matches('.rpt-client-hd')) {
+      lines.push([])
+      lines.push([_csvCellText(node)])
+    } else if (node.matches('.rpt-summary-strip, .rpt-audit-summary, .rpt-grand-total')) {
+      const row = [...node.children].map(_csvCellText).filter(Boolean)
+      if (row.length) lines.push(row)
+      lines.push([])
+    } else if (node.matches('.rpt-audit-hd')) {
+      ;[...node.children].forEach(ch => {
+        const t = _csvCellText(ch)
+        if (t) lines.push([t])
+      })
+      lines.push([])
+    } else {
+      const t = _csvCellText(node)
+      if (t) { lines.push([t]); lines.push([]) }
+    }
+  })
+
+  while (lines.length && lines[lines.length - 1].every(c => c === '')) lines.pop()
+
+  const csv = lines.map(r => r.map(_csvEscape).join(',')).join('\r\n')
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  const stamp = new Date().toISOString().slice(0, 10)
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'),
+    { href: url, download: `${slug || 'report'}_${stamp}.csv` })
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 // ── REPORT 1: Per-Client Compliance Report ────────────────────
