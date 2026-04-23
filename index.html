@@ -2798,11 +2798,18 @@ table.ct td {
  *   trrc_date         date,
  *   trrc_reference    text,
  *
- *   -- Step 2a: Alphalist / DAT submission (forms 1604-C/E/F, 1601-EQ/FQ,
- *   -- and any return carrying a SAWT). BIR eSubmission validates the DAT
- *   -- files and replies by email; practitioners must retain both.
- *   dat_files_saved      boolean not null default false,
- *   validation_email     boolean not null default false,
+ *   -- Step 2a: DAT submissions routed through BIR eSubmission. Returns
+ *   -- can carry one or more of these attachments:
+ *   --   Alphalist  — 1604-C/E/F (RR 2-2006, 11-2013)
+ *   --   QAP        — 1601-EQ/FQ
+ *   --   SLSP       — all VAT-registered 2550Q (RR 1-2012; no threshold)
+ *   --   SAWT       — any return claiming 2307 CWT credits: 1700, 1701,
+ *   --                1701Q, 1702, 1702Q, 2550Q, 2551Q (RR 2-2006)
+ *   -- claims_cwt is the per-return switch for SAWT; the others are
+ *   -- derived from the form code.
+ *   claims_cwt            boolean not null default false,
+ *   dat_files_saved       boolean not null default false,
+ *   validation_email      boolean not null default false,
  *   validation_email_date date,
  *
  *   -- Step 3: Payment
@@ -2823,6 +2830,7 @@ table.ct td {
  *
  * -- Schema migration for existing deployments:
  * -- alter table compliance_records
+ * --   add column if not exists claims_cwt            boolean not null default false,
  * --   add column if not exists dat_files_saved       boolean not null default false,
  * --   add column if not exists validation_email      boolean not null default false,
  * --   add column if not exists validation_email_date date;
@@ -4027,17 +4035,37 @@ async function archiveClient() {
 // ── CLIENT DETAIL: STATUS LOGIC ───────────────────────────────
 
 /**
- * Returns true for returns that require DAT files to be e-submitted and
- * validated by BIR — currently 1604-C/E/F (Alphalist) and 1601-EQ/FQ (QAP).
- * SAWT-bearing returns would be added here once the form model tracks them.
+ * Lists DAT attachments this return must e-submit and have validated:
+ *   • Alphalist — 1604-C/E/F (RR 2-2006, 11-2013)
+ *   • QAP      — 1601-EQ/FQ
+ *   • SLSP     — every VAT-registered 2550Q (RR 1-2012; no amount threshold)
+ *   • SAWT     — returns that claim 2307 CWT credits (per-record flag):
+ *                1700, 1701, 1701Q, 1702, 1702Q, 2550Q, 2551Q (RR 2-2006)
+ * Accepts either a compliance_records row or just a form string (the latter
+ * can't surface SAWT since it depends on claims_cwt).
  */
-function requiresDatSubmission(form) {
-  const f = String(form || '')
-  return /1604-?[CEF]\b/i.test(f) || /1601-?[EF]Q\b/i.test(f)
+function datAttachments(r) {
+  const form = String((typeof r === 'string' ? r : r?.form) || '')
+  const out  = []
+  if (/1604-?[CEF]\b/i.test(form))                      out.push('Alphalist')
+  if (/1601-?[EF]Q\b/i.test(form))                      out.push('QAP')
+  if (/2550Q\b/i.test(form))                            out.push('SLSP')
+  if (typeof r === 'object' && r?.claims_cwt
+      && /\b(1700|1701Q|1701|1702Q|1702|2550Q|2551Q)\b/i.test(form)) {
+    out.push('SAWT')
+  }
+  return out
 }
 
+/** Returns true when the return could carry a SAWT attachment (gates the UI). */
+function canClaimCwt(form) {
+  return /\b(1700|1701Q|1701|1702Q|1702|2550Q|2551Q)\b/i.test(String(form || ''))
+}
+
+function requiresDatSubmission(r) { return datAttachments(r).length > 0 }
+
 function datStepDone(r) {
-  return !requiresDatSubmission(r.form) || (r.dat_files_saved && r.validation_email)
+  return !requiresDatSubmission(r) || (r.dat_files_saved && r.validation_email)
 }
 
 function getCardStatus(r) {
@@ -4135,11 +4163,13 @@ function buildObligationCard(r) {
     ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}${editLink('openTRRCForm')}`
     : ''
 
-  const needsDat     = requiresDatSubmission(r.form)
+  const datAttach    = datAttachments(r)
+  const needsDat     = datAttach.length > 0
   const stepDatDone  = r.dat_files_saved && r.validation_email
+  const stepDatLabel = needsDat ? `${datAttach.join(' + ')} — DAT files + validation email` : ''
   const stepDatDetail = stepDatDone
     ? `DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}${editLink('openDatForm')}`
-    : ''
+    : (needsDat ? `Pending: ${datAttach.join(', ')} DAT + validation${editLink('openDatForm')}` : '')
 
   const step3Done   = r.payment_status === 'paid'
   const step3Detail = step3Done
@@ -4186,7 +4216,7 @@ function buildObligationCard(r) {
     <div class="ob-step${stepDatDone ? ' done' : step2Done ? '' : ' dimmed'}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">3. DAT files + validation email</div>
+        <div class="ob-step-label">3. ${esc(stepDatLabel)}</div>
         ${stepDatDetail ? `<div class="ob-step-detail mono">${stepDatDetail}</div>` : ''}
       </div>
     </div>` : ''}
@@ -4220,6 +4250,7 @@ async function openFilingForm(recordId, isEdit = false) {
     const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
     r = data
   }
+  const showCwt = canClaimCwt(r?.form)
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
@@ -4235,6 +4266,11 @@ async function openFilingForm(recordId, isEdit = false) {
     <label>Tax due amount (₱)</label>
     <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00" value="${r?.tax_due ?? ''}">
   </div>
+  ${showCwt ? `
+  <label class="check-inline">
+    <input type="checkbox" id="ff_cwt_${recordId}" ${r?.claims_cwt ? 'checked' : ''}>
+    Claiming creditable withholding tax (2307 certificates) — SAWT required
+  </label>` : ''}
   <div id="ff_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
     <button class="btn-primary btn-sm" onclick="saveFiling('${recordId}')">Save</button>
@@ -4287,14 +4323,15 @@ async function openTRRCForm(recordId, isEdit = false) {
 
 async function openDatForm(recordId, isEdit = false) {
   _closeAllInlineForms()
-  let r = null
-  if (isEdit) {
-    const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
-    r = data
-  }
+  const { data: r } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
+  const attachments = datAttachments(r)
+  const attachLabel = attachments.length ? attachments.join(' + ') : 'DAT'
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
+  <div style="font-size:.78rem;font-weight:600;margin-bottom:.35rem">
+    Attachments for this return: <span class="mono">${esc(attachLabel)}</span>
+  </div>
   <label class="check-inline">
     <input type="checkbox" id="df_saved_${recordId}" ${r?.dat_files_saved ? 'checked' : ''}>
     DAT files saved to local archive
@@ -4308,7 +4345,7 @@ async function openDatForm(recordId, isEdit = false) {
     <input type="date" id="df_date_${recordId}" value="${r?.validation_email_date ?? ''}">
   </div>
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
-    Required for Alphalist-bearing returns (1604-C/E/F) and QAP attachments (1601-EQ/FQ). Retain both the DAT files and the BIR validation email as proof.
+    eSubmission DAT attachments: Alphalist (1604-C/E/F), QAP (1601-EQ/FQ), SLSP (all VAT 2550Q per RR 1-2012), SAWT (returns claiming 2307 CWT per RR 2-2006). Retain both the DAT files and the BIR validation email.
   </div>
   <div id="df_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
@@ -4369,17 +4406,21 @@ async function saveFiling(recordId) {
   const filedDate = $(`ff_date_${recordId}`).value
   const hasTaxDue = $(`ff_taxdue_${recordId}`).checked
   const taxDue    = hasTaxDue ? parseFloat($(`ff_taxamt_${recordId}`).value || '0') : null
+  const cwtEl     = $(`ff_cwt_${recordId}`)
   const errEl     = $(`ff_err_${recordId}`)
 
   if (!filedDate) { errEl.textContent = 'Date filed is required.'; errEl.style.display = 'block'; return }
   errEl.style.display = 'none'
 
-  const { error } = await supa.from('compliance_records').update({
+  const payload = {
     filed_date:     filedDate,
     has_tax_due:    hasTaxDue,
     tax_due:        taxDue,
     payment_status: hasTaxDue ? 'pending' : 'n/a',
-  }).eq('id', recordId)
+  }
+  if (cwtEl) payload.claims_cwt = cwtEl.checked
+
+  const { error } = await supa.from('compliance_records').update(payload).eq('id', recordId)
 
   if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
@@ -4455,7 +4496,7 @@ async function savePayment(recordId) {
 async function loadHistory() {
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('form,period,filed_date,trrc_saved,trrc_reference,dat_files_saved,validation_email,payment_status,amount_paid')
+    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,payment_status,amount_paid')
     .eq('client_id', activeClientId)
     .not('filed_date', 'is', null)
     .order('filed_date', { ascending: false })
@@ -4471,17 +4512,19 @@ async function loadHistory() {
   }
 
   const rows = records.map(r => {
-    const needsDat = requiresDatSubmission(r.form)
-    const datCell  = needsDat
-      ? (r.dat_files_saved && r.validation_email ? '✅' : '⚠️')
-      : '—'
+    const attach = datAttachments(r)
+    const datCell = attach.length === 0
+      ? '—'
+      : (r.dat_files_saved && r.validation_email
+          ? `${attach.join('+')} ✓`
+          : `${attach.join('+')} ⚠️`)
     return `
 <tr>
   <td class="mono">${esc(r.form)}</td>
   <td>${esc(r.period ?? '—')}</td>
   <td class="mono">${r.filed_date ?? '—'}</td>
   <td class="mono">${r.trrc_saved ? esc(r.trrc_reference ?? '✅') : '—'}</td>
-  <td>${datCell}</td>
+  <td class="mono">${esc(datCell)}</td>
   <td>${r.payment_status === 'paid' ? `₱${Number(r.amount_paid||0).toLocaleString()}` : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
 </tr>`
   }).join('')
@@ -5061,12 +5104,12 @@ async function generateReport4() {
     </tr></thead><tbody>`
 
   records.forEach(r => {
-    const needsDat = requiresDatSubmission(r.form)
-    const datCell  = needsDat
-      ? (r.dat_files_saved && r.validation_email
-          ? `DAT ✓${r.validation_email_date ? ` · ${_rptFmtDate(r.validation_email_date)}` : ''}`
-          : 'Pending')
-      : 'n/a'
+    const attach  = datAttachments(r)
+    const datCell = attach.length === 0
+      ? 'n/a'
+      : (r.dat_files_saved && r.validation_email
+          ? `${attach.join('+')} ✓${r.validation_email_date ? ` · ${_rptFmtDate(r.validation_email_date)}` : ''}`
+          : `${attach.join('+')} pending`)
     html += `<tr>
       <td>${esc(r.form || '—')}</td>
       <td>${esc(r.period || '—')}</td>
