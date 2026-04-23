@@ -2334,6 +2334,18 @@ function buildObligationCard(r) {
   const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
   const isDueOver       = due && due < _today && !r.filed_date
 
+  let penaltyLine = ''
+  if (status === 'overdue' && due) {
+    const daysLate = Math.floor((_today - due) / 86400000)
+    const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
+    if (taxDue) {
+      const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
+      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+    } else {
+      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+    }
+  }
+
   const step1Done   = !!r.filed_date
   const step1Icon   = step1Done ? '✅' : '⬜'
   const step1Detail = step1Done
@@ -2367,7 +2379,7 @@ function buildObligationCard(r) {
     <div class="ob-left">
       <div class="ob-form">${esc(r.form)}</div>
       <div class="ob-name">${esc(r.period ?? '')}</div>
-      <div class="ob-period"><span class="ob-due${isDueOver ? ' overdue' : ''}">Due ${dueTxt}</span></div>
+      <div class="ob-period"><span class="ob-due${isDueOver ? ' overdue' : ''}">Due ${dueTxt}</span>${penaltyLine}</div>
     </div>
     <span class="badge ${cls}">${label}</span>
   </div>
