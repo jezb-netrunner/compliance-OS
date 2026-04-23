@@ -2659,6 +2659,12 @@ table.ct td {
             </div>
           </div>
         </div>
+        <div id="prospectiveNote" class="hint hidden"
+          style="margin-top:.5rem;padding:.5rem .65rem;background:var(--bg2,#f5f5f4);border-left:3px solid var(--mu);border-radius:4px">
+          Profile changes apply <strong>prospectively</strong> from the current
+          calendar year onward. Records from previous years are preserved as
+          they were filed under the regime then in effect.
+        </div>
         <div id="step2Err" class="fld-error" role="alert"></div>
       </div>
 
@@ -3283,9 +3289,14 @@ async function showClientDetail(clientId) {
 async function _updateGenerateYearBtn(clientId) {
   const btn = $('btnGenerateYear')
   if (!btn) return
+  // Year membership comes from obligation_id (`${coveredYear}-…`), not
+  // due_date — otherwise the annual ITR for CY N (deadline N+1)
+  // makes the button think year N+1 is already populated.
   const { data } = await supa.from('compliance_records')
-    .select('due_date').eq('client_id', clientId)
-  const years   = new Set((data || []).map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))
+    .select('obligation_id').eq('client_id', clientId)
+  const years   = new Set((data || [])
+    .map(r => (String(r.obligation_id || '').match(/^(\d{4})/) || [])[1])
+    .filter(Boolean))
   const current = new Date().getFullYear()
   let next = null
   if (!years.has(String(current)))       next = current
@@ -3973,41 +3984,63 @@ async function seedComplianceRecords(clientId, profile, year = new Date().getFul
 }
 
 /**
- * Reconcile compliance_records against the current profile across every
- * year that already has records for this client. Three operations:
+ * Reconcile compliance_records against the current profile, PROSPECTIVELY:
+ * only the current calendar year and later are touched.  Records from
+ * earlier years reflect the regime that was actually in effect at the
+ * time of filing and must not be retroactively rewritten when the
+ * client adopts a new election going forward (e.g. switching from 8%
+ * in 2026 to Graduated + Itemized in 2027 must not retroactively add
+ * 2551Q rows or rename 1701A back to 1701 for the 2026 quarters that
+ * were filed under the 8% regime).
+ *
+ * Within the in-scope years (≥ today's year), three operations:
  *
  *   1. UNFILED records that are no longer required by the new profile
- *      are deleted (e.g. an 8% election retroactively removes the
- *      remaining 2551Q quarters; switching from Corp to SE removes the
- *      remaining 1702Q rows).
+ *      are deleted (e.g. an 8% election removes the remaining 2551Q
+ *      quarters; switching from Corp to SE removes the remaining 1702Q
+ *      rows).
  *   2. UNFILED records still required get their form name / period /
  *      due_date refreshed if they changed (e.g. 1701 → 1701A when the
  *      taxpayer adopts OSD; "(or 1701-MS)" suffix appearing once an
  *      EOPT classification is set).
  *   3. Newly-required obligations are inserted.
  *
- * Filed records (filed_date IS NOT NULL) are NEVER touched — they are
- * the historical compliance trail and must be preserved intact even if
- * the underlying profile no longer calls for the form.
+ * Filed records (filed_date IS NOT NULL) are NEVER touched even within
+ * the in-scope years — they are the historical compliance trail and
+ * must be preserved intact even if the underlying profile no longer
+ * calls for the form.
  */
 async function syncComplianceRecords(clientId, profile) {
   const { data: existing } = await supa
     .from('compliance_records')
     .select('id, obligation_id, form, period, due_date, filed_date')
     .eq('client_id', clientId)
-  const rows = existing || []
+  const allRows = existing || []
 
-  // Operate on the union of years already present in the table.
-  const years = [...new Set(rows.map(r => r.due_date && +r.due_date.slice(0, 4))
-                                .filter(y => Number.isInteger(y)))]
+  // Year membership is taken from the obligation_id prefix
+  // (`${coveredYear}-${localId}`), NOT from due_date — an annual ITR
+  // for CY 2026 carries a 2027 deadline but conceptually belongs to
+  // the 2026 obligation set.
+  const yearOf = r => {
+    const m = String(r.obligation_id || '').match(/^(\d{4})/)
+    return m ? +m[1] : null
+  }
+  const cutoffYear = new Date().getFullYear()
+  const inScope    = allRows.filter(r => {
+    const y = yearOf(r)
+    return y !== null && y >= cutoffYear
+  })
+
+  // Operate on the union of in-scope years already present.
+  const years = [...new Set(inScope.map(yearOf))]
   if (!years.length) return
 
   const wanted    = years.flatMap(y => generateObligations(profile, y))
   const wantedMap = new Map(wanted.map(o => [o.id, o]))
-  const haveMap   = new Map(rows.map(r => [r.obligation_id, r]))
+  const haveMap   = new Map(inScope.map(r => [r.obligation_id, r]))
 
-  // (1) delete unfiled rows no longer required
-  const toDelete = rows
+  // (1) delete unfiled in-scope rows no longer required
+  const toDelete = inScope
     .filter(r => !wantedMap.has(r.obligation_id) && !r.filed_date)
     .map(r => r.id)
   if (toDelete.length) {
@@ -4015,7 +4048,7 @@ async function syncComplianceRecords(clientId, profile) {
     if (error) console.error('syncComplianceRecords (delete):', error)
   }
 
-  // (2) refresh unfiled rows whose form/period/due_date have changed
+  // (2) refresh unfiled in-scope rows whose form/period/due_date changed
   for (const o of wanted) {
     const e = haveMap.get(o.id)
     if (!e || e.filed_date) continue
@@ -4027,7 +4060,7 @@ async function syncComplianceRecords(clientId, profile) {
     if (error) console.error('syncComplianceRecords (update):', error)
   }
 
-  // (3) insert newly-required obligations
+  // (3) insert newly-required obligations for in-scope years
   const toInsert = wanted
     .filter(o => !haveMap.has(o.id))
     .map(o => ({
@@ -4221,6 +4254,7 @@ function openClientSheet(mode, clientId) {
     $('ac_fwt').checked           = !!_currentClient.withholds_final
     $('ac_rbe').checked           = !!_currentClient.is_rbe
     $('archiveRow').classList.remove('hidden')
+    $('prospectiveNote').classList.remove('hidden')
   } else {
     ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
     $('ac_industry').value    = ''
@@ -4234,6 +4268,7 @@ function openClientSheet(mode, clientId) {
     $('ac_fwt').checked           = false
     $('ac_rbe').checked           = false
     $('archiveRow').classList.add('hidden')
+    $('prospectiveNote').classList.add('hidden')
   }
 
   _syncTaxProfileOptions()
