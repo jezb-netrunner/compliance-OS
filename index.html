@@ -897,6 +897,248 @@ body {
   .sum-chip-n { font-size: 1.3rem; }
   .roster-topbar h2 { font-size: 1.1rem; }
 }
+
+/* ═══════════════════════════════════════════════════
+   CLIENT DETAIL VIEW
+═══════════════════════════════════════════════════ */
+.detail-back-bar {
+  position: sticky;
+  top: var(--hdr-h);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .6rem 1.25rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bd);
+}
+.btn-back {
+  background: none;
+  border: none;
+  font-family: var(--sa);
+  font-size: .85rem;
+  color: var(--royal);
+  cursor: pointer;
+  padding: .2rem .4rem;
+  border-radius: var(--r-sm);
+}
+.btn-back:hover { background: var(--sl); }
+.detail-back-bar span {
+  font-family: var(--sa);
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--dk);
+}
+
+.detail-meta-strip {
+  padding: .5rem 1.25rem;
+  font-family: var(--sa);
+  font-size: .78rem;
+  color: var(--mu);
+  background: var(--sl);
+  border-bottom: 1px solid var(--bd);
+}
+
+.detail-subtab-bar {
+  display: flex;
+  gap: .25rem;
+  padding: .6rem 1.25rem 0;
+  border-bottom: 1px solid var(--bd);
+  background: var(--bg);
+  position: sticky;
+  top: calc(var(--hdr-h) + 2.6rem);
+  z-index: 89;
+}
+.subtab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: .45rem .85rem .55rem;
+  font-family: var(--sa);
+  font-size: .85rem;
+  color: var(--mu);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+}
+.subtab:hover { color: var(--dk); }
+.subtab.active {
+  color: var(--royal);
+  border-bottom-color: var(--royal);
+  font-weight: 600;
+}
+
+.detail-panels {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+/* Obligation cards */
+.ob-card {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.ob-card.overdue     { border-left: 3px solid var(--red); }
+.ob-card.trrc-missing { border-left: 3px solid var(--amber); }
+.ob-card.unpaid      { border-left: 3px solid #6366f1; }
+.ob-card.done        { opacity: .65; }
+
+.ob-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: .8rem 1rem .6rem;
+  gap: .75rem;
+}
+.ob-left { flex: 1; min-width: 0; }
+.ob-form {
+  font-family: var(--sa);
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--dk);
+}
+.ob-name {
+  font-family: var(--sa);
+  font-size: .78rem;
+  color: var(--mu);
+  margin-top: .1rem;
+}
+.ob-period {
+  font-family: var(--sa);
+  font-size: .78rem;
+  color: var(--lt);
+  margin-top: .15rem;
+}
+.ob-due {
+  font-family: var(--sa);
+  font-size: .75rem;
+  color: var(--mu);
+  white-space: nowrap;
+}
+.ob-due.overdue { color: var(--red); font-weight: 600; }
+
+/* Step checklist inside obligation card */
+.ob-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 1rem;
+  border-top: 1px solid var(--bd);
+}
+.ob-step {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  padding: .55rem 0;
+  border-bottom: 1px solid var(--bd);
+}
+.ob-step:last-child { border-bottom: none; }
+.ob-step.dimmed { opacity: .45; }
+.ob-step-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: .05rem;
+}
+.ob-step-body { flex: 1; min-width: 0; }
+.ob-step-label {
+  font-family: var(--sa);
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--dk);
+}
+.ob-step-detail {
+  font-family: var(--sa);
+  font-size: .75rem;
+  color: var(--mu);
+  margin-top: .1rem;
+}
+
+/* Action button row */
+.ob-action {
+  padding: .65rem 1rem;
+  border-top: 1px solid var(--bd);
+  background: var(--sl);
+}
+
+/* Inline forms */
+.inline-form {
+  padding: .85rem 1rem;
+  border-top: 1px solid var(--bd);
+  background: #f8faff;
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+}
+.inline-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .65rem;
+}
+@media (max-width: 560px) {
+  .inline-form-row { grid-template-columns: 1fr; }
+}
+.inline-form-actions {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+}
+.btn-cancel-inline {
+  background: none;
+  border: 1px solid var(--bd);
+  padding: .38rem .85rem;
+  border-radius: var(--r-sm);
+  font-family: var(--sa);
+  font-size: .82rem;
+  color: var(--mu);
+  cursor: pointer;
+}
+.btn-cancel-inline:hover { background: var(--sl); }
+
+/* History table */
+.hist-wrap {
+  overflow-x: auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--bd);
+}
+.hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--sa);
+  font-size: .82rem;
+}
+.hist-table thead {
+  background: var(--sl);
+}
+.hist-table th {
+  text-align: left;
+  padding: .55rem .85rem;
+  font-weight: 600;
+  color: var(--mu);
+  font-size: .75rem;
+  border-bottom: 1px solid var(--bd);
+  white-space: nowrap;
+}
+.hist-table td {
+  padding: .55rem .85rem;
+  color: var(--dk);
+  border-bottom: 1px solid var(--bd);
+  vertical-align: top;
+}
+.hist-table tr:last-child td { border-bottom: none; }
+
+/* Notes panel */
+.notes-panel-wrap {
+  max-width: 640px;
+}
+.notes-panel-wrap textarea {
+  resize: vertical;
+  min-height: 160px;
+}
 </style>
 </head>
 <body>
@@ -1052,7 +1294,45 @@ body {
 
   <!-- ── CLIENT DETAIL VIEW ── -->
   <div id="clientView" class="hidden">
-    <!-- Populated by client detail module -->
+
+    <div class="detail-back-bar">
+      <button class="btn-back" onclick="showRosterView()">← Clients</button>
+      <span id="detailClientName"></span>
+    </div>
+
+    <div class="detail-meta-strip">
+      <span id="detailMetaStrip"></span>
+    </div>
+
+    <div class="detail-subtab-bar" role="tablist">
+      <button class="subtab active" role="tab" aria-selected="true"
+        data-tab="obligations" onclick="_switchSubtab('obligations',this)">Obligations</button>
+      <button class="subtab" role="tab" aria-selected="false"
+        data-tab="history" onclick="_switchSubtab('history',this)">History</button>
+      <button class="subtab" role="tab" aria-selected="false"
+        data-tab="notes" onclick="_switchSubtab('notes',this)">Notes</button>
+    </div>
+
+    <div class="detail-panels">
+      <div id="obligationsPanel"></div>
+
+      <div id="historyPanel" class="hidden"></div>
+
+      <div id="notesPanel" class="hidden">
+        <div class="notes-panel-wrap">
+          <div class="fld">
+            <label for="clientNotesArea">Notes</label>
+            <textarea
+              id="clientNotesArea"
+              rows="10"
+              placeholder="Engagement notes, special instructions, reminders…"
+              onblur="saveClientNotes()"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 </div><!-- #appView -->
@@ -1360,12 +1640,35 @@ function showRosterView() {
   loadRoster()   // refresh data whenever returning to the roster
 }
 
-function showClientDetail(clientId) {
+async function showClientDetail(clientId) {
   activeClientId = clientId
   $('loginView').classList.add('hidden')
   $('appView').classList.remove('hidden')
   $('rosterView').classList.add('hidden')
   $('clientView').classList.remove('hidden')
+
+  _switchSubtab('obligations', qs('.subtab[data-tab="obligations"]'))
+  $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading…</p>'
+  $('detailClientName').textContent = ''
+  $('detailMetaStrip').textContent  = ''
+
+  const { data: client } = await supa.from('clients').select('*').eq('id', clientId).single()
+  if (!client) {
+    $('obligationsPanel').innerHTML = '<p style="color:var(--red);font-size:.82rem">Could not load client.</p>'
+    return
+  }
+
+  $('detailClientName').textContent = client.display_name
+
+  const meta = [
+    client.tin          ? `TIN ${esc(client.tin)}`          : '',
+    client.rdo_code     ? `RDO ${esc(client.rdo_code)}`     : '',
+    client.taxpayer_type ? esc(client.taxpayer_type)         : '',
+    client.vat_status   ? esc(client.vat_status)            : '',
+  ].filter(Boolean).join(' · ')
+  $('detailMetaStrip').textContent = meta
+
+  await loadObligations(clientId)
 }
 
 
@@ -1846,6 +2149,409 @@ async function saveClient() {
   await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status })
   closeAddClient()
   loadRoster()
+}
+
+
+// ── CLIENT DETAIL: STATUS LOGIC ───────────────────────────────
+
+function getCardStatus(r) {
+  const today = new Date(); today.setHours(0,0,0,0)
+  const due   = r.due_date ? new Date(r.due_date) : null
+
+  if (r.payment_status === 'paid') return 'done'
+  if (r.trrc_saved && !r.filed_date) return 'trrc-missing'   // shouldn't happen but guard
+  if (r.filed_date && r.trrc_saved && r.payment_status !== 'paid') return 'unpaid'
+  if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
+  if (!r.filed_date && due && due < today) return 'overdue'
+  return 'pending'
+}
+
+function getStatusLabel(status) {
+  return {
+    'pending':       'Pending filing',
+    'overdue':       'Overdue',
+    'trrc-missing':  'TRRC needed',
+    'unpaid':        'Payment pending',
+    'done':          'Complete',
+  }[status] ?? status
+}
+
+function getStatusBadgeClass(status) {
+  return {
+    'pending':       'badge-dim',
+    'overdue':       'badge-red',
+    'trrc-missing':  'badge-amber',
+    'unpaid':        'badge-blue',
+    'done':          'badge-green',
+  }[status] ?? 'badge-dim'
+}
+
+
+// ── CLIENT DETAIL: LOAD + RENDER OBLIGATIONS ──────────────────
+
+async function loadObligations(clientId) {
+  const { data: records, error } = await supa
+    .from('compliance_records')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('due_date', { ascending: true })
+
+  if (error) {
+    $('obligationsPanel').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
+    return
+  }
+
+  if (!records || records.length === 0) {
+    $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem">No obligations found.</p>'
+    return
+  }
+
+  $('obligationsPanel').innerHTML = records.map(buildObligationCard).join('')
+}
+
+function buildObligationCard(r) {
+  const status    = getCardStatus(r)
+  const label     = getStatusLabel(status)
+  const badgeCls  = getStatusBadgeClass(status)
+  const today     = new Date(); today.setHours(0,0,0,0)
+  const due       = r.due_date ? new Date(r.due_date) : null
+  const dueTxt    = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
+  const isDueOver = due && due < today && !r.filed_date
+
+  // Step 1: Filed
+  const step1Done = !!r.filed_date
+  const step1Icon = step1Done ? '✅' : '⬜'
+  const step1Detail = step1Done
+    ? `${r.filed_date}${r.filing_reference ? ` · Ref: ${esc(r.filing_reference)}` : ''}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}`
+    : ''
+
+  // Step 2: TRRC
+  const step2Dim  = !step1Done
+  const step2Done = !!r.trrc_saved
+  const step2Icon = step2Done ? '✅' : (step2Dim ? '⬜' : '⬜')
+  const step2Detail = step2Done
+    ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}`
+    : ''
+
+  // Step 3: Payment
+  const step3Dim  = !step2Done
+  const step3Done = r.payment_status === 'paid'
+  const step3Icon = step3Done ? '✅' : (step3Dim ? '⬜' : '⬜')
+  const step3Detail = step3Done
+    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}`
+    : (r.payment_status === 'n/a' ? 'No tax due — no payment needed' : '')
+
+  // Which action to show
+  let actionBtn = ''
+  if (!step1Done) {
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">Record filing</button>`
+  } else if (!step2Done) {
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">Record TRRC</button>`
+  } else if (!step3Done && r.payment_status !== 'n/a') {
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openPaymentForm('${r.id}')">Record payment</button>`
+  }
+
+  return `
+<div class="ob-card ${status}" id="card_${r.id}">
+  <div class="ob-header">
+    <div class="ob-left">
+      <div class="ob-form">${esc(r.form)}</div>
+      <div class="ob-name">${esc(r.period ?? '')}</div>
+      <div class="ob-period"><span class="ob-due${isDueOver ? ' overdue' : ''}">Due ${dueTxt}</span></div>
+    </div>
+    <span class="badge ${badgeCls}">${label}</span>
+  </div>
+  <div class="ob-steps">
+    <div class="ob-step${step1Done ? '' : ''}">
+      <span class="ob-step-icon">${step1Icon}</span>
+      <div class="ob-step-body">
+        <div class="ob-step-label">1. Filed</div>
+        ${step1Detail ? `<div class="ob-step-detail mono">${step1Detail}</div>` : ''}
+      </div>
+    </div>
+    <div class="ob-step${step2Dim ? ' dimmed' : ''}">
+      <span class="ob-step-icon">${step2Icon}</span>
+      <div class="ob-step-body">
+        <div class="ob-step-label">2. TRRC saved</div>
+        ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
+      </div>
+    </div>
+    <div class="ob-step${step3Dim ? ' dimmed' : ''}">
+      <span class="ob-step-icon">${step3Icon}</span>
+      <div class="ob-step-body">
+        <div class="ob-step-label">3. Payment</div>
+        ${step3Detail ? `<div class="ob-step-detail mono">${step3Detail}</div>` : ''}
+      </div>
+    </div>
+  </div>
+  ${actionBtn ? `<div class="ob-action">${actionBtn}</div>` : ''}
+  <div id="form_${r.id}" class="hidden"></div>
+</div>`
+}
+
+
+// ── CLIENT DETAIL: INLINE FORMS ───────────────────────────────
+
+function _closeAllInlineForms() {
+  document.querySelectorAll('[id^="form_"]').forEach(el => {
+    el.classList.add('hidden')
+    el.innerHTML = ''
+  })
+}
+
+function openFilingForm(recordId) {
+  _closeAllInlineForms()
+  const el = $(`form_${recordId}`)
+  el.innerHTML = `
+<div class="inline-form">
+  <div class="inline-form-row">
+    <div class="fld">
+      <label>Date filed <span class="req">*</span></label>
+      <input type="date" id="ff_date_${recordId}">
+    </div>
+    <div class="fld">
+      <label>eBIRForms confirmation no.</label>
+      <input type="text" id="ff_ref_${recordId}" placeholder="e.g. 202401-…">
+    </div>
+  </div>
+  <div class="fld" style="flex-direction:row;align-items:center;gap:.5rem">
+    <input type="checkbox" id="ff_taxdue_${recordId}" onchange="_toggleTaxDue('${recordId}')">
+    <label for="ff_taxdue_${recordId}" style="margin:0">Has tax due?</label>
+  </div>
+  <div class="fld hidden" id="ff_taxdue_wrap_${recordId}">
+    <label>Tax due amount (₱)</label>
+    <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00">
+  </div>
+  <div id="ff_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
+  <div class="inline-form-actions">
+    <button class="btn-primary btn-sm" onclick="saveFiling('${recordId}')">Save</button>
+    <button class="btn-cancel-inline" onclick="_closeAllInlineForms()">Cancel</button>
+  </div>
+</div>`
+  el.classList.remove('hidden')
+}
+
+function _toggleTaxDue(recordId) {
+  const wrap = $(`ff_taxdue_wrap_${recordId}`)
+  if ($(`ff_taxdue_${recordId}`).checked) {
+    wrap.classList.remove('hidden')
+  } else {
+    wrap.classList.add('hidden')
+  }
+}
+
+function openTRRCForm(recordId) {
+  _closeAllInlineForms()
+  const el = $(`form_${recordId}`)
+  el.innerHTML = `
+<div class="inline-form">
+  <div class="inline-form-row">
+    <div class="fld">
+      <label>TRRC date <span class="req">*</span></label>
+      <input type="date" id="tf_date_${recordId}">
+    </div>
+    <div class="fld">
+      <label>TRRC reference</label>
+      <input type="text" id="tf_ref_${recordId}" placeholder="TRRC-…">
+    </div>
+  </div>
+  <div id="tf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
+  <div class="inline-form-actions">
+    <button class="btn-primary btn-sm" onclick="saveTRRC('${recordId}')">Save</button>
+    <button class="btn-cancel-inline" onclick="_closeAllInlineForms()">Cancel</button>
+  </div>
+</div>`
+  el.classList.remove('hidden')
+}
+
+function openPaymentForm(recordId) {
+  _closeAllInlineForms()
+  const el = $(`form_${recordId}`)
+  el.innerHTML = `
+<div class="inline-form">
+  <div class="inline-form-row">
+    <div class="fld">
+      <label>Amount paid (₱) <span class="req">*</span></label>
+      <input type="number" id="pf_amt_${recordId}" min="0" step="0.01" placeholder="0.00">
+    </div>
+    <div class="fld">
+      <label>Payment date <span class="req">*</span></label>
+      <input type="date" id="pf_date_${recordId}">
+    </div>
+  </div>
+  <div class="inline-form-row">
+    <div class="fld">
+      <label>Reference / confirmation no.</label>
+      <input type="text" id="pf_ref_${recordId}" placeholder="e.g. LANDBANK-…">
+    </div>
+    <div class="fld">
+      <label>Payment mode</label>
+      <select id="pf_mode_${recordId}">
+        <option value="">— select —</option>
+        <option value="Online banking">Online banking</option>
+        <option value="Over-the-counter">Over-the-counter</option>
+        <option value="GCash">GCash</option>
+        <option value="Maya">Maya</option>
+        <option value="Check">Check</option>
+        <option value="Others">Others</option>
+      </select>
+    </div>
+  </div>
+  <div id="pf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
+  <div class="inline-form-actions">
+    <button class="btn-primary btn-sm" onclick="savePayment('${recordId}')">Save</button>
+    <button class="btn-cancel-inline" onclick="_closeAllInlineForms()">Cancel</button>
+  </div>
+</div>`
+  el.classList.remove('hidden')
+}
+
+
+// ── CLIENT DETAIL: SAVE FUNCTIONS ────────────────────────────
+
+async function saveFiling(recordId) {
+  const filedDate = $(`ff_date_${recordId}`).value
+  const reference = $(`ff_ref_${recordId}`).value.trim()
+  const hasTaxDue = $(`ff_taxdue_${recordId}`).checked
+  const taxDue    = hasTaxDue ? parseFloat($(`ff_taxamt_${recordId}`).value || '0') : null
+  const errEl     = $(`ff_err_${recordId}`)
+
+  if (!filedDate) { errEl.textContent = 'Date filed is required.'; errEl.style.display = 'block'; return }
+  errEl.style.display = 'none'
+
+  const { error } = await supa.from('compliance_records').update({
+    filed_date:       filedDate,
+    filing_reference: reference || null,
+    has_tax_due:      hasTaxDue,
+    tax_due:          taxDue,
+    payment_status:   hasTaxDue ? 'pending' : 'n/a',
+  }).eq('id', recordId)
+
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  await loadObligations(activeClientId)
+}
+
+async function saveTRRC(recordId) {
+  const trrcDate = $(`tf_date_${recordId}`).value
+  const trrcRef  = $(`tf_ref_${recordId}`).value.trim()
+  const errEl    = $(`tf_err_${recordId}`)
+
+  if (!trrcDate) { errEl.textContent = 'TRRC date is required.'; errEl.style.display = 'block'; return }
+  errEl.style.display = 'none'
+
+  const { error } = await supa.from('compliance_records').update({
+    trrc_saved:      true,
+    trrc_date:       trrcDate,
+    trrc_reference:  trrcRef || null,
+  }).eq('id', recordId)
+
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  await loadObligations(activeClientId)
+}
+
+async function savePayment(recordId) {
+  const amountPaid = parseFloat($(`pf_amt_${recordId}`).value || '0')
+  const payDate    = $(`pf_date_${recordId}`).value
+  const payRef     = $(`pf_ref_${recordId}`).value.trim()
+  const payMode    = $(`pf_mode_${recordId}`).value
+  const errEl      = $(`pf_err_${recordId}`)
+
+  if (!amountPaid || amountPaid <= 0) { errEl.textContent = 'Amount paid is required.'; errEl.style.display = 'block'; return }
+  if (!payDate) { errEl.textContent = 'Payment date is required.'; errEl.style.display = 'block'; return }
+  errEl.style.display = 'none'
+
+  const { error } = await supa.from('compliance_records').update({
+    payment_status:    'paid',
+    amount_paid:       amountPaid,
+    payment_date:      payDate,
+    payment_reference: payRef || null,
+    payment_mode:      payMode || null,
+  }).eq('id', recordId)
+
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  await loadObligations(activeClientId)
+}
+
+
+// ── CLIENT DETAIL: HISTORY TAB ────────────────────────────────
+
+async function loadHistory() {
+  const { data: records, error } = await supa
+    .from('compliance_records')
+    .select('*')
+    .eq('client_id', activeClientId)
+    .not('filed_date', 'is', null)
+    .order('filed_date', { ascending: false })
+
+  if (error) {
+    $('historyPanel').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
+    return
+  }
+
+  if (!records || records.length === 0) {
+    $('historyPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem">No filed records yet.</p>'
+    return
+  }
+
+  const rows = records.map(r => `
+<tr>
+  <td class="mono">${esc(r.form)}</td>
+  <td>${esc(r.period ?? '—')}</td>
+  <td class="mono">${r.filed_date ?? '—'}</td>
+  <td class="mono">${esc(r.filing_reference ?? '—')}</td>
+  <td>${r.trrc_saved ? '✅' : '—'}</td>
+  <td>${r.payment_status === 'paid' ? `₱${Number(r.amount_paid||0).toLocaleString()}` : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
+</tr>`).join('')
+
+  $('historyPanel').innerHTML = `
+<div class="hist-wrap">
+  <table class="hist-table">
+    <thead>
+      <tr>
+        <th>Form</th>
+        <th>Period</th>
+        <th>Filed</th>
+        <th>Confirmation</th>
+        <th>TRRC</th>
+        <th>Payment</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`
+}
+
+
+// ── CLIENT DETAIL: SUB-TAB SWITCHER ──────────────────────────
+
+function _switchSubtab(name, btn) {
+  ['obligations','history','notes'].forEach(tab => {
+    const panel = $(`${tab}Panel`)
+    if (panel) panel.classList.toggle('hidden', tab !== name)
+  })
+  document.querySelectorAll('.subtab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === name)
+    b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false')
+  })
+  if (name === 'history') loadHistory()
+  if (name === 'notes')   loadClientNotes()
+}
+
+
+// ── CLIENT DETAIL: NOTES TAB ──────────────────────────────────
+
+async function loadClientNotes() {
+  const { data: client } = await supa
+    .from('clients')
+    .select('notes')
+    .eq('id', activeClientId)
+    .single()
+  $('clientNotesArea').value = client?.notes ?? ''
+}
+
+async function saveClientNotes() {
+  const notes = $('clientNotesArea').value
+  await supa.from('clients').update({ notes }).eq('id', activeClientId)
 }
 </script>
 </body>
