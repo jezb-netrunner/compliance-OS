@@ -1596,6 +1596,27 @@ table.ct tfoot td {
   border-bottom: none;
   color: var(--ink);
 }
+table.ct td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.report-month-hdr td {
+  background: var(--s3);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--mu);
+  padding: .4rem .6rem;
+}
+.report-subtotal td {
+  background: var(--s2);
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--ink);
+  padding: .35rem .6rem;
+  border-top: 1px solid var(--bd);
+}
 
 .rpt-table-wrap {
   overflow-x: auto;
@@ -1660,6 +1681,180 @@ table.ct tfoot td {
   display: flex;
   justify-content: space-between;
 }
+
+.rpt-audit-hd {
+  font-size: .82rem;
+  color: var(--ch);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid var(--bd);
+}
+.rpt-audit-hd strong { color: var(--ink); }
+.rpt-audit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 2rem;
+  background: var(--s2);
+  border-radius: var(--rr);
+  padding: .75rem 1rem;
+  margin-top: 1rem;
+  font-size: .82rem;
+  color: var(--dim);
+}
+.rpt-audit-summary strong { color: var(--ink); }
+.rpt-audit-disclaimer {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-style: italic;
+  font-size: .75rem;
+  color: var(--mu);
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+.rpt-print-footer { display: none; }
+
+.year-pill-bar {
+  display: flex;
+  gap: .4rem;
+  margin-bottom: .85rem;
+  flex-wrap: wrap;
+}
+.year-pill {
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: 999px;
+  padding: .25rem .75rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--mu);
+  cursor: pointer;
+  font-family: inherit;
+}
+.year-pill:hover { color: var(--ink); border-color: var(--royal); }
+.year-pill.active {
+  background: var(--royal);
+  color: #fff;
+  border-color: var(--royal);
+}
+
+.settings-wrap { max-width: 560px; padding: 1.25rem; }
+.settings-toggle {
+  display: flex;
+  gap: .75rem;
+  align-items: flex-start;
+  margin-top: .75rem;
+  font-size: .85rem;
+  color: var(--ch);
+  cursor: pointer;
+}
+.settings-toggle input { margin-top: .25rem; }
+.settings-toggle strong { display: block; color: var(--ink); font-weight: 600; }
+.settings-toggle-hint {
+  display: block;
+  font-size: .75rem;
+  color: var(--mu);
+  margin-top: .15rem;
+  line-height: 1.45;
+}
+
+.modal-ov {
+  position: fixed; inset: 0;
+  background: rgba(17, 17, 17, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.modal-ov.hidden { display: none; }
+.modal-card {
+  background: var(--sf);
+  border-radius: var(--r);
+  box-shadow: var(--sh);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+}
+.modal-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .9rem 1.15rem;
+  border-bottom: 1px solid var(--bd);
+}
+.modal-title {
+  font-family: var(--se);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.modal-body { padding: 1.15rem; }
+.enroll-link-row {
+  display: flex;
+  gap: .5rem;
+  align-items: stretch;
+}
+.enroll-link-row input {
+  flex: 1;
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: var(--rr);
+  padding: .5rem .65rem;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: .78rem;
+  color: var(--ink);
+}
+.enroll-link-row input:focus { outline: 2px solid var(--royal); border-color: var(--royal); }
+
+.bulk-bar {
+  display: flex;
+  gap: .65rem;
+  align-items: center;
+  padding: .55rem 1rem;
+  background: var(--rs);
+  border-bottom: 1px solid var(--bd);
+  font-size: .82rem;
+  color: var(--ink);
+}
+.bulk-bar.hidden { display: none; }
+.bulk-bar strong { color: var(--royal); font-weight: 700; }
+.ob-card, .client-card { position: relative; }
+.bulk-chk {
+  position: absolute;
+  top: .55rem;
+  left: .55rem;
+  width: 18px; height: 18px;
+  z-index: 3;
+  cursor: pointer;
+}
+.ob-card.bulk-eligible,
+.client-card.bulk-mode-card { padding-left: 2.25rem; }
+.ob-card.bulk-selected,
+.client-card.bulk-selected { box-shadow: 0 0 0 2px var(--royal) inset; }
+.bulk-taxtable { width: 100%; margin-top: .65rem; font-size: .82rem; border-collapse: collapse; }
+.bulk-taxtable th,
+.bulk-taxtable td { padding: .35rem .5rem; border-bottom: 1px solid var(--bd); text-align: left; }
+.bulk-taxtable input {
+  width: 120px; padding: .3rem .45rem;
+  border: 1px solid var(--bd); border-radius: var(--rr);
+  font-family: var(--sa);
+}
+.combined-group-hdr {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 700; color: var(--mu);
+  margin: .9rem 0 .25rem;
+  padding-bottom: .2rem;
+  border-bottom: 1px solid var(--bd);
+}
+.combined-row {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .4rem 0;
+  font-size: .85rem;
+  border-bottom: 1px solid var(--bd);
+  cursor: pointer;
+}
+.combined-row .cr-name { flex: 1; color: var(--ink); font-weight: 600; }
+.combined-row .cr-form { color: var(--mu); font-size: .78rem; }
 
 /* ═══════════════════════════════════════════════════
    PRINT STYLES
@@ -1743,6 +1938,31 @@ table.ct tfoot td {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  .rpt-audit-hd {
+    border-bottom: 1px solid #000;
+    font-size: 11px;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  .rpt-audit-summary {
+    background: #f4f4f4 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 10px;
+  }
+  .rpt-audit-disclaimer { font-size: 9px; }
+  table.ct td { font-size: 10px; }
+  .rpt-print-footer {
+    display: block;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    text-align: center;
+    font-size: 9px;
+    color: #555;
+    padding: .4rem 0;
+    border-top: 1px solid #ccc;
+  }
 }
 </style>
 </head>
@@ -1820,6 +2040,9 @@ table.ct tfoot td {
           <button class="sidebar-nav-item" onclick="showReports()">
             <span>Reports</span>
           </button>
+          <button class="sidebar-nav-item" onclick="showSettings()">
+            <span>Settings</span>
+          </button>
         </nav>
       </div>
 
@@ -1837,7 +2060,16 @@ table.ct tfoot td {
       <!-- Top bar: heading + add button -->
       <div class="roster-topbar">
         <h2>My Clients</h2>
-        <button class="btn-primary btn-sm" onclick="openClientSheet('add')">+ Add Client</button>
+        <button class="btn-ghost btn-sm" id="btnBulkClients"
+          style="margin-left:auto" onclick="toggleBulkClients()">Bulk update</button>
+        <button class="btn-primary btn-sm" style="margin-left:.5rem"
+          onclick="openClientSheet('add')">+ Add Client</button>
+      </div>
+      <div id="bulkClientBar" class="bulk-bar hidden">
+        <span><strong id="bulkClientCount">0</strong> selected</span>
+        <button class="btn-primary btn-sm" id="bulkClientView"
+          onclick="openCombinedObligations()" disabled>View combined obligations</button>
+        <button class="btn-ghost btn-sm" onclick="toggleBulkClients()">Cancel</button>
       </div>
 
       <!-- Summary strip -->
@@ -1899,8 +2131,20 @@ table.ct tfoot td {
     <div class="detail-back-bar">
       <button class="btn-back" onclick="showRosterView()">← Clients</button>
       <span id="detailClientName"></span>
-      <button class="btn-ghost btn-sm" style="margin-left:auto"
+      <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
+        onclick="generateYearObligations()">Generate Obligations</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
+        onclick="shareEnrollmentLink()">Share Enrollment Link</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
+        id="btnBulkObs" onclick="toggleBulkObs()">Select</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
+    </div>
+    <div id="bulkObBar" class="bulk-bar hidden">
+      <span><strong id="bulkObCount">0</strong> selected</span>
+      <button class="btn-primary btn-sm" id="bulkObMark"
+        onclick="openBulkFilingSheet()" disabled>Mark as Filed</button>
+      <button class="btn-ghost btn-sm" onclick="toggleBulkObs()">Cancel</button>
     </div>
 
     <div class="detail-meta-strip">
@@ -1957,6 +2201,9 @@ table.ct tfoot td {
           </button>
           <button class="sidebar-nav-item" onclick="showReports()">
             <span>Reports</span>
+          </button>
+          <button class="sidebar-nav-item" onclick="showSettings()">
+            <span>Settings</span>
           </button>
         </nav>
       </div>
@@ -2042,6 +2289,9 @@ table.ct tfoot td {
           <button class="sidebar-nav-item active" onclick="showReports()" aria-current="page">
             <span>Reports</span>
           </button>
+          <button class="sidebar-nav-item" onclick="showSettings()">
+            <span>Settings</span>
+          </button>
         </nav>
       </div>
       <div class="sidebar-footer">
@@ -2070,6 +2320,9 @@ table.ct tfoot td {
           </button>
           <button class="rpt-type-item" data-rpt="3" onclick="_selectReport(3)">
             Penalty Exposure Report
+          </button>
+          <button class="rpt-type-item" data-rpt="4" onclick="_selectReport(4)">
+            Compliance Audit Trail
           </button>
         </div>
 
@@ -2117,6 +2370,26 @@ table.ct tfoot td {
             <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
           </div>
 
+          <!-- Report 4 controls -->
+          <div id="rptCtrl4" class="rpt-controls hidden">
+            <span class="rpt-controls-title">Compliance Audit Trail</span>
+            <span class="rpt-ctrl-group">
+              <label for="rptClient4">Client</label>
+              <select id="rptClient4"></select>
+            </span>
+            <span class="rpt-ctrl-group">
+              <label for="rptYear4">Year</label>
+              <select id="rptYear4">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+              </select>
+            </span>
+            <button class="btn-primary btn-sm" onclick="generateReport4()">Generate</button>
+            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+          </div>
+
           <!-- Content area -->
           <div class="rpt-content" id="rptContent">
             <p style="color:var(--mu);font-size:.85rem">Select a report type and click <strong>Generate</strong>.</p>
@@ -2126,6 +2399,65 @@ table.ct tfoot td {
       </div><!-- .rpt-body -->
     </main>
   </div><!-- #pgReports -->
+
+  <!-- ── SETTINGS VIEW ── -->
+  <div id="pgSettings" class="app-shell hidden">
+    <aside class="sidebar" role="complementary" aria-label="Settings navigation">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">The Present Value<span class="dot">.</span></div>
+        <div class="sidebar-brand-sub">Practitioner Suite</div>
+      </div>
+      <div>
+        <div class="sidebar-label">Navigation</div>
+        <nav class="sidebar-nav" aria-label="Primary">
+          <button class="sidebar-nav-item" onclick="showRosterView()"><span>Clients</span></button>
+          <button class="sidebar-nav-item" onclick="showDashboard()"><span>Dashboard</span></button>
+          <button class="sidebar-nav-item" onclick="showReports()"><span>Reports</span></button>
+          <button class="sidebar-nav-item active" onclick="showSettings()" aria-current="page"><span>Settings</span></button>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-pract-name" id="stSidebarName"></div>
+        <div class="sidebar-pract-email" id="stSidebarEmail"></div>
+        <button class="btn-ghost btn-sm btn-full" onclick="signOut()">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main-content" role="main">
+      <div class="roster-topbar"><h2>Settings</h2></div>
+      <div class="settings-wrap">
+        <div class="card">
+          <div class="db-section-title">Profile</div>
+          <div class="fg" style="margin-top:.75rem">
+            <div class="fld span2">
+              <label for="stName">Practitioner name</label>
+              <input type="text" id="stName" autocomplete="name">
+            </div>
+            <div class="fld span2">
+              <label for="stFirm">Firm name</label>
+              <input type="text" id="stFirm" autocomplete="organization">
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <div class="db-section-title">Notifications</div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="stEmailReminders">
+            <span>
+              <strong>Weekly email digest</strong>
+              <span class="settings-toggle-hint">Monday 8:00 AM PHT — deadlines due this week plus any overdue items.</span>
+            </span>
+          </label>
+        </div>
+
+        <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+          <button class="btn-primary btn-sm" onclick="saveSettings()">Save</button>
+          <span id="stSaveMsg" style="font-size:.78rem;color:var(--mu)"></span>
+        </div>
+      </div>
+    </main>
+  </div><!-- #pgSettings -->
 
 </div><!-- #appView -->
 
@@ -2285,6 +2617,60 @@ table.ct tfoot td {
 </div><!-- #addClientSheet -->
 
 
+<!-- ═══════════════════════════════════════════════
+     BULK FILING SHEET + COMBINED OBLIGATIONS SHEET
+═══════════════════════════════════════════════════ -->
+<div id="bulkFilingSheet" class="sheet-ov hidden"
+  onclick="if(event.target===this)closeBulkFilingSheet()"
+  role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-hdr">
+      <span class="sheet-title">Mark as Filed</span>
+      <button class="sheet-close" onclick="closeBulkFilingSheet()" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-body" id="bulkFilingBody"></div>
+  </div>
+</div>
+
+<div id="combinedObSheet" class="sheet-ov hidden"
+  onclick="if(event.target===this)closeCombinedObSheet()"
+  role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-hdr">
+      <span class="sheet-title">Combined obligations</span>
+      <button class="sheet-close" onclick="closeCombinedObSheet()" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-body" id="combinedObBody"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     ENROLLMENT LINK MODAL
+═══════════════════════════════════════════════════ -->
+<div id="enrollLinkModal" class="modal-ov hidden"
+  onclick="if(event.target===this)closeEnrollLink()"
+  role="dialog" aria-modal="true" aria-labelledby="enrollLinkTitle">
+  <div class="modal-card">
+    <div class="modal-hdr">
+      <span class="modal-title" id="enrollLinkTitle">Share enrollment link</span>
+      <button class="sheet-close" onclick="closeEnrollLink()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="enrollLinkHint" style="font-size:.8rem;color:var(--mu);margin-bottom:.75rem"></p>
+      <div class="enroll-link-row">
+        <input type="text" id="enrollLinkUrl" readonly>
+        <button class="btn-primary btn-sm" onclick="copyEnrollLink()" id="enrollLinkCopyBtn">Copy link</button>
+      </div>
+      <p style="font-size:.75rem;color:var(--mu);margin-top:.9rem;line-height:1.5">
+        Link expires in 7 days. Client does not need to create an account.
+      </p>
+      <p id="enrollLinkErr" style="font-size:.78rem;color:var(--red);margin-top:.5rem;display:none"></p>
+    </div>
+  </div>
+</div>
+
+
 <script>
 /*
  * ══════════════════════════════════════════════════════════════
@@ -2301,9 +2687,14 @@ table.ct tfoot td {
  *   email       text,
  *   name        text,
  *   firm_name   text,
- *   plan        text not null default 'pro',
- *   created_at  timestamptz not null default now()
+ *   plan             text    not null default 'pro',
+ *   email_reminders  boolean not null default true,
+ *   created_at       timestamptz not null default now()
  * );
+ *
+ * -- If upgrading an existing deployment:
+ * -- alter table practitioners
+ * --   add column if not exists email_reminders boolean not null default true;
  *
  * alter table practitioners enable row level security;
  *
@@ -2421,6 +2812,64 @@ table.ct tfoot td {
  *   );
  *
  *
+ * ── 3b. ENROLLMENT TOKENS ────────────────────────────────────
+ *
+ * create table if not exists enrollment_tokens (
+ *   id                uuid primary key default gen_random_uuid(),
+ *   practitioner_id   uuid not null
+ *                       references practitioners(id) on delete cascade,
+ *   token             text unique not null default gen_random_uuid()::text,
+ *   client_name_hint  text,
+ *   used              boolean     not null default false,
+ *   created_at        timestamptz not null default now(),
+ *   expires_at        timestamptz not null default (now() + interval '7 days')
+ * );
+ *
+ * create index if not exists enrollment_tokens_token_idx
+ *   on enrollment_tokens (token);
+ *
+ * alter table enrollment_tokens enable row level security;
+ *
+ * -- Practitioner can read/write their own tokens.
+ * create policy "enrollment_tokens: own practitioner"
+ *   on enrollment_tokens for all
+ *   to authenticated
+ *   using (
+ *     practitioner_id in (
+ *       select id from practitioners where auth_id = auth.uid()
+ *     )
+ *   )
+ *   with check (
+ *     practitioner_id in (
+ *       select id from practitioners where auth_id = auth.uid()
+ *     )
+ *   );
+ *
+ * -- Anonymous enrollment page: read a live token only.
+ * create policy "enrollment_tokens: public lookup"
+ *   on enrollment_tokens for select
+ *   to anon
+ *   using (used = false and expires_at > now());
+ *
+ * -- Anonymous enrollment page: insert the client row.
+ * create policy "clients: public enrollment insert"
+ *   on clients for insert
+ *   to anon
+ *   with check (
+ *     practitioner_id in (
+ *       select practitioner_id from enrollment_tokens
+ *       where used = false and expires_at > now()
+ *     )
+ *   );
+ *
+ * -- Anonymous enrollment page: mark the token used.
+ * create policy "enrollment_tokens: public consume"
+ *   on enrollment_tokens for update
+ *   to anon
+ *   using (used = false and expires_at > now())
+ *   with check (used = true);
+ *
+ *
  * ── 4. TRIGGERS  (auto-update updated_at) ────────────────────
  *
  * create or replace function _touch_updated_at()
@@ -2445,8 +2894,8 @@ table.ct tfoot td {
 
 // ── SUPABASE ──────────────────────────────────────────────────
 const _IS_DEV  = new URLSearchParams(location.search).has('dev')
-const SUPA_URL = 'YOUR_URL'
-const SUPA_KEY = 'YOUR_ANON_KEY'
+const SUPA_URL = 'https://pqevddxxhlhiqzslzdsy.supabase.co'
+const SUPA_KEY = 'sb_publishable_2ExdGSjFVHUHnuVlAVAbmw_xflEibJE'
 const supa     = _IS_DEV ? _mkDevSupa() : supabase.createClient(SUPA_URL, SUPA_KEY)
 
 // Stub Supabase client used when ?dev is in the URL so the real
@@ -2546,6 +2995,7 @@ function showRosterView() {
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
   $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   activeClientId = null
   loadRoster()   // refresh data whenever returning to the roster
 }
@@ -2557,6 +3007,7 @@ function showDashboard() {
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.remove('hidden')
   $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   const n = $('dbSidebarName'), e = $('dbSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   if (e) e.textContent = currentPractitioner?.email || ''
@@ -2684,6 +3135,7 @@ async function showClientDetail(clientId) {
   $('rosterView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
   $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   $('clientView').classList.remove('hidden')
 
   _switchSubtab('obligations')
@@ -2708,7 +3160,39 @@ async function showClientDetail(clientId) {
   ].filter(Boolean).join(' · ')
   $('detailMetaStrip').textContent = meta
 
+  await _updateGenerateYearBtn(clientId)
   await loadObligations(clientId)
+}
+
+async function _updateGenerateYearBtn(clientId) {
+  const btn = $('btnGenerateYear')
+  if (!btn) return
+  const { data } = await supa.from('compliance_records')
+    .select('due_date').eq('client_id', clientId)
+  const years = new Set((data || []).map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))
+  let next = new Date().getFullYear()
+  while (years.has(String(next))) next++
+  btn.textContent = `Generate ${next} Obligations`
+  btn.dataset.year = String(next)
+}
+
+async function generateYearObligations() {
+  const btn = $('btnGenerateYear')
+  const yr  = +btn.dataset.year
+  if (!yr || !_currentClient) return
+  if (!confirm(`Generate all ${yr} obligations for ${_currentClient.display_name}?`)) return
+  btn.disabled = true
+  await seedComplianceRecords(activeClientId, {
+    taxpayer_type:      _currentClient.taxpayer_type,
+    vat_status:         _currentClient.vat_status,
+    has_employees:      _currentClient.has_employees,
+    withholds_expanded: _currentClient.withholds_expanded,
+    withholds_final:    _currentClient.withholds_final,
+    fiscal_year_start:  _currentClient.fiscal_start_month,
+  }, yr)
+  btn.disabled = false
+  await _updateGenerateYearBtn(activeClientId)
+  await loadObligations(activeClientId, yr)
 }
 
 
@@ -2862,7 +3346,7 @@ function _iso(date) { return date.toISOString().split('T')[0] }
  *   - RMC 30-2026 (EO 110, s. 2026) — CY 2025 annual ITR deadline overridden
  *     from 15 Apr 2026 to 15 May 2026.
  */
-function generateObligations(profile) {
+function generateObligations(profile, year) {
   const {
     taxpayer_type,
     vat_status,
@@ -2871,7 +3355,7 @@ function generateObligations(profile) {
     withholds_final    = false,
     fiscal_year_start  = 1,   // 1 = calendar year
   } = profile
-  const yr  = new Date().getFullYear()
+  const yr  = year ?? new Date().getFullYear()
   const obs = []
 
   /** Build one obligation entry */
@@ -3085,8 +3569,8 @@ async function applyRMC30_2026Override() {
 }
 
 /** Insert compliance_records for a newly added client, skipping any that already exist */
-async function seedComplianceRecords(clientId, profile) {
-  const obligations = generateObligations(profile)
+async function seedComplianceRecords(clientId, profile, year = new Date().getFullYear()) {
+  const obligations = generateObligations(profile, year)
   if (!obligations.length) return
 
   const { data: existing } = await supa
@@ -3150,7 +3634,8 @@ function buildClientCard(client, stats) {
   return `<div class="client-card"
     data-status="${statusKey}"
     data-name="${esc(client.display_name.toLowerCase())}"
-    onclick="showClientDetail('${esc(client.id)}')"
+    data-client-id="${esc(client.id)}"
+    onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${esc(client.id)}')"
     role="button" tabindex="0"
     onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(client.id)}')"
     aria-label="${esc(client.display_name)}">
@@ -3466,7 +3951,7 @@ function _statusMeta(status) {
 
 // ── CLIENT DETAIL: LOAD + RENDER OBLIGATIONS ──────────────────
 
-async function loadObligations(clientId) {
+async function loadObligations(clientId, yearFilter) {
   const { data: records, error } = await supa
     .from('compliance_records')
     .select('*')
@@ -3485,7 +3970,24 @@ async function loadObligations(clientId) {
 
   _today = new Date(); _today.setHours(0,0,0,0)
   _historyLoaded = false
-  $('obligationsPanel').innerHTML = records.map(buildObligationCard).join('')
+
+  const years   = [...new Set(records.map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))].sort()
+  const nowYr   = String(new Date().getFullYear())
+  const activeY = yearFilter ? String(yearFilter)
+                             : (years.includes(nowYr) ? nowYr : years[years.length - 1])
+
+  const pills = years.length > 1
+    ? `<div class="year-pill-bar">${years.map(y =>
+        `<button class="year-pill${y === activeY ? ' active' : ''}" onclick="loadObligations('${clientId}', '${y}')">${y}</button>`
+      ).join('')}</div>`
+    : ''
+
+  const filtered = records.filter(r => r.due_date && r.due_date.startsWith(activeY))
+  const body     = filtered.length
+    ? filtered.map(buildObligationCard).join('')
+    : `<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">No obligations for ${esc(activeY)}.</p>`
+
+  $('obligationsPanel').innerHTML = pills + body
 }
 
 function buildObligationCard(r) {
@@ -3844,6 +4346,7 @@ function showReports() {
   $('rosterView').classList.add('hidden')
   $('clientView').classList.add('hidden')
   $('pgDashboard').classList.add('hidden')
+  $('pgSettings').classList.add('hidden')
   $('pgReports').classList.remove('hidden')
   const n = $('rptSidebarName'), e = $('rptSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
@@ -3904,16 +4407,19 @@ async function _initReportControls() {
     return
   }
 
-  clientSel.innerHTML = clients.map(c =>
+  const clientOptsHtml = clients.map(c =>
     `<option value="${c.id}">${esc(c.display_name)}</option>`
   ).join('')
+  clientSel.innerHTML = clientOptsHtml
+  const clientSel4 = $('rptClient4')
+  if (clientSel4) clientSel4.innerHTML = clientOptsHtml
 }
 
 function _selectReport(n) {
   document.querySelectorAll('.rpt-type-item').forEach(b => {
     b.classList.toggle('active', +b.dataset.rpt === n)
   })
-  ;[1, 2, 3].forEach(i => {
+  ;[1, 2, 3, 4].forEach(i => {
     const el = $(`rptCtrl${i}`)
     if (el) el.classList.toggle('hidden', i !== n)
   })
@@ -4020,19 +4526,31 @@ async function generateReport1() {
     html += `<p style="font-size:.8rem;color:var(--mu);margin-bottom:1.5rem">${metaParts.join(' · ')}</p>`
   }
 
-  // Month sections
+  // Single continuous table with month group header rows
+  html += `<div class="rpt-table-wrap"><table class="ct">
+    <colgroup>
+      <col style="width:140px">
+      <col style="width:130px">
+      <col style="width:100px">
+      <col style="width:100px">
+      <col style="width:60px">
+      <col style="width:90px">
+      <col style="width:100px">
+      <col style="width:75px">
+      <col style="width:100px">
+    </colgroup>
+    <thead style="position:sticky;top:0;background:var(--s2);z-index:1"><tr>
+      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
+      <th>TRRC</th><th>Payment</th><th>Amount Paid</th><th>Days Late</th><th>Status</th>
+    </tr></thead><tbody>`
+
   Object.keys(byMonth).sort().forEach(mo => {
     const recs    = byMonth[mo]
     const moLabel = new Date(mo + '-15').toLocaleDateString('en-PH', {month:'long', year:'numeric'})
     let moTotPaid = 0
     recs.forEach(r => { if (r.payment_status === 'paid') moTotPaid += +(r.amount_paid || 0) })
 
-    html += `<div class="rpt-month-section">`
-    html += `<div class="rpt-section-hd">${esc(moLabel)}</div>`
-    html += `<div class="rpt-table-wrap"><table class="ct"><thead><tr>
-      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
-      <th>TRRC</th><th>Payment</th><th>Amount Paid</th><th>Days Late</th><th>Status</th>
-    </tr></thead><tbody>`
+    html += `<tr class="report-month-hdr"><td colspan="9">${esc(moLabel)}</td></tr>`
 
     recs.forEach(r => {
       const dl = _daysLate(r)
@@ -4049,12 +4567,14 @@ async function generateReport1() {
       </tr>`
     })
 
-    html += `</tbody><tfoot><tr>
-      <td colspan="6" style="text-align:right;color:var(--mu)">Month total paid</td>
+    html += `<tr class="report-subtotal">
+      <td colspan="6" style="text-align:right">Month total paid</td>
       <td>${_rptFmtAmt(moTotPaid)}</td>
       <td colspan="2"></td>
-    </tr></tfoot></table></div></div>`
+    </tr>`
   })
+
+  html += `</tbody></table></div>`
 
   $('rptContent').innerHTML = html
 }
@@ -4277,6 +4797,397 @@ async function generateReport3() {
   </div>`
 
   $('rptContent').innerHTML = html
+}
+
+// ── REPORT 4: Compliance Audit Trail ──────────────────────────
+
+async function generateReport4() {
+  const clientId = $('rptClient4').value
+  const year     = +$('rptYear4').value
+  if (!clientId) { _rptError('Select a client first.'); return }
+
+  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+
+  const [{ data: client }, { data: records, error }] = await Promise.all([
+    supa.from('clients')
+      .select('display_name, tin, rdo_code, vat_status')
+      .eq('id', clientId).single(),
+    supa.from('compliance_records')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('due_date', `${year}-01-01`)
+      .lte('due_date', `${year}-12-31`)
+      .order('due_date')
+  ])
+
+  if (error) { _rptError(error.message); return }
+
+  const genTs    = new Date().toLocaleString('en-PH')
+  const firmName = currentPractitioner?.firm_name || currentPractitioner?.name || ''
+  const dash     = v => v ? esc(v) : '—'
+
+  let totObl = 0, totComplete = 0, totOutstanding = 0, totRemitted = 0
+  ;(records || []).forEach(r => {
+    totObl++
+    if (r.filed_date && r.payment_status === 'paid') totComplete++
+    else totOutstanding++
+    if (r.payment_status === 'paid') totRemitted += +(r.amount_paid || 0)
+  })
+
+  let html = `<div class="rpt-audit-hd">
+    <div><strong>Client:</strong> ${esc(client?.display_name || '—')} · <strong>TIN:</strong> ${dash(client?.tin)} · <strong>RDO:</strong> ${dash(client?.rdo_code)}</div>
+    <div><strong>Tax type:</strong> ${dash(client?.vat_status)} · <strong>Generated:</strong> ${esc(genTs)}</div>
+    <div><strong>Generated by:</strong> ${esc(firmName)}</div>
+  </div>`
+
+  if (!records?.length) {
+    html += '<p style="color:var(--mu);font-size:.85rem;margin-top:1rem">No records found for this client and year.</p>'
+    $('rptContent').innerHTML = html
+    return
+  }
+
+  html += `<div class="rpt-table-wrap"><table class="ct">
+    <colgroup>
+      <col style="width:130px"><col style="width:120px"><col style="width:95px"><col style="width:95px">
+      <col style="width:140px"><col style="width:95px"><col style="width:140px"><col style="width:95px">
+      <col style="width:80px"><col style="width:140px"><col style="width:100px"><col style="width:110px">
+    </colgroup>
+    <thead style="position:sticky;top:0;background:var(--s2);z-index:1"><tr>
+      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
+      <th>Filing Ref</th><th>TRRC Date</th><th>TRRC Ref</th>
+      <th>Payment Date</th><th>Mode</th><th>Payment Ref</th>
+      <th>Amount Paid</th><th>Status</th>
+    </tr></thead><tbody>`
+
+  records.forEach(r => {
+    html += `<tr>
+      <td>${esc(r.form || '—')}</td>
+      <td>${esc(r.period || '—')}</td>
+      <td>${_rptFmtDate(r.due_date)}</td>
+      <td>${_rptFmtDate(r.filed_date)}</td>
+      <td>${dash(r.filing_reference)}</td>
+      <td>${_rptFmtDate(r.trrc_date)}</td>
+      <td>${dash(r.trrc_reference)}</td>
+      <td>${_rptFmtDate(r.payment_date)}</td>
+      <td>${dash(r.payment_mode)}</td>
+      <td>${dash(r.payment_reference)}</td>
+      <td>${r.payment_status === 'paid' ? _rptFmtAmt(r.amount_paid) : '—'}</td>
+      <td>${_rptStatusBadge(r)}</td>
+    </tr>`
+  })
+
+  html += `</tbody></table></div>
+    <div class="rpt-audit-summary">
+      <span>Total obligations: <strong>${totObl}</strong></span>
+      <span>Complete: <strong>${totComplete}</strong></span>
+      <span>Outstanding: <strong>${totOutstanding}</strong></span>
+      <span>Total remitted: <strong>${_rptFmtAmt(totRemitted)}</strong></span>
+    </div>
+    <p class="rpt-audit-disclaimer">This audit trail reflects reference numbers logged in The Present Value Practitioner Suite. Original confirmation documents are retained by the practitioner.</p>
+    <div class="rpt-print-footer">Generated on ${esc(genTs)} · The Present Value Practitioner Suite · ${esc(firmName)}</div>`
+
+  $('rptContent').innerHTML = html
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+
+function showSettings() {
+  $('loginView').classList.add('hidden')
+  $('appView').classList.remove('hidden')
+  $('rosterView').classList.add('hidden')
+  $('clientView').classList.add('hidden')
+  $('pgDashboard').classList.add('hidden')
+  $('pgReports').classList.add('hidden')
+  $('pgSettings').classList.remove('hidden')
+  const n = $('stSidebarName'), e = $('stSidebarEmail')
+  if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
+  if (e) e.textContent = currentPractitioner?.email || ''
+  loadSettings()
+}
+
+async function loadSettings() {
+  if (!currentPractitioner) return
+  $('stSaveMsg').textContent = ''
+  const { data, error } = await supa
+    .from('practitioners')
+    .select('name, firm_name, email_reminders')
+    .eq('id', currentPractitioner.id)
+    .single()
+  if (error) { $('stSaveMsg').textContent = error.message; return }
+  $('stName').value               = data?.name ?? ''
+  $('stFirm').value               = data?.firm_name ?? ''
+  $('stEmailReminders').checked   = data?.email_reminders ?? true
+}
+
+async function saveSettings() {
+  if (!currentPractitioner) return
+  const msg = $('stSaveMsg')
+  msg.style.color   = 'var(--mu)'
+  msg.textContent   = 'Saving…'
+  const payload = {
+    name:            $('stName').value.trim() || null,
+    firm_name:       $('stFirm').value.trim() || null,
+    email_reminders: $('stEmailReminders').checked,
+  }
+  const { error } = await supa
+    .from('practitioners')
+    .update(payload)
+    .eq('id', currentPractitioner.id)
+  if (error) {
+    msg.style.color = 'var(--red)'
+    msg.textContent = error.message
+    return
+  }
+  Object.assign(currentPractitioner, payload)
+  const nEls = ['sidebarPractName', 'dbSidebarName', 'rptSidebarName', 'stSidebarName']
+  nEls.forEach(id => { const el = $(id); if (el) el.textContent = payload.firm_name || payload.name || '' })
+  msg.style.color = 'var(--green)'
+  msg.textContent = 'Saved ✓'
+  setTimeout(() => { msg.textContent = '' }, 2000)
+}
+
+// ── ENROLLMENT LINK ───────────────────────────────────────────
+
+async function shareEnrollmentLink() {
+  if (!currentPractitioner || !activeClientId || !_currentClient) return
+  const modal    = $('enrollLinkModal')
+  const urlInput = $('enrollLinkUrl')
+  const hint     = $('enrollLinkHint')
+  const err      = $('enrollLinkErr')
+  err.style.display = 'none'
+  hint.textContent = `Generating link for ${_currentClient.display_name}…`
+  urlInput.value   = ''
+  modal.classList.remove('hidden')
+
+  const { data, error } = await supa
+    .from('enrollment_tokens')
+    .insert({
+      practitioner_id:  currentPractitioner.id,
+      client_name_hint: _currentClient.display_name,
+    })
+    .select('token')
+    .single()
+
+  if (error || !data) {
+    err.style.display = 'block'
+    err.textContent   = error?.message || 'Could not create link.'
+    hint.textContent  = ''
+    return
+  }
+
+  const base = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}enroll.html`
+  urlInput.value   = `${base}?token=${encodeURIComponent(data.token)}`
+  hint.textContent = `Send this link to ${_currentClient.display_name} to collect their details.`
+  urlInput.focus(); urlInput.select()
+}
+
+function closeEnrollLink() {
+  $('enrollLinkModal').classList.add('hidden')
+}
+
+async function copyEnrollLink() {
+  const input = $('enrollLinkUrl')
+  const btn   = $('enrollLinkCopyBtn')
+  if (!input.value) return
+  try {
+    await navigator.clipboard.writeText(input.value)
+  } catch {
+    input.select()
+    document.execCommand('copy')
+  }
+  const prev = btn.textContent
+  btn.textContent = 'Copied ✓'
+  setTimeout(() => { btn.textContent = prev }, 1500)
+}
+
+// ── BULK SELECT: CLIENT DETAIL ────────────────────────────────
+const _bulkObs = { active: false, records: new Map(), selected: new Set() }
+
+async function toggleBulkObs() {
+  _bulkObs.active = !_bulkObs.active
+  _bulkObs.selected.clear(); _bulkObs.records.clear()
+  $('bulkObBar').classList.toggle('hidden', !_bulkObs.active)
+  $('btnBulkObs').textContent = _bulkObs.active ? 'Exit select mode' : 'Select'
+  document.querySelectorAll('#obligationsPanel .bulk-chk').forEach(el => el.remove())
+  document.querySelectorAll('#obligationsPanel .ob-card')
+    .forEach(el => el.classList.remove('bulk-selected', 'bulk-eligible'))
+  if (!_bulkObs.active) { _updateBulkObsBar(); return }
+  const { data } = await supa.from('compliance_records')
+    .select('id, form, period, due_date, filed_date')
+    .eq('client_id', activeClientId)
+  ;(data || []).forEach(r => {
+    if (r.filed_date) return
+    const card = $(`card_${r.id}`); if (!card) return
+    _bulkObs.records.set(r.id, r)
+    card.classList.add('bulk-eligible')
+    const chk = document.createElement('input')
+    chk.type = 'checkbox'; chk.className = 'bulk-chk'
+    chk.addEventListener('change', () => {
+      if (chk.checked) _bulkObs.selected.add(r.id); else _bulkObs.selected.delete(r.id)
+      card.classList.toggle('bulk-selected', chk.checked)
+      _updateBulkObsBar()
+    })
+    card.prepend(chk)
+  })
+  _updateBulkObsBar()
+}
+
+function _updateBulkObsBar() {
+  const n = _bulkObs.selected.size
+  $('bulkObCount').textContent = n
+  $('bulkObMark').disabled = n === 0
+}
+
+// ── BULK FILING SHEET ─────────────────────────────────────────
+function openBulkFilingSheet(records) {
+  records = records || [..._bulkObs.selected].map(id => _bulkObs.records.get(id)).filter(Boolean)
+  if (!records.length) return
+  const today = new Date().toISOString().slice(0, 10)
+  const rows  = records.map(r =>
+    `<tr data-id="${r.id}"><td>${esc(r.form || '—')}</td><td>${esc(r.period || '—')}</td>` +
+    `<td><input type="number" min="0" step="0.01" class="bf-tax" placeholder="0.00"></td></tr>`
+  ).join('')
+  $('bulkFilingBody').innerHTML = `
+    <p style="font-size:.82rem;color:var(--mu);margin-bottom:.85rem">
+      Applying to <strong>${records.length}</strong> obligation${records.length === 1 ? '' : 's'}.
+    </p>
+    <div class="fg">
+      <div class="fld"><label>Filed date</label><input type="date" id="bfDate" value="${today}"></div>
+      <div class="fld"><label>Filing reference</label>
+        <input type="text" id="bfRef" placeholder="Leave blank to fill individually later"></div>
+    </div>
+    <label class="check-inline" style="margin-top:.75rem">
+      <input type="checkbox" id="bfHasTax"
+        onchange="document.getElementById('bfTaxWrap').classList.toggle('hidden', !this.checked)">
+      Has tax due?
+    </label>
+    <div id="bfTaxWrap" class="hidden">
+      <table class="bulk-taxtable"><thead><tr><th>Form</th><th>Period</th><th>Tax due (₱)</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+      <button class="btn-primary btn-sm" id="bfSave" onclick="_saveBulkFiling()">Save all</button>
+      <span id="bfProgress" style="font-size:.8rem;color:var(--mu)"></span>
+    </div>`
+  $('bulkFilingSheet').dataset.ids = records.map(r => r.id).join(',')
+  $('bulkFilingSheet').classList.remove('hidden')
+}
+
+function closeBulkFilingSheet() { $('bulkFilingSheet').classList.add('hidden') }
+
+async function _saveBulkFiling() {
+  const ids = ($('bulkFilingSheet').dataset.ids || '').split(',').filter(Boolean)
+  if (!ids.length) return
+  const filedDate = $('bfDate').value
+  const ref       = $('bfRef').value.trim() || null
+  const hasTax    = $('bfHasTax').checked
+  const prog      = $('bfProgress')
+  if (!filedDate) { prog.style.color = 'var(--red)'; prog.textContent = 'Filed date is required.'; return }
+  prog.style.color = 'var(--mu)'
+  const taxByRow = {}
+  document.querySelectorAll('#bulkFilingBody tbody tr').forEach(tr => {
+    taxByRow[tr.dataset.id] = parseFloat(tr.querySelector('.bf-tax').value || '0') || 0
+  })
+  $('bfSave').disabled = true
+  let done = 0
+  prog.textContent = `Saving 0 of ${ids.length}…`
+  await Promise.all(ids.map(id =>
+    supa.from('compliance_records').update({
+      filed_date:       filedDate,
+      filing_reference: ref,
+      has_tax_due:      hasTax,
+      tax_due:          hasTax ? taxByRow[id] : null,
+      payment_status:   hasTax ? 'pending' : 'n/a',
+    }).eq('id', id).then(() => {
+      done++; prog.textContent = `Saving ${done} of ${ids.length}…`
+    })
+  ))
+  prog.textContent = `Saved ${done} of ${ids.length}.`
+  setTimeout(async () => {
+    closeBulkFilingSheet()
+    closeCombinedObSheet()
+    if (_bulkObs.active) toggleBulkObs()
+    if (_bulkClients.active) toggleBulkClients()
+    if (activeClientId && !$('clientView').classList.contains('hidden')) await loadObligations(activeClientId)
+    else loadRoster()
+  }, 400)
+}
+
+// ── BULK SELECT: ROSTER ───────────────────────────────────────
+const _bulkClients = { active: false, selected: new Set() }
+
+function toggleBulkClients() {
+  _bulkClients.active = !_bulkClients.active
+  _bulkClients.selected.clear()
+  $('bulkClientBar').classList.toggle('hidden', !_bulkClients.active)
+  $('btnBulkClients').textContent = _bulkClients.active ? 'Exit bulk mode' : 'Bulk update'
+  $('clientList').classList.toggle('bulk-mode', _bulkClients.active)
+  document.querySelectorAll('#clientList .bulk-chk').forEach(el => el.remove())
+  document.querySelectorAll('#clientList .client-card')
+    .forEach(el => el.classList.remove('bulk-selected', 'bulk-mode-card'))
+  if (!_bulkClients.active) { _updateBulkClientBar(); return }
+  document.querySelectorAll('#clientList .client-card').forEach(card => {
+    const id = card.dataset.clientId
+    if (!id) return
+    card.classList.add('bulk-mode-card')
+    const chk = document.createElement('input')
+    chk.type = 'checkbox'; chk.className = 'bulk-chk'
+    chk.addEventListener('click', e => e.stopPropagation())
+    chk.addEventListener('change', () => {
+      if (chk.checked) _bulkClients.selected.add(id); else _bulkClients.selected.delete(id)
+      card.classList.toggle('bulk-selected', chk.checked)
+      _updateBulkClientBar()
+    })
+    card.prepend(chk)
+  })
+  _updateBulkClientBar()
+}
+
+function _updateBulkClientBar() {
+  const n = _bulkClients.selected.size
+  $('bulkClientCount').textContent = n
+  $('bulkClientView').disabled = n === 0
+}
+
+async function openCombinedObligations() {
+  const ids = [..._bulkClients.selected]
+  if (!ids.length) return
+  const [{ data: clients }, { data: records }] = await Promise.all([
+    supa.from('clients').select('id, display_name').in('id', ids),
+    supa.from('compliance_records')
+      .select('id, client_id, form, period, due_date, filed_date')
+      .in('client_id', ids).is('filed_date', null).order('due_date'),
+  ])
+  const nameOf = {}; (clients || []).forEach(c => { nameOf[c.id] = c.display_name })
+  const byDate = {}
+  ;(records || []).forEach(r => { (byDate[r.due_date] = byDate[r.due_date] || []).push(r) })
+  const groups = Object.keys(byDate).sort().map(d => {
+    const label = new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+    const rows  = byDate[d].map(r =>
+      `<label class="combined-row">
+         <input type="checkbox" class="co-chk" data-id="${r.id}" checked>
+         <span class="cr-name">${esc(nameOf[r.client_id] || '—')}</span>
+         <span class="cr-form">${esc(r.form || '—')} · ${esc(r.period || '—')}</span>
+       </label>`
+    ).join('')
+    return `<div class="combined-group-hdr">${esc(label)}</div>${rows}`
+  }).join('') || '<p style="color:var(--mu);font-size:.85rem;padding:.5rem 0">No unfiled obligations for the selected clients.</p>'
+  const recMap = {}; (records || []).forEach(r => { recMap[r.id] = r })
+  $('combinedObBody').innerHTML = groups +
+    `<div style="margin-top:1rem;display:flex;gap:.5rem">
+       <button class="btn-primary btn-sm" onclick="_combinedMarkFiled()">Mark as Filed</button>
+     </div>`
+  $('combinedObSheet')._recMap = recMap
+  $('combinedObSheet').classList.remove('hidden')
+}
+
+function closeCombinedObSheet() { $('combinedObSheet').classList.add('hidden') }
+
+function _combinedMarkFiled() {
+  const recMap = $('combinedObSheet')._recMap || {}
+  const picked = [...document.querySelectorAll('#combinedObBody .co-chk:checked')]
+    .map(c => recMap[c.dataset.id]).filter(Boolean)
+  if (picked.length) openBulkFilingSheet(picked)
 }
 </script>
 </body>
