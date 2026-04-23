@@ -1234,6 +1234,12 @@ body {
   color: var(--mu);
   margin-top: .1rem;
 }
+.ob-edit-link {
+  color: var(--royal);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ob-edit-link:hover { text-decoration: underline; }
 
 /* Action button row */
 .ob-action {
@@ -3169,9 +3175,16 @@ async function _updateGenerateYearBtn(clientId) {
   if (!btn) return
   const { data } = await supa.from('compliance_records')
     .select('due_date').eq('client_id', clientId)
-  const years = new Set((data || []).map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))
-  let next = new Date().getFullYear()
-  while (years.has(String(next))) next++
+  const years   = new Set((data || []).map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))
+  const current = new Date().getFullYear()
+  let next = null
+  if (!years.has(String(current)))       next = current
+  else if (!years.has(String(current + 1))) next = current + 1
+  if (next === null) {
+    btn.classList.add('hidden')
+    return
+  }
+  btn.classList.remove('hidden')
   btn.textContent = `Generate ${next} Obligations`
   btn.dataset.year = String(next)
 }
@@ -4012,19 +4025,22 @@ function buildObligationCard(r) {
     }
   }
 
+  const editLink = (fn) =>
+    ` · <a href="#" class="ob-edit-link" onclick="event.preventDefault();${fn}('${r.id}',true)">Edit</a>`
+
   const step1Done   = !!r.filed_date
   const step1Detail = step1Done
-    ? `${r.filed_date}${r.filing_reference ? ` · Ref: ${esc(r.filing_reference)}` : ''}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}`
+    ? `${r.filed_date}${r.filing_reference ? ` · Ref: ${esc(r.filing_reference)}` : ''}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}${editLink('openFilingForm')}`
     : ''
 
   const step2Done   = !!r.trrc_saved
   const step2Detail = step2Done
-    ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}`
+    ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}${editLink('openTRRCForm')}`
     : ''
 
   const step3Done   = r.payment_status === 'paid'
   const step3Detail = step3Done
-    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}`
+    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${editLink('openPaymentForm')}`
     : (r.payment_status === 'n/a' ? 'No tax due — no payment needed' : '')
 
   let actionBtn = ''
@@ -4084,28 +4100,33 @@ function _closeAllInlineForms() {
   })
 }
 
-function openFilingForm(recordId) {
+async function openFilingForm(recordId, isEdit = false) {
   _closeAllInlineForms()
+  let r = null
+  if (isEdit) {
+    const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
+    r = data
+  }
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="inline-form-row">
     <div class="fld">
       <label>Date filed <span class="req">*</span></label>
-      <input type="date" id="ff_date_${recordId}">
+      <input type="date" id="ff_date_${recordId}" value="${r?.filed_date ?? ''}">
     </div>
     <div class="fld">
       <label>eBIRForms confirmation no.</label>
-      <input type="text" id="ff_ref_${recordId}" placeholder="e.g. 202401-…">
+      <input type="text" id="ff_ref_${recordId}" placeholder="e.g. 202401-…" value="${esc(r?.filing_reference ?? '')}">
     </div>
   </div>
   <label class="check-inline">
-    <input type="checkbox" id="ff_taxdue_${recordId}" onchange="_toggleTaxDue('${recordId}')">
+    <input type="checkbox" id="ff_taxdue_${recordId}" ${r?.has_tax_due ? 'checked' : ''} onchange="_toggleTaxDue('${recordId}')">
     Has tax due?
   </label>
-  <div class="fld hidden" id="ff_taxdue_wrap_${recordId}">
+  <div class="fld ${r?.has_tax_due ? '' : 'hidden'}" id="ff_taxdue_wrap_${recordId}">
     <label>Tax due amount (₱)</label>
-    <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00">
+    <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00" value="${r?.tax_due ?? ''}">
   </div>
   <div id="ff_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
@@ -4125,19 +4146,24 @@ function _toggleTaxDue(recordId) {
   }
 }
 
-function openTRRCForm(recordId) {
+async function openTRRCForm(recordId, isEdit = false) {
   _closeAllInlineForms()
+  let r = null
+  if (isEdit) {
+    const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
+    r = data
+  }
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="inline-form-row">
     <div class="fld">
       <label>TRRC date <span class="req">*</span></label>
-      <input type="date" id="tf_date_${recordId}">
+      <input type="date" id="tf_date_${recordId}" value="${r?.trrc_date ?? ''}">
     </div>
     <div class="fld">
       <label>TRRC reference</label>
-      <input type="text" id="tf_ref_${recordId}" placeholder="TRRC-…">
+      <input type="text" id="tf_ref_${recordId}" placeholder="TRRC-…" value="${esc(r?.trrc_reference ?? '')}">
     </div>
   </div>
   <div id="tf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
@@ -4149,36 +4175,37 @@ function openTRRCForm(recordId) {
   el.classList.remove('hidden')
 }
 
-function openPaymentForm(recordId) {
+async function openPaymentForm(recordId, isEdit = false) {
   _closeAllInlineForms()
+  let r = null
+  if (isEdit) {
+    const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
+    r = data
+  }
+  const modes = ['Online banking','Over-the-counter','GCash','Maya','Check','Others']
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="inline-form-row">
     <div class="fld">
       <label>Amount paid (₱) <span class="req">*</span></label>
-      <input type="number" id="pf_amt_${recordId}" min="0" step="0.01" placeholder="0.00">
+      <input type="number" id="pf_amt_${recordId}" min="0" step="0.01" placeholder="0.00" value="${r?.amount_paid ?? ''}">
     </div>
     <div class="fld">
       <label>Payment date <span class="req">*</span></label>
-      <input type="date" id="pf_date_${recordId}">
+      <input type="date" id="pf_date_${recordId}" value="${r?.payment_date ?? ''}">
     </div>
   </div>
   <div class="inline-form-row">
     <div class="fld">
       <label>Reference / confirmation no.</label>
-      <input type="text" id="pf_ref_${recordId}" placeholder="e.g. LANDBANK-…">
+      <input type="text" id="pf_ref_${recordId}" placeholder="e.g. LANDBANK-…" value="${esc(r?.payment_reference ?? '')}">
     </div>
     <div class="fld">
       <label>Payment mode</label>
       <select id="pf_mode_${recordId}">
         <option value="">— select —</option>
-        <option value="Online banking">Online banking</option>
-        <option value="Over-the-counter">Over-the-counter</option>
-        <option value="GCash">GCash</option>
-        <option value="Maya">Maya</option>
-        <option value="Check">Check</option>
-        <option value="Others">Others</option>
+        ${modes.map(m => `<option value="${m}"${r?.payment_mode === m ? ' selected' : ''}>${m}</option>`).join('')}
       </select>
     </div>
   </div>
