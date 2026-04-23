@@ -1306,11 +1306,11 @@ body {
 
     <div class="detail-subtab-bar" role="tablist">
       <button class="subtab active" role="tab" aria-selected="true"
-        data-tab="obligations" onclick="_switchSubtab('obligations',this)">Obligations</button>
+        data-tab="obligations" onclick="_switchSubtab('obligations')">Obligations</button>
       <button class="subtab" role="tab" aria-selected="false"
-        data-tab="history" onclick="_switchSubtab('history',this)">History</button>
+        data-tab="history" onclick="_switchSubtab('history')">History</button>
       <button class="subtab" role="tab" aria-selected="false"
-        data-tab="notes" onclick="_switchSubtab('notes',this)">Notes</button>
+        data-tab="notes" onclick="_switchSubtab('notes')">Notes</button>
     </div>
 
     <div class="detail-panels">
@@ -1609,6 +1609,9 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY)
 // ── GLOBALS ───────────────────────────────────────────────────
 let currentPractitioner = null
 let activeClientId      = null
+let _currentClient      = null
+let _historyLoaded      = false
+let _today              = null
 
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -1641,13 +1644,15 @@ function showRosterView() {
 }
 
 async function showClientDetail(clientId) {
-  activeClientId = clientId
+  activeClientId  = clientId
+  _currentClient  = null
+  _historyLoaded  = false
   $('loginView').classList.add('hidden')
   $('appView').classList.remove('hidden')
   $('rosterView').classList.add('hidden')
   $('clientView').classList.remove('hidden')
 
-  _switchSubtab('obligations', qs('.subtab[data-tab="obligations"]'))
+  _switchSubtab('obligations')
   $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading…</p>'
   $('detailClientName').textContent = ''
   $('detailMetaStrip').textContent  = ''
@@ -1658,13 +1663,14 @@ async function showClientDetail(clientId) {
     return
   }
 
+  _currentClient = client
   $('detailClientName').textContent = client.display_name
 
   const meta = [
-    client.tin          ? `TIN ${esc(client.tin)}`          : '',
-    client.rdo_code     ? `RDO ${esc(client.rdo_code)}`     : '',
-    client.taxpayer_type ? esc(client.taxpayer_type)         : '',
-    client.vat_status   ? esc(client.vat_status)            : '',
+    client.tin           ? `TIN ${esc(client.tin)}`      : '',
+    client.rdo_code      ? `RDO ${esc(client.rdo_code)}` : '',
+    client.taxpayer_type ? esc(client.taxpayer_type)      : '',
+    client.vat_status    ? esc(client.vat_status)         : '',
   ].filter(Boolean).join(' · ')
   $('detailMetaStrip').textContent = meta
 
@@ -2155,35 +2161,22 @@ async function saveClient() {
 // ── CLIENT DETAIL: STATUS LOGIC ───────────────────────────────
 
 function getCardStatus(r) {
-  const today = new Date(); today.setHours(0,0,0,0)
-  const due   = r.due_date ? new Date(r.due_date) : null
-
+  const due = r.due_date ? new Date(r.due_date) : null
   if (r.payment_status === 'paid') return 'done'
-  if (r.trrc_saved && !r.filed_date) return 'trrc-missing'   // shouldn't happen but guard
-  if (r.filed_date && r.trrc_saved && r.payment_status !== 'paid') return 'unpaid'
+  if (r.filed_date && r.trrc_saved) return 'unpaid'
   if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
-  if (!r.filed_date && due && due < today) return 'overdue'
+  if (!r.filed_date && due && due < _today) return 'overdue'
   return 'pending'
 }
 
-function getStatusLabel(status) {
-  return {
-    'pending':       'Pending filing',
-    'overdue':       'Overdue',
-    'trrc-missing':  'TRRC needed',
-    'unpaid':        'Payment pending',
-    'done':          'Complete',
-  }[status] ?? status
-}
-
-function getStatusBadgeClass(status) {
-  return {
-    'pending':       'badge-dim',
-    'overdue':       'badge-red',
-    'trrc-missing':  'badge-amber',
-    'unpaid':        'badge-blue',
-    'done':          'badge-green',
-  }[status] ?? 'badge-dim'
+function _statusMeta(status) {
+  return ({
+    pending:        { label: 'Pending filing',   cls: 'badge-dim'   },
+    overdue:        { label: 'Overdue',           cls: 'badge-red'   },
+    'trrc-missing': { label: 'TRRC needed',       cls: 'badge-amber' },
+    unpaid:         { label: 'Payment pending',   cls: 'badge-blue'  },
+    done:           { label: 'Complete',          cls: 'badge-green' },
+  })[status] ?? { label: status, cls: 'badge-dim' }
 }
 
 
@@ -2206,42 +2199,36 @@ async function loadObligations(clientId) {
     return
   }
 
+  _today = new Date(); _today.setHours(0,0,0,0)
+  _historyLoaded = false
   $('obligationsPanel').innerHTML = records.map(buildObligationCard).join('')
 }
 
 function buildObligationCard(r) {
-  const status    = getCardStatus(r)
-  const label     = getStatusLabel(status)
-  const badgeCls  = getStatusBadgeClass(status)
-  const today     = new Date(); today.setHours(0,0,0,0)
-  const due       = r.due_date ? new Date(r.due_date) : null
-  const dueTxt    = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
-  const isDueOver = due && due < today && !r.filed_date
+  const status          = getCardStatus(r)
+  const { label, cls }  = _statusMeta(status)
+  const due             = r.due_date ? new Date(r.due_date) : null
+  const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
+  const isDueOver       = due && due < _today && !r.filed_date
 
-  // Step 1: Filed
-  const step1Done = !!r.filed_date
-  const step1Icon = step1Done ? '✅' : '⬜'
+  const step1Done   = !!r.filed_date
+  const step1Icon   = step1Done ? '✅' : '⬜'
   const step1Detail = step1Done
     ? `${r.filed_date}${r.filing_reference ? ` · Ref: ${esc(r.filing_reference)}` : ''}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}`
     : ''
 
-  // Step 2: TRRC
-  const step2Dim  = !step1Done
-  const step2Done = !!r.trrc_saved
-  const step2Icon = step2Done ? '✅' : (step2Dim ? '⬜' : '⬜')
+  const step2Done   = !!r.trrc_saved
+  const step2Icon   = step2Done ? '✅' : '⬜'
   const step2Detail = step2Done
     ? `${r.trrc_date ?? ''}${r.trrc_reference ? ` · Ref: ${esc(r.trrc_reference)}` : ''}`
     : ''
 
-  // Step 3: Payment
-  const step3Dim  = !step2Done
-  const step3Done = r.payment_status === 'paid'
-  const step3Icon = step3Done ? '✅' : (step3Dim ? '⬜' : '⬜')
+  const step3Done   = r.payment_status === 'paid'
+  const step3Icon   = step3Done ? '✅' : '⬜'
   const step3Detail = step3Done
     ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}`
     : (r.payment_status === 'n/a' ? 'No tax due — no payment needed' : '')
 
-  // Which action to show
   let actionBtn = ''
   if (!step1Done) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">Record filing</button>`
@@ -2259,24 +2246,24 @@ function buildObligationCard(r) {
       <div class="ob-name">${esc(r.period ?? '')}</div>
       <div class="ob-period"><span class="ob-due${isDueOver ? ' overdue' : ''}">Due ${dueTxt}</span></div>
     </div>
-    <span class="badge ${badgeCls}">${label}</span>
+    <span class="badge ${cls}">${label}</span>
   </div>
   <div class="ob-steps">
-    <div class="ob-step${step1Done ? '' : ''}">
+    <div class="ob-step">
       <span class="ob-step-icon">${step1Icon}</span>
       <div class="ob-step-body">
         <div class="ob-step-label">1. Filed</div>
         ${step1Detail ? `<div class="ob-step-detail mono">${step1Detail}</div>` : ''}
       </div>
     </div>
-    <div class="ob-step${step2Dim ? ' dimmed' : ''}">
+    <div class="ob-step${step1Done ? '' : ' dimmed'}">
       <span class="ob-step-icon">${step2Icon}</span>
       <div class="ob-step-body">
         <div class="ob-step-label">2. TRRC saved</div>
         ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
       </div>
     </div>
-    <div class="ob-step${step3Dim ? ' dimmed' : ''}">
+    <div class="ob-step${step2Done ? '' : ' dimmed'}">
       <span class="ob-step-icon">${step3Icon}</span>
       <div class="ob-step-body">
         <div class="ob-step-label">3. Payment</div>
@@ -2478,7 +2465,7 @@ async function savePayment(recordId) {
 async function loadHistory() {
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('*')
+    .select('form,period,filed_date,filing_reference,trrc_saved,payment_status,amount_paid')
     .eq('client_id', activeClientId)
     .not('filed_date', 'is', null)
     .order('filed_date', { ascending: false })
@@ -2524,7 +2511,7 @@ async function loadHistory() {
 
 // ── CLIENT DETAIL: SUB-TAB SWITCHER ──────────────────────────
 
-function _switchSubtab(name, btn) {
+function _switchSubtab(name) {
   ['obligations','history','notes'].forEach(tab => {
     const panel = $(`${tab}Panel`)
     if (panel) panel.classList.toggle('hidden', tab !== name)
@@ -2533,7 +2520,7 @@ function _switchSubtab(name, btn) {
     b.classList.toggle('active', b.dataset.tab === name)
     b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false')
   })
-  if (name === 'history') loadHistory()
+  if (name === 'history' && !_historyLoaded) { loadHistory(); _historyLoaded = true }
   if (name === 'notes')   loadClientNotes()
 }
 
@@ -2541,11 +2528,12 @@ function _switchSubtab(name, btn) {
 // ── CLIENT DETAIL: NOTES TAB ──────────────────────────────────
 
 async function loadClientNotes() {
+  if (_currentClient) {
+    $('clientNotesArea').value = _currentClient.notes ?? ''
+    return
+  }
   const { data: client } = await supa
-    .from('clients')
-    .select('notes')
-    .eq('id', activeClientId)
-    .single()
+    .from('clients').select('notes').eq('id', activeClientId).single()
   $('clientNotesArea').value = client?.notes ?? ''
 }
 
