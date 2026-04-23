@@ -178,17 +178,8 @@ h2 {
         <input type="text" id="f_rdo" placeholder="e.g. 040">
       </div>
       <div class="fld span2">
-        <label for="f_industry">Industry</label>
-        <select id="f_industry">
-          <option value="">— Select —</option>
-          <option>Professional Services</option>
-          <option>Retail</option>
-          <option>Trading</option>
-          <option>Real Estate</option>
-          <option>Construction</option>
-          <option>Manufacturing</option>
-          <option>Other</option>
-        </select>
+        <label for="f_industry">Line of Business</label>
+        <input type="text" id="f_industry" placeholder="e.g. Computer Programming Activities" autocomplete="off">
       </div>
     </div>
     <div class="err" id="err1"></div>
@@ -203,20 +194,49 @@ h2 {
     <div class="fg">
       <div class="fld">
         <label for="f_type">Taxpayer type</label>
-        <select id="f_type">
-          <option value="Self-Employed">Self-Employed</option>
-          <option value="Corporation">Corporation</option>
-          <option value="Mixed Income">Mixed Income</option>
-          <option value="Employee">Employee</option>
+        <select id="f_type" onchange="_syncVatOptions()">
+          <optgroup label="Individual">
+            <option value="Self-Employed">Self-Employed / Professional</option>
+            <option value="Mixed Income">Mixed Income</option>
+            <option value="Employee">Employee</option>
+            <option value="Estate">Estate (filed by fiduciary)</option>
+            <option value="Trust">Trust (filed by fiduciary)</option>
+          </optgroup>
+          <optgroup label="Non-Individual">
+            <option value="Corporation">Corporation</option>
+            <option value="One Person Corporation">One Person Corporation</option>
+            <option value="General Partnership">General Partnership</option>
+            <option value="General Professional Partnership">General Professional Partnership</option>
+            <option value="Cooperative">Cooperative</option>
+          </optgroup>
         </select>
       </div>
       <div class="fld">
         <label for="f_vat">VAT status</label>
-        <select id="f_vat">
+        <select id="f_vat" onchange="_syncVatOptions()">
           <option value="VAT-Registered">VAT-Registered</option>
           <option value="Non-VAT (8% Option)">Non-VAT — 8% Option</option>
           <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax</option>
           <option value="Non-VAT (Graduated)">Non-VAT — Graduated</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="f_classification">Tax classification (EOPT)</label>
+        <select id="f_classification">
+          <option value="">— Select —</option>
+          <option value="Micro">Micro (gross sales &lt; ₱3M)</option>
+          <option value="Small">Small (₱3M – &lt;₱20M)</option>
+          <option value="Medium">Medium (₱20M – &lt;₱1B)</option>
+          <option value="Large">Large (≥ ₱1B)</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="f_deduction">Deduction method</label>
+        <select id="f_deduction">
+          <option value="">— Select —</option>
+          <option value="Itemized">Itemized Deduction</option>
+          <option value="OSD">Optional Standard Deduction (OSD)</option>
+          <option value="8%">8% Income Tax Rate</option>
         </select>
       </div>
       <div class="fld span2">
@@ -285,6 +305,46 @@ function renderInvalid() {
     </div>`
 }
 
+// Cross-field rules mirroring the in-app form:
+//  - 8% election (Sec. 24(A)(2)(b)) is for SE/Professional or Mixed only
+//  - choosing 8% locks deduction_method = '8%'; other VAT statuses hide '8%'
+//  - pure-compensation Employees have no deduction method or EOPT class
+function _syncVatOptions() {
+  const typeSel  = $('f_type')
+  const vatSel   = $('f_vat')
+  const classSel = $('f_classification')
+  const dedSel   = $('f_deduction')
+  if (!typeSel || !vatSel) return
+
+  const t = typeSel.value
+  const isEmployee       = t === 'Employee'
+  const eightPctEligible = (t === 'Self-Employed' || t === 'Mixed Income')
+
+  ;[...vatSel.options].forEach(opt => {
+    if (opt.value === 'Non-VAT (8% Option)') opt.disabled = !eightPctEligible
+  })
+  if (vatSel.value === 'Non-VAT (8% Option)' && !eightPctEligible) {
+    vatSel.value = 'Non-VAT (Percentage Tax)'
+  }
+
+  if (dedSel) {
+    const eightPctChosen = vatSel.value === 'Non-VAT (8% Option)'
+    ;[...dedSel.options].forEach(opt => {
+      if (opt.value === '8%') opt.disabled = !eightPctChosen
+    })
+    if (eightPctChosen) { dedSel.value = '8%'; dedSel.disabled = true }
+    else {
+      if (dedSel.value === '8%') dedSel.value = ''
+      dedSel.disabled = isEmployee
+    }
+    if (isEmployee) dedSel.value = ''
+  }
+  if (classSel) {
+    classSel.disabled = isEmployee
+    if (isEmployee) classSel.value = ''
+  }
+}
+
 function renderForm(tok) {
   const tpl = $('formTpl').content.cloneNode(true)
   $('card').innerHTML = ''
@@ -307,6 +367,8 @@ function renderForm(tok) {
   })
 
   $('btnSubmit').addEventListener('click', () => submit(tok))
+
+  _syncVatOptions()
 }
 
 async function submit(tok) {
@@ -325,6 +387,8 @@ async function submit(tok) {
 
   const taxpayer_type      = $('f_type').value
   const vat_status         = $('f_vat').value
+  const tax_classification = $('f_classification').value || null
+  const deduction_method   = $('f_deduction').value      || null
   const fiscal_start_month = parseInt($('f_fiscal').value, 10)
 
   const payload = {
@@ -335,6 +399,8 @@ async function submit(tok) {
     industry:           $('f_industry').value   || null,
     taxpayer_type,
     vat_status,
+    tax_classification,
+    deduction_method,
     regime:             vat_status,
     fiscal_start_month,
     is_active:          true,
