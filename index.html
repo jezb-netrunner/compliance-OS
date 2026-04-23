@@ -1682,6 +1682,37 @@ table.ct td {
   justify-content: space-between;
 }
 
+.rpt-audit-hd {
+  font-size: .82rem;
+  color: var(--ch);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid var(--bd);
+}
+.rpt-audit-hd strong { color: var(--ink); }
+.rpt-audit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 2rem;
+  background: var(--s2);
+  border-radius: var(--rr);
+  padding: .75rem 1rem;
+  margin-top: 1rem;
+  font-size: .82rem;
+  color: var(--dim);
+}
+.rpt-audit-summary strong { color: var(--ink); }
+.rpt-audit-disclaimer {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-style: italic;
+  font-size: .75rem;
+  color: var(--mu);
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+.rpt-print-footer { display: none; }
+
 /* ═══════════════════════════════════════════════════
    PRINT STYLES
 ═══════════════════════════════════════════════════ */
@@ -1763,6 +1794,31 @@ table.ct td {
     border: 1px solid #ccc;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .rpt-audit-hd {
+    border-bottom: 1px solid #000;
+    font-size: 11px;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  .rpt-audit-summary {
+    background: #f4f4f4 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 10px;
+  }
+  .rpt-audit-disclaimer { font-size: 9px; }
+  table.ct td { font-size: 10px; }
+  .rpt-print-footer {
+    display: block;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    text-align: center;
+    font-size: 9px;
+    color: #555;
+    padding: .4rem 0;
+    border-top: 1px solid #ccc;
   }
 }
 </style>
@@ -2092,6 +2148,9 @@ table.ct td {
           <button class="rpt-type-item" data-rpt="3" onclick="_selectReport(3)">
             Penalty Exposure Report
           </button>
+          <button class="rpt-type-item" data-rpt="4" onclick="_selectReport(4)">
+            Compliance Audit Trail
+          </button>
         </div>
 
         <!-- Right: controls + output -->
@@ -2135,6 +2194,26 @@ table.ct td {
               <input type="date" id="rptAsOf">
             </span>
             <button class="btn-primary btn-sm" onclick="generateReport3()">Generate</button>
+            <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
+          </div>
+
+          <!-- Report 4 controls -->
+          <div id="rptCtrl4" class="rpt-controls hidden">
+            <span class="rpt-controls-title">Compliance Audit Trail</span>
+            <span class="rpt-ctrl-group">
+              <label for="rptClient4">Client</label>
+              <select id="rptClient4"></select>
+            </span>
+            <span class="rpt-ctrl-group">
+              <label for="rptYear4">Year</label>
+              <select id="rptYear4">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+              </select>
+            </span>
+            <button class="btn-primary btn-sm" onclick="generateReport4()">Generate</button>
             <button class="btn-ghost btn-sm print-btn" style="margin-left:auto" onclick="window.print()">Print</button>
           </div>
 
@@ -3925,16 +4004,19 @@ async function _initReportControls() {
     return
   }
 
-  clientSel.innerHTML = clients.map(c =>
+  const clientOptsHtml = clients.map(c =>
     `<option value="${c.id}">${esc(c.display_name)}</option>`
   ).join('')
+  clientSel.innerHTML = clientOptsHtml
+  const clientSel4 = $('rptClient4')
+  if (clientSel4) clientSel4.innerHTML = clientOptsHtml
 }
 
 function _selectReport(n) {
   document.querySelectorAll('.rpt-type-item').forEach(b => {
     b.classList.toggle('active', +b.dataset.rpt === n)
   })
-  ;[1, 2, 3].forEach(i => {
+  ;[1, 2, 3, 4].forEach(i => {
     const el = $(`rptCtrl${i}`)
     if (el) el.classList.toggle('hidden', i !== n)
   })
@@ -4310,6 +4392,96 @@ async function generateReport3() {
   html += `<div class="rpt-warning">
     Estimates based on NIRC Sec. 248–249. Actual penalties may vary. Verify with BIR.
   </div>`
+
+  $('rptContent').innerHTML = html
+}
+
+// ── REPORT 4: Compliance Audit Trail ──────────────────────────
+
+async function generateReport4() {
+  const clientId = $('rptClient4').value
+  const year     = +$('rptYear4').value
+  if (!clientId) { _rptError('Select a client first.'); return }
+
+  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+
+  const [{ data: client }, { data: records, error }] = await Promise.all([
+    supa.from('clients')
+      .select('display_name, tin, rdo_code, vat_status')
+      .eq('id', clientId).single(),
+    supa.from('compliance_records')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('due_date', `${year}-01-01`)
+      .lte('due_date', `${year}-12-31`)
+      .order('due_date')
+  ])
+
+  if (error) { _rptError(error.message); return }
+
+  const genTs    = new Date().toLocaleString('en-PH')
+  const firmName = currentPractitioner?.firm_name || currentPractitioner?.name || ''
+  const dash     = v => v ? esc(v) : '—'
+
+  let totObl = 0, totComplete = 0, totOutstanding = 0, totRemitted = 0
+  ;(records || []).forEach(r => {
+    totObl++
+    if (r.filed_date && r.payment_status === 'paid') totComplete++
+    else totOutstanding++
+    if (r.payment_status === 'paid') totRemitted += +(r.amount_paid || 0)
+  })
+
+  let html = `<div class="rpt-audit-hd">
+    <div><strong>Client:</strong> ${esc(client?.display_name || '—')} · <strong>TIN:</strong> ${dash(client?.tin)} · <strong>RDO:</strong> ${dash(client?.rdo_code)}</div>
+    <div><strong>Tax type:</strong> ${dash(client?.vat_status)} · <strong>Generated:</strong> ${esc(genTs)}</div>
+    <div><strong>Generated by:</strong> ${esc(firmName)}</div>
+  </div>`
+
+  if (!records?.length) {
+    html += '<p style="color:var(--mu);font-size:.85rem;margin-top:1rem">No records found for this client and year.</p>'
+    $('rptContent').innerHTML = html
+    return
+  }
+
+  html += `<div class="rpt-table-wrap"><table class="ct">
+    <colgroup>
+      <col style="width:130px"><col style="width:120px"><col style="width:95px"><col style="width:95px">
+      <col style="width:140px"><col style="width:95px"><col style="width:140px"><col style="width:95px">
+      <col style="width:80px"><col style="width:140px"><col style="width:100px"><col style="width:110px">
+    </colgroup>
+    <thead style="position:sticky;top:0;background:var(--s2);z-index:1"><tr>
+      <th>Form</th><th>Period</th><th>Due Date</th><th>Filed Date</th>
+      <th>Filing Ref</th><th>TRRC Date</th><th>TRRC Ref</th>
+      <th>Payment Date</th><th>Mode</th><th>Payment Ref</th>
+      <th>Amount Paid</th><th>Status</th>
+    </tr></thead><tbody>`
+
+  records.forEach(r => {
+    html += `<tr>
+      <td>${esc(r.form || '—')}</td>
+      <td>${esc(r.period || '—')}</td>
+      <td>${_rptFmtDate(r.due_date)}</td>
+      <td>${_rptFmtDate(r.filed_date)}</td>
+      <td>${dash(r.filing_reference)}</td>
+      <td>${_rptFmtDate(r.trrc_date)}</td>
+      <td>${dash(r.trrc_reference)}</td>
+      <td>${_rptFmtDate(r.payment_date)}</td>
+      <td>${dash(r.payment_mode)}</td>
+      <td>${dash(r.payment_reference)}</td>
+      <td>${r.payment_status === 'paid' ? _rptFmtAmt(r.amount_paid) : '—'}</td>
+      <td>${_rptStatusBadge(r)}</td>
+    </tr>`
+  })
+
+  html += `</tbody></table></div>
+    <div class="rpt-audit-summary">
+      <span>Total obligations: <strong>${totObl}</strong></span>
+      <span>Complete: <strong>${totComplete}</strong></span>
+      <span>Outstanding: <strong>${totOutstanding}</strong></span>
+      <span>Total remitted: <strong>${_rptFmtAmt(totRemitted)}</strong></span>
+    </div>
+    <p class="rpt-audit-disclaimer">This audit trail reflects reference numbers logged in The Present Value Practitioner Suite. Original confirmation documents are retained by the practitioner.</p>
+    <div class="rpt-print-footer">Generated on ${esc(genTs)} · The Present Value Practitioner Suite · ${esc(firmName)}</div>`
 
   $('rptContent').innerHTML = html
 }
