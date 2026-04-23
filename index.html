@@ -3235,7 +3235,10 @@ async function handleLogin() {
   btn.textContent = 'Sending…'
   _setLoginMsg('', '')
 
-  const { error } = await supa.auth.signInWithOtp({ email })
+  const { error } = await supa.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: location.origin + location.pathname },
+  })
 
   btn.disabled    = false
   btn.textContent = 'Send sign-in link'
