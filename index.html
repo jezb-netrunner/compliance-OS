@@ -1713,6 +1713,30 @@ table.ct td {
 }
 .rpt-print-footer { display: none; }
 
+.year-pill-bar {
+  display: flex;
+  gap: .4rem;
+  margin-bottom: .85rem;
+  flex-wrap: wrap;
+}
+.year-pill {
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: 999px;
+  padding: .25rem .75rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--mu);
+  cursor: pointer;
+  font-family: inherit;
+}
+.year-pill:hover { color: var(--ink); border-color: var(--royal); }
+.year-pill.active {
+  background: var(--royal);
+  color: #fff;
+  border-color: var(--royal);
+}
+
 /* ═══════════════════════════════════════════════════
    PRINT STYLES
 ═══════════════════════════════════════════════════ */
@@ -1976,7 +2000,9 @@ table.ct td {
     <div class="detail-back-bar">
       <button class="btn-back" onclick="showRosterView()">← Clients</button>
       <span id="detailClientName"></span>
-      <button class="btn-ghost btn-sm" style="margin-left:auto"
+      <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
+        onclick="generateYearObligations()">Generate Obligations</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
     </div>
 
@@ -2808,7 +2834,39 @@ async function showClientDetail(clientId) {
   ].filter(Boolean).join(' · ')
   $('detailMetaStrip').textContent = meta
 
+  await _updateGenerateYearBtn(clientId)
   await loadObligations(clientId)
+}
+
+async function _updateGenerateYearBtn(clientId) {
+  const btn = $('btnGenerateYear')
+  if (!btn) return
+  const { data } = await supa.from('compliance_records')
+    .select('due_date').eq('client_id', clientId)
+  const years = new Set((data || []).map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))
+  let next = new Date().getFullYear()
+  while (years.has(String(next))) next++
+  btn.textContent = `Generate ${next} Obligations`
+  btn.dataset.year = String(next)
+}
+
+async function generateYearObligations() {
+  const btn = $('btnGenerateYear')
+  const yr  = +btn.dataset.year
+  if (!yr || !_currentClient) return
+  if (!confirm(`Generate all ${yr} obligations for ${_currentClient.display_name}?`)) return
+  btn.disabled = true
+  await seedComplianceRecords(activeClientId, {
+    taxpayer_type:      _currentClient.taxpayer_type,
+    vat_status:         _currentClient.vat_status,
+    has_employees:      _currentClient.has_employees,
+    withholds_expanded: _currentClient.withholds_expanded,
+    withholds_final:    _currentClient.withholds_final,
+    fiscal_year_start:  _currentClient.fiscal_start_month,
+  }, yr)
+  btn.disabled = false
+  await _updateGenerateYearBtn(activeClientId)
+  await loadObligations(activeClientId, yr)
 }
 
 
@@ -2962,7 +3020,7 @@ function _iso(date) { return date.toISOString().split('T')[0] }
  *   - RMC 30-2026 (EO 110, s. 2026) — CY 2025 annual ITR deadline overridden
  *     from 15 Apr 2026 to 15 May 2026.
  */
-function generateObligations(profile) {
+function generateObligations(profile, year) {
   const {
     taxpayer_type,
     vat_status,
@@ -2971,7 +3029,7 @@ function generateObligations(profile) {
     withholds_final    = false,
     fiscal_year_start  = 1,   // 1 = calendar year
   } = profile
-  const yr  = new Date().getFullYear()
+  const yr  = year ?? new Date().getFullYear()
   const obs = []
 
   /** Build one obligation entry */
@@ -3185,8 +3243,8 @@ async function applyRMC30_2026Override() {
 }
 
 /** Insert compliance_records for a newly added client, skipping any that already exist */
-async function seedComplianceRecords(clientId, profile) {
-  const obligations = generateObligations(profile)
+async function seedComplianceRecords(clientId, profile, year = new Date().getFullYear()) {
+  const obligations = generateObligations(profile, year)
   if (!obligations.length) return
 
   const { data: existing } = await supa
@@ -3566,7 +3624,7 @@ function _statusMeta(status) {
 
 // ── CLIENT DETAIL: LOAD + RENDER OBLIGATIONS ──────────────────
 
-async function loadObligations(clientId) {
+async function loadObligations(clientId, yearFilter) {
   const { data: records, error } = await supa
     .from('compliance_records')
     .select('*')
@@ -3585,7 +3643,24 @@ async function loadObligations(clientId) {
 
   _today = new Date(); _today.setHours(0,0,0,0)
   _historyLoaded = false
-  $('obligationsPanel').innerHTML = records.map(buildObligationCard).join('')
+
+  const years   = [...new Set(records.map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))].sort()
+  const nowYr   = String(new Date().getFullYear())
+  const activeY = yearFilter ? String(yearFilter)
+                             : (years.includes(nowYr) ? nowYr : years[years.length - 1])
+
+  const pills = years.length > 1
+    ? `<div class="year-pill-bar">${years.map(y =>
+        `<button class="year-pill${y === activeY ? ' active' : ''}" onclick="loadObligations('${clientId}', '${y}')">${y}</button>`
+      ).join('')}</div>`
+    : ''
+
+  const filtered = records.filter(r => r.due_date && r.due_date.startsWith(activeY))
+  const body     = filtered.length
+    ? filtered.map(buildObligationCard).join('')
+    : `<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">No obligations for ${esc(activeY)}.</p>`
+
+  $('obligationsPanel').innerHTML = pills + body
 }
 
 function buildObligationCard(r) {
