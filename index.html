@@ -1578,6 +1578,17 @@ table.ct {
   font-family: var(--sa);
   font-size: .82rem;
 }
+/* Fixed layout enforces colgroup widths so multiple per-section tables
+   (e.g. one per client in the Monthly Filing Summary) align column-for-
+   column instead of each sizing to its own content. */
+table.ct.ct-fixed {
+  table-layout: fixed;
+}
+table.ct.ct-fixed td,
+table.ct.ct-fixed th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 table.ct thead { background: var(--s2); }
 table.ct th {
   text-align: left;
@@ -1905,17 +1916,21 @@ table.ct td {
     print-color-adjust: exact;
   }
 
-  .badge-red,
-  .badge-amber,
-  .badge-green,
-  .badge-blue,
-  .badge-dim {
-    background: none !important;
-    color: #000 !important;
+  /* Keep status colors when printed. Use explicit print-safe palettes
+     and force the printer to honor backgrounds/colors. */
+  .badge-red, .badge-amber, .badge-green, .badge-blue, .badge-dim {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
     font-weight: 700;
-    padding: 0;
-    border-radius: 0;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid currentColor;
   }
+  .badge-red   { background: #fde2e2 !important; color: #b00020 !important; }
+  .badge-amber { background: #fff3d6 !important; color: #8a5a00 !important; }
+  .badge-green { background: #def4e1 !important; color: #1d6b2c !important; }
+  .badge-blue  { background: #dde8fb !important; color: #1d4ed8 !important; }
+  .badge-dim   { background: #ececec !important; color: #444    !important; }
 
   table.ct { font-size: 11px; }
   table.ct thead {
@@ -5014,9 +5029,17 @@ async function generateReport2() {
 
     html += `<div class="rpt-client-section">`
     html += `<div class="rpt-client-hd">${esc(c.display_name)}</div>`
-    html += `<div class="rpt-table-wrap"><table class="ct"><thead><tr>
-      <th>Form</th><th>Due Date</th><th>Status</th><th>Filed Date</th><th>Amount Paid</th>
-    </tr></thead><tbody>`
+    html += `<div class="rpt-table-wrap"><table class="ct ct-fixed">
+      <colgroup>
+        <col style="width:30%">
+        <col style="width:18%">
+        <col style="width:18%">
+        <col style="width:18%">
+        <col style="width:16%">
+      </colgroup>
+      <thead><tr>
+        <th>Form</th><th>Due Date</th><th>Status</th><th>Filed Date</th><th>Amount Paid</th>
+      </tr></thead><tbody>`
 
     recs.forEach(r => {
       const amtCell = r.payment_status === 'paid' && r.amount_paid != null
