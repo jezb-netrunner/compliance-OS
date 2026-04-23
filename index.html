@@ -663,6 +663,240 @@ body {
     transition-duration: .01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   SIDEBAR — brand mark + footer identity
+═══════════════════════════════════════════════════ */
+.sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  padding-bottom: .25rem;
+}
+.sidebar-brand-name {
+  font-family: var(--se);
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+.sidebar-brand-name .dot { color: var(--royal); }
+.sidebar-brand-sub {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--bd);
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+.sidebar-pract-name {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--ch);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-pract-email {
+  font-size: .7rem;
+  color: var(--mu);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: .25rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   ROSTER — TOP BAR
+═══════════════════════════════════════════════════ */
+.roster-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+}
+.roster-topbar h2 {
+  font-family: var(--se);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.025em;
+}
+
+/* ═══════════════════════════════════════════════════
+   ROSTER — SUMMARY STRIP
+═══════════════════════════════════════════════════ */
+.roster-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .55rem;
+  margin-bottom: 1.25rem;
+}
+.sum-chip {
+  background: var(--sf);
+  border-radius: var(--r);
+  box-shadow: var(--shs);
+  padding: .72rem .9rem;
+  border-left: 3px solid var(--bd);
+}
+.sum-chip.overdue { border-left-color: var(--red);   }
+.sum-chip.urgent  { border-left-color: var(--amber); }
+.sum-chip.trrc    { border-left-color: var(--royal); }
+.sum-chip.payment { border-left-color: var(--green); }
+.sum-chip-n {
+  font-family: var(--se);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+.sum-chip.overdue .sum-chip-n { color: var(--red);   }
+.sum-chip.urgent  .sum-chip-n { color: var(--amber); }
+.sum-chip.trrc    .sum-chip-n { color: var(--royal); }
+.sum-chip.payment .sum-chip-n { color: var(--green); }
+.sum-chip-l {
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--mu);
+  margin-top: .2rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   ROSTER — CONTROLS (search + filter tabs)
+═══════════════════════════════════════════════════ */
+.roster-controls {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.roster-search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+  font-family: var(--sa);
+  font-size: .82rem;
+  font-weight: 500;
+  padding: .45rem .9rem;
+  border: 1.5px solid var(--bd);
+  border-radius: 100px;
+  background: var(--sf);
+  color: var(--ink);
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.roster-search:focus {
+  border-color: var(--royal);
+  box-shadow: 0 0 0 3px var(--rs);
+}
+.roster-search::placeholder { color: var(--lt); }
+
+.filter-tabs {
+  display: flex;
+  gap: .2rem;
+  background: var(--s2);
+  border-radius: 100px;
+  padding: .22rem;
+}
+.filter-tab {
+  font-family: var(--sa);
+  font-size: .74rem;
+  font-weight: 600;
+  padding: .32rem .85rem;
+  border-radius: 100px;
+  border: none;
+  background: transparent;
+  color: var(--mu);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.filter-tab:hover:not(.active) { color: var(--ch); }
+.filter-tab.active {
+  background: var(--sf);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+
+/* ═══════════════════════════════════════════════════
+   CLIENT CARDS
+═══════════════════════════════════════════════════ */
+.client-card {
+  background: var(--sf);
+  border-radius: var(--r);
+  box-shadow: var(--shs);
+  padding: .88rem 1rem;
+  margin-bottom: .45rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  border-left: 3px solid var(--bd);
+  transition: box-shadow .18s, transform .18s;
+}
+.client-card:hover { box-shadow: var(--sh); transform: translateY(-1px); }
+.client-card[data-status="overdue"]  { border-left-color: var(--red);   }
+.client-card[data-status="urgent"]   { border-left-color: var(--amber); }
+.client-card[data-status="on-track"] { border-left-color: var(--green); }
+
+.cc-left { min-width: 0; flex: 1; }
+
+.cc-name {
+  font-family: var(--se);
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-meta {
+  font-size: .72rem;
+  color: var(--mu);
+  margin-top: .12rem;
+}
+.cc-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .3rem;
+  flex-shrink: 0;
+}
+
+/* Add-client step dots */
+.step-dots { display: flex; gap: .35rem; }
+.step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bd);
+  transition: background .2s;
+}
+.step-dot.active { background: var(--royal); }
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE OVERRIDES
+═══════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .roster-summary { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .sidebar-brand  { display: none; }
+  .sidebar-footer { display: none; }
+  .sum-chip-n { font-size: 1.3rem; }
+  .roster-topbar h2 { font-size: 1.1rem; }
+}
 </style>
 </head>
 <body>
@@ -716,11 +950,103 @@ body {
 
   <!-- ── ROSTER VIEW ── -->
   <div id="rosterView" class="app-shell">
-    <aside class="sidebar" role="complementary" aria-label="Roster controls">
-      <!-- Populated by roster module -->
+
+    <aside class="sidebar" role="complementary" aria-label="Roster navigation">
+
+      <!-- Brand mark (desktop only) -->
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">The Present Value<span class="dot">.</span></div>
+        <div class="sidebar-brand-sub">Practitioner Suite</div>
+      </div>
+
+      <!-- Primary nav -->
+      <div>
+        <div class="sidebar-label">Navigation</div>
+        <nav class="sidebar-nav" aria-label="Primary">
+          <button class="sidebar-nav-item active" onclick="showRosterView()" aria-current="page">
+            <span>Clients</span>
+            <span class="nav-badge" id="navBadgeClients">—</span>
+          </button>
+          <button class="sidebar-nav-item" disabled aria-disabled="true"
+            style="opacity:.38;cursor:not-allowed;">
+            <span>Deadlines</span>
+            <span style="font-size:.62rem;color:var(--mu)">Soon</span>
+          </button>
+          <button class="sidebar-nav-item" disabled aria-disabled="true"
+            style="opacity:.38;cursor:not-allowed;">
+            <span>Reports</span>
+            <span style="font-size:.62rem;color:var(--mu)">Soon</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Practitioner identity + sign-out (desktop footer) -->
+      <div class="sidebar-footer">
+        <div class="sidebar-pract-name" id="sidebarPractName"></div>
+        <div class="sidebar-pract-email" id="sidebarPractEmail"></div>
+        <button class="btn-ghost btn-sm btn-full" onclick="signOut()">Sign out</button>
+      </div>
+
     </aside>
+
     <main class="main-content" id="rosterMain" role="main">
-      <!-- Populated by roster module -->
+
+      <!-- Top bar: heading + add button -->
+      <div class="roster-topbar">
+        <h2>My Clients</h2>
+        <button class="btn-primary btn-sm" onclick="openAddClient()">+ Add Client</button>
+      </div>
+
+      <!-- Summary strip -->
+      <div id="rosterSummary" class="roster-summary" aria-label="Summary">
+        <div class="sum-chip overdue">
+          <div class="sum-chip-n" id="sumOverdue">—</div>
+          <div class="sum-chip-l">Overdue</div>
+        </div>
+        <div class="sum-chip urgent">
+          <div class="sum-chip-n" id="sumUrgent">—</div>
+          <div class="sum-chip-l">Due this week</div>
+        </div>
+        <div class="sum-chip trrc">
+          <div class="sum-chip-n" id="sumTrrc">—</div>
+          <div class="sum-chip-l">TRRC needed</div>
+        </div>
+        <div class="sum-chip payment">
+          <div class="sum-chip-n" id="sumPayment">—</div>
+          <div class="sum-chip-l">Payment pending</div>
+        </div>
+      </div>
+
+      <!-- Search + filter tabs -->
+      <div class="roster-controls">
+        <input
+          type="search"
+          class="roster-search"
+          id="rosterSearch"
+          placeholder="Search clients…"
+          aria-label="Search clients"
+          oninput="_applyRosterFilter()"
+        >
+        <div class="filter-tabs" role="tablist" aria-label="Filter clients">
+          <button class="filter-tab active" role="tab" aria-selected="true"
+            data-filter="all" onclick="_setFilter('all',this)">All</button>
+          <button class="filter-tab" role="tab" aria-selected="false"
+            data-filter="overdue" onclick="_setFilter('overdue',this)">Overdue</button>
+          <button class="filter-tab" role="tab" aria-selected="false"
+            data-filter="urgent" onclick="_setFilter('urgent',this)">Urgent</button>
+          <button class="filter-tab" role="tab" aria-selected="false"
+            data-filter="active" onclick="_setFilter('active',this)">Active</button>
+        </div>
+      </div>
+
+      <!-- Client list -->
+      <div id="clientList">
+        <div class="empty-state">
+          No clients yet.<br>
+          <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -730,6 +1056,123 @@ body {
   </div>
 
 </div><!-- #appView -->
+
+
+<!-- ═══════════════════════════════════════════════
+     ADD CLIENT SHEET
+     Outside #appView so fixed positioning is never
+     clipped by a display:none ancestor.
+═══════════════════════════════════════════════════ -->
+<div id="addClientSheet" class="sheet-ov hidden"
+  onclick="if(event.target===this)closeAddClient()"
+  role="dialog" aria-modal="true" aria-labelledby="addSheetTitle">
+
+  <div class="sheet-card">
+
+    <div class="sheet-hdr">
+      <span class="sheet-title" id="addSheetTitle">Add Client</span>
+      <span class="sheet-meta">
+        <span class="step-dots" aria-hidden="true">
+          <span class="step-dot active" id="stepDot1"></span>
+          <span class="step-dot"        id="stepDot2"></span>
+        </span>
+      </span>
+      <button class="sheet-close" onclick="closeAddClient()" aria-label="Close sheet">×</button>
+    </div>
+
+    <div class="sheet-body">
+
+      <!-- ── STEP 1: Identity ── -->
+      <div id="addStep1">
+        <p style="font-size:.75rem;color:var(--mu);margin-bottom:1rem;font-weight:600;">
+          Step 1 of 2 — Identity
+        </p>
+        <div class="fg">
+          <div class="fld span2">
+            <label for="ac_name">Client name <span class="req">*</span></label>
+            <input type="text" id="ac_name" placeholder="e.g. Juan dela Cruz" autocomplete="off">
+          </div>
+          <div class="fld">
+            <label for="ac_tin">TIN</label>
+            <input type="text" id="ac_tin" placeholder="000-000-000-000">
+            <span class="hint">From BIR Certificate of Registration</span>
+          </div>
+          <div class="fld">
+            <label for="ac_rdo">RDO code</label>
+            <input type="text" id="ac_rdo" placeholder="e.g. 040">
+          </div>
+          <div class="fld span2">
+            <label for="ac_industry">Industry</label>
+            <select id="ac_industry">
+              <option value="">— Select —</option>
+              <option>Professional Services</option>
+              <option>Retail</option>
+              <option>Trading</option>
+              <option>Real Estate</option>
+              <option>Construction</option>
+              <option>Manufacturing</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div id="step1Err" class="fld-error" role="alert"></div>
+      </div>
+
+      <!-- ── STEP 2: Tax profile ── -->
+      <div id="addStep2" style="display:none;">
+        <p style="font-size:.75rem;color:var(--mu);margin-bottom:1rem;font-weight:600;">
+          Step 2 of 2 — Tax profile
+        </p>
+        <div class="fg">
+          <div class="fld">
+            <label for="ac_type">Taxpayer type</label>
+            <select id="ac_type">
+              <option value="Self-Employed">Self-Employed</option>
+              <option value="Corporation">Corporation</option>
+              <option value="Mixed Income">Mixed Income</option>
+              <option value="Employee">Employee</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label for="ac_vat">VAT status</label>
+            <select id="ac_vat">
+              <option value="VAT-Registered">VAT-Registered</option>
+              <option value="Non-VAT (8% Option)">Non-VAT — 8% Option</option>
+              <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax</option>
+              <option value="Non-VAT (Graduated)">Non-VAT — Graduated</option>
+            </select>
+          </div>
+          <div class="fld span2">
+            <label for="ac_fiscal">Fiscal year start</label>
+            <select id="ac_fiscal">
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+        </div>
+        <div id="step2Err" class="fld-error" role="alert"></div>
+      </div>
+
+    </div><!-- .sheet-body -->
+
+    <div class="sheet-footer">
+      <button id="addBackBtn" class="btn-ghost btn-sm hidden" onclick="_goAddStep(1)">← Back</button>
+      <button id="addNextBtn" class="btn-primary btn-sm" style="margin-left:auto"
+        onclick="_goAddStep(2)">Next →</button>
+    </div>
+
+  </div><!-- .sheet-card -->
+</div><!-- #addClientSheet -->
 
 
 <script>
@@ -914,6 +1357,7 @@ function showRosterView() {
   $('rosterView').classList.remove('hidden')
   $('clientView').classList.add('hidden')
   activeClientId = null
+  loadRoster()   // refresh data whenever returning to the roster
 }
 
 function showClientDetail(clientId) {
@@ -1004,8 +1448,11 @@ async function _onSessionChange(session) {
         currentPractitioner.email     || ''
     }
 
-    showRosterView()
-    // Roster content is populated by the roster module (loaded later)
+    // Populate sidebar identity (desktop)
+    const sp = $('sidebarPractName');  if (sp) sp.textContent  = currentPractitioner?.firm_name || currentPractitioner?.name  || ''
+    const se = $('sidebarPractEmail'); if (se) se.textContent  = currentPractitioner?.email || ''
+
+    showRosterView()   // also calls loadRoster()
   } else {
     currentPractitioner = null
     activeClientId      = null
@@ -1029,6 +1476,377 @@ supa.auth.getSession().then(({ data: { session } }) => {
 $('loginEmail').addEventListener('keydown', e => {
   if (e.key === 'Enter') handleLogin()
 })
+
+
+// ── OBLIGATION GENERATION ─────────────────────────────────────
+
+const _MONTHS = ['January','February','March','April','May','June',
+                 'July','August','September','October','November','December']
+
+/** Move a Saturday or Sunday to the following Monday */
+function _nextWeekday(date) {
+  const d   = new Date(date)
+  const day = d.getDay()
+  if (day === 6) d.setDate(d.getDate() + 2)   // Sat → Mon
+  if (day === 0) d.setDate(d.getDate() + 1)   // Sun → Mon
+  return d
+}
+
+function _iso(date) { return date.toISOString().split('T')[0] }
+
+/**
+ * Returns an array of obligation objects for the current calendar year
+ * based on the client's taxpayer_type and vat_status.
+ *
+ * Each object: { id, form, name, period, dueDate, category }
+ */
+function generateObligations(profile) {
+  const { taxpayer_type, vat_status } = profile
+  const yr  = new Date().getFullYear()
+  const obs = []
+
+  /** Build one obligation entry */
+  const ob = (localId, form, name, period, rawDate, category) => ({
+    id:       `${yr}-${localId}`,
+    form,
+    name,
+    period,
+    dueDate:  _nextWeekday(rawDate),
+    category,
+  })
+
+  /** Shorthand: new Date(year, month-1, day) */
+  const d = (month, day, y) => new Date(y ?? yr, month - 1, day)
+
+  const isEmployee = taxpayer_type === 'Employee'
+  const isBusiness = !isEmployee
+  const isVAT      = vat_status === 'VAT-Registered'
+
+  // ── Annual registration fee (all non-employee) ──────────────
+  if (isBusiness) {
+    obs.push(ob('0605', 'BIR Form 0605',
+      'Annual Registration Fee', `${yr}`,
+      d(1, 31), 'registration'))
+  }
+
+  // ── VAT-registered: 2550M monthly ─────────────────────────
+  // Due the 25th of the month following the covered month.
+  if (isVAT) {
+    for (let m = 1; m <= 12; m++) {
+      const dueMonth = m === 12 ? 1 : m + 1
+      const dueYear  = m === 12 ? yr + 1 : yr
+      const id       = _MONTHS[m - 1].toLowerCase().slice(0, 3)
+      obs.push(ob(`2550M-${id}`, 'BIR Form 2550M',
+        'Monthly VAT Declaration', `${_MONTHS[m - 1]} ${yr}`,
+        d(dueMonth, 25, dueYear), 'vat'))
+    }
+  }
+
+  // ── Non-VAT (any variant): 2551Q quarterly ─────────────────
+  // Due the 25th of the month following quarter-end.
+  if (isBusiness && !isVAT) {
+    obs.push(ob('2551Q-q1', 'BIR Form 2551Q', 'Quarterly Percentage Tax', `${yr} Q1 (Jan–Mar)`, d(4,  25),       'tax'))
+    obs.push(ob('2551Q-q2', 'BIR Form 2551Q', 'Quarterly Percentage Tax', `${yr} Q2 (Apr–Jun)`, d(7,  25),       'tax'))
+    obs.push(ob('2551Q-q3', 'BIR Form 2551Q', 'Quarterly Percentage Tax', `${yr} Q3 (Jul–Sep)`, d(10, 25),       'tax'))
+    obs.push(ob('2551Q-q4', 'BIR Form 2551Q', 'Quarterly Percentage Tax', `${yr} Q4 (Oct–Dec)`, d(1,  25, yr+1), 'tax'))
+  }
+
+  // ── Self-employed / mixed income: 1701Q + 1701 annual ──────
+  if (taxpayer_type === 'Self-Employed' || taxpayer_type === 'Mixed Income') {
+    obs.push(ob('1701Q-q1', 'BIR Form 1701Q', 'Quarterly ITR', `${yr} Q1 (Jan–Mar)`, d(5,  15),       'income'))
+    obs.push(ob('1701Q-q2', 'BIR Form 1701Q', 'Quarterly ITR', `${yr} Q2 (Jan–Jun)`, d(8,  15),       'income'))
+    obs.push(ob('1701Q-q3', 'BIR Form 1701Q', 'Quarterly ITR', `${yr} Q3 (Jan–Sep)`, d(11, 15),       'income'))
+    obs.push(ob('1701',     'BIR Form 1701',  'Annual ITR',     `CY ${yr}`,           d(4,  15, yr+1), 'income'))
+  }
+
+  // ── Employee: 1700 annual ───────────────────────────────────
+  if (isEmployee) {
+    obs.push(ob('1700', 'BIR Form 1700',
+      'Annual ITR (Compensation)', `CY ${yr}`,
+      d(4, 15, yr + 1), 'income'))
+  }
+
+  return obs
+}
+
+/** Insert compliance_records for a newly added client, skipping any that already exist */
+async function seedComplianceRecords(clientId, profile) {
+  const obligations = generateObligations(profile)
+  if (!obligations.length) return
+
+  const { data: existing } = await supa
+    .from('compliance_records')
+    .select('obligation_id')
+    .eq('client_id', clientId)
+
+  const seen = new Set((existing || []).map(r => r.obligation_id))
+
+  const rows = obligations
+    .filter(o => !seen.has(o.id))
+    .map(o => ({
+      client_id:      clientId,
+      obligation_id:  o.id,
+      form:           o.form,
+      period:         o.period,
+      due_date:       _iso(o.dueDate),
+      payment_status: 'n/a',
+    }))
+
+  if (rows.length) {
+    const { error } = await supa.from('compliance_records').insert(rows)
+    if (error) console.error('seedComplianceRecords:', error)
+  }
+}
+
+
+// ── CLIENT CARD ───────────────────────────────────────────────
+
+/**
+ * Builds the HTML string for one client card in the roster.
+ * @param {object} client  — row from the clients table
+ * @param {object} stats   — { total, overdue, urgent }
+ */
+function buildClientCard(client, stats) {
+  const { overdue, urgent, total } = stats
+
+  let statusKey, statusBadge
+  if (overdue > 0) {
+    statusKey   = 'overdue'
+    statusBadge = `<span class="badge-red">${overdue} overdue</span>`
+  } else if (urgent > 0) {
+    statusKey   = 'urgent'
+    statusBadge = `<span class="badge-amber">${urgent} due soon</span>`
+  } else {
+    statusKey   = 'on-track'
+    statusBadge = total > 0
+      ? `<span class="badge-green">On track</span>`
+      : `<span class="badge-dim">No obligations</span>`
+  }
+
+  const metaParts = [
+    client.tin      ? `TIN ${esc(client.tin)}`      : '',
+    client.rdo_code ? `RDO ${esc(client.rdo_code)}` : '',
+  ].filter(Boolean)
+
+  const typeBadge = client.taxpayer_type
+    ? `<span class="badge-blue">${esc(client.taxpayer_type)}</span>`
+    : ''
+
+  return `<div class="client-card"
+    data-status="${statusKey}"
+    data-name="${esc(client.display_name.toLowerCase())}"
+    onclick="showClientDetail('${esc(client.id)}')"
+    role="button" tabindex="0"
+    onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(client.id)}')"
+    aria-label="${esc(client.display_name)}">
+  <div class="cc-left">
+    <div class="cc-name">${esc(client.display_name)}</div>
+    ${metaParts.length ? `<div class="cc-meta">${metaParts.join(' · ')}</div>` : ''}
+  </div>
+  <div class="cc-right">
+    ${typeBadge}
+    ${statusBadge}
+  </div>
+</div>`
+}
+
+
+// ── LOAD ROSTER ───────────────────────────────────────────────
+
+let _rosterFilter = 'all'
+
+async function loadRoster() {
+  if (!currentPractitioner) return
+
+  const today = new Date().toISOString().split('T')[0]
+  const week  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+
+  const { data: clients, error } = await supa
+    .from('clients')
+    .select('*')
+    .eq('practitioner_id', currentPractitioner.id)
+    .eq('is_active', true)
+    .order('display_name')
+
+  if (error) { console.error('loadRoster:', error); return }
+
+  // Aggregate counts for summary strip
+  let sumOverdue = 0, sumUrgent = 0, sumTrrc = 0, sumPayment = 0
+
+  const cards = await Promise.all((clients || []).map(async client => {
+    const { data: recs } = await supa
+      .from('compliance_records')
+      .select('due_date,filed_date,trrc_saved,has_tax_due,payment_status')
+      .eq('client_id', client.id)
+
+    const r = recs || []
+
+    const stats = {
+      total:   r.length,
+      overdue: r.filter(x => !x.filed_date && x.due_date < today).length,
+      urgent:  r.filter(x => !x.filed_date && x.due_date >= today && x.due_date <= week).length,
+    }
+
+    // Accumulate summary-strip totals
+    r.forEach(x => {
+      if (!x.filed_date && x.due_date < today)                                   sumOverdue++
+      if (!x.filed_date && x.due_date >= today && x.due_date <= week)            sumUrgent++
+      if (x.filed_date  && !x.trrc_saved)                                        sumTrrc++
+      if (x.filed_date  && x.has_tax_due && x.payment_status !== 'paid')         sumPayment++
+    })
+
+    return buildClientCard(client, stats)
+  }))
+
+  // Update summary strip
+  $('sumOverdue').textContent  = sumOverdue
+  $('sumUrgent').textContent   = sumUrgent
+  $('sumTrrc').textContent     = sumTrrc
+  $('sumPayment').textContent  = sumPayment
+
+  // Update nav badge
+  const nb = $('navBadgeClients')
+  if (nb) nb.textContent = (clients || []).length
+
+  // Render client list
+  const listEl = $('clientList')
+  if (!clients || !clients.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      No clients yet.<br>
+      <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
+    </div>`
+  } else {
+    listEl.innerHTML = cards.join('')
+    _applyRosterFilter()
+  }
+}
+
+function _setFilter(filter, btn) {
+  _rosterFilter = filter
+  document.querySelectorAll('.filter-tab').forEach(b => {
+    b.classList.remove('active')
+    b.setAttribute('aria-selected', 'false')
+  })
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true') }
+  _applyRosterFilter()
+}
+
+function _applyRosterFilter() {
+  const q = ($('rosterSearch')?.value || '').toLowerCase()
+  document.querySelectorAll('.client-card').forEach(card => {
+    const status = card.dataset.status
+    const name   = card.dataset.name || ''
+    const meta   = (card.querySelector('.cc-meta')?.textContent || '').toLowerCase()
+
+    const matchFilter =
+      _rosterFilter === 'overdue' ? status === 'overdue' :
+      _rosterFilter === 'urgent'  ? status === 'urgent'  :
+      _rosterFilter === 'active'  ? true                 : true   // 'active' = all active clients
+
+    const matchSearch = !q || name.includes(q) || meta.includes(q)
+
+    card.classList.toggle('hidden', !(matchFilter && matchSearch))
+  })
+}
+
+
+// ── ADD CLIENT SHEET ──────────────────────────────────────────
+
+function openAddClient() {
+  // Clear all fields
+  ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
+  $('ac_industry').value = ''
+  $('ac_type').value     = 'Self-Employed'
+  $('ac_vat').value      = 'VAT-Registered'
+  $('ac_fiscal').value   = '1'
+  $('step1Err').style.display = 'none'
+  $('step2Err').style.display = 'none'
+
+  _renderStep(1)
+  $('addClientSheet').classList.remove('hidden')
+  setTimeout(() => $('ac_name').focus(), 60)
+}
+
+function closeAddClient() {
+  $('addClientSheet').classList.add('hidden')
+}
+
+/** Called by the sheet's Next / Save button — validates before advancing */
+function _goAddStep(n) {
+  if (n === 2) {
+    const name = ($('ac_name').value || '').trim()
+    if (!name) {
+      $('step1Err').textContent   = 'Client name is required.'
+      $('step1Err').style.display = 'block'
+      $('ac_name').focus()
+      return
+    }
+    $('step1Err').style.display = 'none'
+  }
+  _renderStep(n)
+}
+
+/** Swap the visible step panel and update footer buttons */
+function _renderStep(n) {
+  const onStep1 = n === 1
+  $('addStep1').style.display   = onStep1 ? '' : 'none'
+  $('addStep2').style.display   = onStep1 ? 'none' : ''
+  $('stepDot1').classList.toggle('active', onStep1)
+  $('stepDot2').classList.toggle('active', !onStep1)
+  $('addSheetTitle').textContent = onStep1 ? 'Add Client' : 'Tax Profile'
+
+  const backBtn = $('addBackBtn')
+  const nextBtn = $('addNextBtn')
+  backBtn.classList.toggle('hidden', onStep1)
+  nextBtn.textContent = onStep1 ? 'Next →' : 'Save client'
+  nextBtn.onclick     = onStep1 ? () => _goAddStep(2) : saveClient
+}
+
+async function saveClient() {
+  if (!currentPractitioner) return
+
+  const name = ($('ac_name').value || '').trim()
+  if (!name) { _goAddStep(1); return }
+
+  const btn = $('addNextBtn')
+  btn.disabled    = true
+  btn.textContent = 'Saving…'
+  $('step2Err').style.display = 'none'
+
+  const taxpayer_type      = $('ac_type').value
+  const vat_status         = $('ac_vat').value
+  const fiscal_start_month = parseInt($('ac_fiscal').value, 10)
+
+  const { data: newClient, error } = await supa
+    .from('clients')
+    .insert({
+      practitioner_id:   currentPractitioner.id,
+      display_name:      name,
+      tin:               $('ac_tin').value.trim()      || null,
+      rdo_code:          $('ac_rdo').value.trim()      || null,
+      industry:          $('ac_industry').value        || null,
+      taxpayer_type,
+      vat_status,
+      regime:            vat_status,
+      fiscal_start_month,
+      is_active:         true,
+    })
+    .select()
+    .single()
+
+  btn.disabled    = false
+  btn.textContent = 'Save client'
+
+  if (error) {
+    $('step2Err').textContent   = error.message
+    $('step2Err').style.display = 'block'
+    return
+  }
+
+  await seedComplianceRecords(newClient.id, { taxpayer_type, vat_status })
+  closeAddClient()
+  loadRoster()
+}
 </script>
 </body>
 </html>
