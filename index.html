@@ -3308,6 +3308,8 @@ async function generateYearObligations() {
   await seedComplianceRecords(activeClientId, {
     taxpayer_type:      _currentClient.taxpayer_type,
     vat_status:         _currentClient.vat_status,
+    tax_classification: _currentClient.tax_classification,
+    deduction_method:   _currentClient.deduction_method,
     has_employees:      _currentClient.has_employees,
     withholds_expanded: _currentClient.withholds_expanded,
     withholds_final:    _currentClient.withholds_final,
@@ -3857,6 +3859,78 @@ async function seedComplianceRecords(clientId, profile, year = new Date().getFul
   }
 }
 
+/**
+ * Reconcile compliance_records against the current profile across every
+ * year that already has records for this client. Three operations:
+ *
+ *   1. UNFILED records that are no longer required by the new profile
+ *      are deleted (e.g. an 8% election retroactively removes the
+ *      remaining 2551Q quarters; switching from Corp to SE removes the
+ *      remaining 1702Q rows).
+ *   2. UNFILED records still required get their form name / period /
+ *      due_date refreshed if they changed (e.g. 1701 → 1701A when the
+ *      taxpayer adopts OSD; "(or 1701-MS)" suffix appearing once an
+ *      EOPT classification is set).
+ *   3. Newly-required obligations are inserted.
+ *
+ * Filed records (filed_date IS NOT NULL) are NEVER touched — they are
+ * the historical compliance trail and must be preserved intact even if
+ * the underlying profile no longer calls for the form.
+ */
+async function syncComplianceRecords(clientId, profile) {
+  const { data: existing } = await supa
+    .from('compliance_records')
+    .select('id, obligation_id, form, period, due_date, filed_date')
+    .eq('client_id', clientId)
+  const rows = existing || []
+
+  // Operate on the union of years already present in the table.
+  const years = [...new Set(rows.map(r => r.due_date && +r.due_date.slice(0, 4))
+                                .filter(y => Number.isInteger(y)))]
+  if (!years.length) return
+
+  const wanted    = years.flatMap(y => generateObligations(profile, y))
+  const wantedMap = new Map(wanted.map(o => [o.id, o]))
+  const haveMap   = new Map(rows.map(r => [r.obligation_id, r]))
+
+  // (1) delete unfiled rows no longer required
+  const toDelete = rows
+    .filter(r => !wantedMap.has(r.obligation_id) && !r.filed_date)
+    .map(r => r.id)
+  if (toDelete.length) {
+    const { error } = await supa.from('compliance_records').delete().in('id', toDelete)
+    if (error) console.error('syncComplianceRecords (delete):', error)
+  }
+
+  // (2) refresh unfiled rows whose form/period/due_date have changed
+  for (const o of wanted) {
+    const e = haveMap.get(o.id)
+    if (!e || e.filed_date) continue
+    const due_iso = _iso(o.dueDate)
+    if (e.form === o.form && e.period === o.period && e.due_date === due_iso) continue
+    const { error } = await supa.from('compliance_records')
+      .update({ form: o.form, period: o.period, due_date: due_iso })
+      .eq('id', e.id)
+    if (error) console.error('syncComplianceRecords (update):', error)
+  }
+
+  // (3) insert newly-required obligations
+  const toInsert = wanted
+    .filter(o => !haveMap.has(o.id))
+    .map(o => ({
+      client_id:      clientId,
+      obligation_id:  o.id,
+      form:           o.form,
+      period:         o.period,
+      due_date:       _iso(o.dueDate),
+      payment_status: 'n/a',
+    }))
+  if (toInsert.length) {
+    const { error } = await supa.from('compliance_records').insert(toInsert)
+    if (error) console.error('syncComplianceRecords (insert):', error)
+  }
+}
+
 
 // ── CLIENT CARD ───────────────────────────────────────────────
 
@@ -4211,12 +4285,26 @@ async function saveClient() {
 
   let error
 
+  // Profile fields routed into the obligation generator (both for the
+  // initial seed on create and for the reconcile pass on edit).
+  const obligationProfile = {
+    taxpayer_type,
+    vat_status,
+    tax_classification,
+    deduction_method,
+    has_employees,
+    withholds_expanded,
+    withholds_final,
+    fiscal_year_start: fiscal_start_month,
+  }
+
   if (isEdit) {
     const { error: upErr } = await supa
       .from('clients')
       .update(payload)
       .eq('id', _editingClientId)
     error = upErr
+    if (!upErr) await syncComplianceRecords(_editingClientId, obligationProfile)
   } else {
     const { data: newClient, error: insErr } = await supa
       .from('clients')
@@ -4224,16 +4312,7 @@ async function saveClient() {
       .select()
       .single()
     error = insErr
-    if (!insErr) await seedComplianceRecords(newClient.id, {
-      taxpayer_type,
-      vat_status,
-      tax_classification,
-      deduction_method,
-      has_employees,
-      withholds_expanded,
-      withholds_final,
-      fiscal_year_start: fiscal_start_month,
-    })
+    if (!insErr) await seedComplianceRecords(newClient.id, obligationProfile)
   }
 
   btn.disabled    = false
