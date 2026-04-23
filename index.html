@@ -2570,11 +2570,21 @@ table.ct td {
         <div class="fg">
           <div class="fld">
             <label for="ac_type">Taxpayer type</label>
-            <select id="ac_type">
-              <option value="Self-Employed">Self-Employed</option>
-              <option value="Corporation">Corporation</option>
-              <option value="Mixed Income">Mixed Income</option>
-              <option value="Employee">Employee</option>
+            <select id="ac_type" onchange="_syncVatOptions('ac_type','ac_vat')">
+              <optgroup label="Individual">
+                <option value="Self-Employed">Self-Employed / Professional</option>
+                <option value="Mixed Income">Mixed Income</option>
+                <option value="Employee">Employee</option>
+                <option value="Estate">Estate (filed by fiduciary)</option>
+                <option value="Trust">Trust (filed by fiduciary)</option>
+              </optgroup>
+              <optgroup label="Non-Individual">
+                <option value="Corporation">Corporation</option>
+                <option value="One Person Corporation">One Person Corporation</option>
+                <option value="General Partnership">General Partnership</option>
+                <option value="General Professional Partnership">General Professional Partnership</option>
+                <option value="Cooperative">Cooperative</option>
+              </optgroup>
             </select>
           </div>
           <div class="fld">
@@ -2754,10 +2764,20 @@ table.ct td {
  *   tin                 text,
  *   rdo_code            text,
  *   taxpayer_type       text,
- *     -- 'Self-Employed' | 'Corporation' | 'Mixed Income' | 'Employee'
+ *     -- INDIVIDUAL (natural persons + fiduciaries):
+ *     --   'Self-Employed' | 'Mixed Income' | 'Employee'
+ *     --   | 'Estate' | 'Trust'
+ *     -- NON-INDIVIDUAL (Sec. 22(B) corporations + special entities):
+ *     --   'Corporation' | 'One Person Corporation'
+ *     --   | 'General Partnership'
+ *     --   | 'General Professional Partnership'   -- 1702-EX info return
+ *     --   | 'Cooperative'                        -- 1702-EX info return
  *   vat_status          text,
  *     -- 'VAT-Registered' | 'Non-VAT (8% Option)'
  *     -- | 'Non-VAT (Percentage Tax)' | 'Non-VAT (Graduated)'
+ *     -- 'Non-VAT (8% Option)' is reserved for individuals (Self-
+ *     -- Employed / Mixed Income); the 8% election is unavailable to
+ *     -- non-individuals under NIRC Sec. 24(A)(2)(b).
  *   regime              text,           -- display alias for vat_status
  *   fiscal_start_month  int not null default 1,   -- 1 = January
  *   industry            text,
@@ -3522,9 +3542,28 @@ function generateObligations(profile, year) {
     return { y, m }
   }
 
+  // ── Taxpayer typology ────────────────────────────────────────
+  // NIRC distinguishes "individuals" (natural persons, plus estates &
+  // trusts taxed via fiduciary under Sec. 60) from "corporations" — the
+  // latter defined in Sec. 22(B) to include partnerships (no matter how
+  // created), joint-stock companies, joint accounts, associations, and
+  // insurance companies, EXCEPT general professional partnerships (GPPs)
+  // and joint ventures formed for construction or energy operations.
+  // GPPs and qualifying tax-exempt cooperatives are non-individuals but
+  // file information returns (1702-EX) rather than paying corporate tax.
   const isEmployee    = taxpayer_type === 'Employee'
+  const isSelfEmp     = taxpayer_type === 'Self-Employed'
+  const isMixed       = taxpayer_type === 'Mixed Income'
+  const isFiduciary   = taxpayer_type === 'Estate' || taxpayer_type === 'Trust'
   const isCorporation = taxpayer_type === 'Corporation'
-  const isSEOrMixed   = taxpayer_type === 'Self-Employed' || taxpayer_type === 'Mixed Income'
+                        || taxpayer_type === 'One Person Corporation'
+                        || taxpayer_type === 'General Partnership'
+  const isGPP         = taxpayer_type === 'General Professional Partnership'
+  const isCoop        = taxpayer_type === 'Cooperative'
+  const isIndividual  = isEmployee || isSelfEmp || isMixed || isFiduciary
+  const isSEOrMixed   = isSelfEmp || isMixed
+  // "Business" here means anyone with a trade/business or practice of
+  // profession — i.e. anyone other than a pure-compensation employee.
   const isBusiness    = !isEmployee
   const isVAT         = vat_status === 'VAT-Registered'
 
@@ -3547,12 +3586,22 @@ function generateObligations(profile, year) {
   }
 
   // ── Non-VAT business: 2551Q quarterly percentage tax ──────────
-  // NIRC Sec. 116 as amended by RA 10963 (TRAIN): individuals who opted
-  // for the 8% income tax rate are EXEMPT from the 3% percentage tax
-  // (and thus do not file 2551Q). The 8% election substitutes both the
-  // graduated income tax and the percentage tax.
+  // NIRC Sec. 116 (3% of gross quarterly sales/receipts) applies to any
+  // person — individual or non-individual — whose receipts are exempt
+  // from VAT under Sec. 109(BB) and who is not VAT-registered. Two
+  // exclusions in the current rules:
+  //   (a) Individuals who opted for the 8% income tax rate under
+  //       Sec. 24(A)(2)(b) as amended by RA 10963 (TRAIN). The 8% rate
+  //       substitutes both the graduated income tax and percentage tax.
+  //       Only individuals (SE / professional / Mixed Income on the
+  //       business side) may elect 8% — corporations, partnerships,
+  //       cooperatives, estates, and trusts cannot.
+  //   (b) GPPs (Sec. 26) and tax-exempt cooperatives don't pay income
+  //       or business tax at the entity level, so 2551Q does not apply.
+  // The rate reverted from 1% back to 3% on 1 July 2023 (per CREATE Act
+  // sunset; see RMC 69-2023).
   const isEightPercentOption = vat_status === 'Non-VAT (8% Option)'
-  if (isBusiness && !isVAT && !isEightPercentOption) {
+  if (isBusiness && !isVAT && !isEightPercentOption && !isGPP && !isCoop) {
     for (let q = 1; q <= 4; q++) {
       const { y: qy, m: qm } = quarterEndMonth(q)
       const due = addMonths(qm, 25, 1, qy)
@@ -3562,9 +3611,12 @@ function generateObligations(profile, year) {
     }
   }
 
-  // ── Self-employed / mixed income: 1701Q + annual ITR ──────────
-  // 1701Q is cumulative YTD (NIRC Sec. 74, TRAIN deadlines).
-  if (isSEOrMixed) {
+  // ── Individual business / fiduciary: 1701Q + annual ITR ──────
+  // 1701Q is cumulative YTD (NIRC Sec. 74; TRAIN deadlines May 15 /
+  // Aug 15 / Nov 15). It applies to anyone with business or professional
+  // income filing on the individual ITR — that is, SE, Mixed Income,
+  // and fiduciaries of estates/trusts engaged in trade or business.
+  if (isSEOrMixed || isFiduciary) {
     obs.push(ob('1701Q-q1', 'BIR Form 1701Q',
       'Quarterly ITR (Q1 cumulative)', `${yr} Q1 (covers Jan–Mar)`,
       d(5, 15), 'income'))
@@ -3574,13 +3626,29 @@ function generateObligations(profile, year) {
     obs.push(ob('1701Q-q3', 'BIR Form 1701Q',
       'Quarterly ITR (Q3 cumulative YTD)', `${yr} Q3 (covers Jul–Sep)`,
       d(11, 15), 'income'))
-    obs.push(ob('1701', 'BIR Form 1701',
+
+    // Annual ITR form selection per RMC 17-2019 / current BIR guidance:
+    //   • 1701A — pure SE/professional whose ONLY income is from
+    //     business/profession AND who uses the 8% rate or OSD.
+    //   • 1701  — Mixed Income earners (compensation + business), or
+    //     SE/professional using Itemized Deduction, or estates/trusts.
+    // The 8% election is the unambiguous trigger for 1701A; for SE
+    // taxpayers on graduated rates we cannot tell Itemized vs OSD from
+    // the current schema, so we default to 1701 (the safer, broader
+    // form). RMC 34-2025 introduced 1701-MS as an OPTIONAL alternative
+    // for micro/small individuals — we don't auto-generate it because
+    // 1701/1701A remain valid (and 1701-MS is not yet on eFPS).
+    const annualForm =
+      (isSelfEmp && isEightPercentOption) ? 'BIR Form 1701A' : 'BIR Form 1701'
+    obs.push(ob('1701', annualForm,
       'Annual ITR', `CY ${yr}`,
       annualItrDueDate(yr), 'income'))
   }
 
-  // ── Corporation: 1702Q + annual corporate ITR ────────────────
-  // NIRC Sec. 75: 1702Q within 60 days after each of the first 3 quarter-ends.
+  // ── Corporation / partnership: 1702Q + annual corporate ITR ──
+  // NIRC Sec. 22(B): "corporation" includes general partnerships, joint
+  // stock companies, and associations. NIRC Sec. 75: 1702Q within 60
+  // days after each of the first three quarter-ends.
   if (isCorporation) {
     for (let q = 1; q <= 3; q++) {
       const { y: qy, m: qm } = quarterEndMonth(q)
@@ -3592,6 +3660,28 @@ function generateObligations(profile, year) {
     }
     obs.push(ob('1702', 'BIR Form 1702-RT / 1702-MX / 1702-EX',
       'Annual Corporate ITR (+ AFS attachment)', `CY ${yr}`,
+      annualItrDueDate(yr), 'income'))
+  }
+
+  // ── GPP: information return only (1702-EX) ───────────────────
+  // Sec. 26: a general professional partnership is not subject to
+  // income tax as such; it files 1702-EX as an information return.
+  // Each partner reports their distributive share on their own 1701.
+  if (isGPP) {
+    obs.push(ob('1702EX', 'BIR Form 1702-EX',
+      'Annual Information Return (GPP — partners taxed individually)',
+      `CY ${yr}`, annualItrDueDate(yr), 'income'))
+  }
+
+  // ── Cooperative: information return (1702-EX) ────────────────
+  // CDA-registered cooperatives transacting only with members are
+  // generally exempt under RA 9520 / NIRC Sec. 30 and file 1702-EX as
+  // an information return. (Coops with non-member transactions above
+  // the threshold should be reclassified as 'Corporation' to pick up
+  // 1702Q + 1702-RT instead.)
+  if (isCoop) {
+    obs.push(ob('1702EX', 'BIR Form 1702-EX',
+      'Annual Information Return (Cooperative)', `CY ${yr}`,
       annualItrDueDate(yr), 'income'))
   }
 
@@ -3917,6 +4007,7 @@ function openClientSheet(mode, clientId) {
     $('archiveRow').classList.add('hidden')
   }
 
+  _syncVatOptions('ac_type', 'ac_vat')
   _renderStep(1)
   $('addClientSheet').classList.remove('hidden')
   setTimeout(() => $('ac_name').focus(), 60)
@@ -3924,6 +4015,32 @@ function openClientSheet(mode, clientId) {
 
 function closeAddClient() {
   $('addClientSheet').classList.add('hidden')
+}
+
+/**
+ * Disable VAT-status options that are invalid for the chosen taxpayer
+ * type. Today the only legal constraint we enforce client-side is that
+ * the 8% income tax election (NIRC Sec. 24(A)(2)(b)) is reserved for
+ * individuals — Self-Employed/Professional and Mixed Income. If the
+ * current selection becomes invalid we fall back to "Non-VAT
+ * (Percentage Tax)" so the user is forced to make a deliberate choice.
+ */
+function _syncVatOptions(typeSelId, vatSelId) {
+  const typeSel = $(typeSelId)
+  const vatSel  = $(vatSelId)
+  if (!typeSel || !vatSel) return
+  const t = typeSel.value
+  const eightPctEligible = (t === 'Self-Employed' || t === 'Mixed Income')
+  ;[...vatSel.options].forEach(opt => {
+    if (opt.value === 'Non-VAT (8% Option)') {
+      opt.disabled = !eightPctEligible
+      opt.title    = eightPctEligible ? '' :
+        '8% income tax option is available only to individual SE/Professional or Mixed Income taxpayers (NIRC Sec. 24(A)(2)(b)).'
+    }
+  })
+  if (vatSel.value === 'Non-VAT (8% Option)' && !eightPctEligible) {
+    vatSel.value = 'Non-VAT (Percentage Tax)'
+  }
 }
 
 /** Called by the sheet's Next / Save button — validates before advancing */

@@ -203,11 +203,21 @@ h2 {
     <div class="fg">
       <div class="fld">
         <label for="f_type">Taxpayer type</label>
-        <select id="f_type">
-          <option value="Self-Employed">Self-Employed</option>
-          <option value="Corporation">Corporation</option>
-          <option value="Mixed Income">Mixed Income</option>
-          <option value="Employee">Employee</option>
+        <select id="f_type" onchange="_syncVatOptions()">
+          <optgroup label="Individual">
+            <option value="Self-Employed">Self-Employed / Professional</option>
+            <option value="Mixed Income">Mixed Income</option>
+            <option value="Employee">Employee</option>
+            <option value="Estate">Estate (filed by fiduciary)</option>
+            <option value="Trust">Trust (filed by fiduciary)</option>
+          </optgroup>
+          <optgroup label="Non-Individual">
+            <option value="Corporation">Corporation</option>
+            <option value="One Person Corporation">One Person Corporation</option>
+            <option value="General Partnership">General Partnership</option>
+            <option value="General Professional Partnership">General Professional Partnership</option>
+            <option value="Cooperative">Cooperative</option>
+          </optgroup>
         </select>
       </div>
       <div class="fld">
@@ -285,6 +295,23 @@ function renderInvalid() {
     </div>`
 }
 
+// 8% income tax election (NIRC Sec. 24(A)(2)(b)) is reserved for
+// individual SE/Professional or Mixed Income taxpayers; disable it for
+// other types so the enrollee cannot pick an invalid combination.
+function _syncVatOptions() {
+  const typeSel = $('f_type')
+  const vatSel  = $('f_vat')
+  if (!typeSel || !vatSel) return
+  const t = typeSel.value
+  const eightPctEligible = (t === 'Self-Employed' || t === 'Mixed Income')
+  ;[...vatSel.options].forEach(opt => {
+    if (opt.value === 'Non-VAT (8% Option)') opt.disabled = !eightPctEligible
+  })
+  if (vatSel.value === 'Non-VAT (8% Option)' && !eightPctEligible) {
+    vatSel.value = 'Non-VAT (Percentage Tax)'
+  }
+}
+
 function renderForm(tok) {
   const tpl = $('formTpl').content.cloneNode(true)
   $('card').innerHTML = ''
@@ -307,6 +334,8 @@ function renderForm(tok) {
   })
 
   $('btnSubmit').addEventListener('click', () => submit(tok))
+
+  _syncVatOptions()
 }
 
 async function submit(tok) {
