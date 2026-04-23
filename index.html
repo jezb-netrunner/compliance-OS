@@ -1806,6 +1806,56 @@ table.ct td {
 }
 .enroll-link-row input:focus { outline: 2px solid var(--royal); border-color: var(--royal); }
 
+.bulk-bar {
+  display: flex;
+  gap: .65rem;
+  align-items: center;
+  padding: .55rem 1rem;
+  background: var(--rs);
+  border-bottom: 1px solid var(--bd);
+  font-size: .82rem;
+  color: var(--ink);
+}
+.bulk-bar.hidden { display: none; }
+.bulk-bar strong { color: var(--royal); font-weight: 700; }
+.ob-card, .client-card { position: relative; }
+.bulk-chk {
+  position: absolute;
+  top: .55rem;
+  left: .55rem;
+  width: 18px; height: 18px;
+  z-index: 3;
+  cursor: pointer;
+}
+.ob-card.bulk-eligible,
+.client-card.bulk-mode-card { padding-left: 2.25rem; }
+.ob-card.bulk-selected,
+.client-card.bulk-selected { box-shadow: 0 0 0 2px var(--royal) inset; }
+.bulk-taxtable { width: 100%; margin-top: .65rem; font-size: .82rem; border-collapse: collapse; }
+.bulk-taxtable th,
+.bulk-taxtable td { padding: .35rem .5rem; border-bottom: 1px solid var(--bd); text-align: left; }
+.bulk-taxtable input {
+  width: 120px; padding: .3rem .45rem;
+  border: 1px solid var(--bd); border-radius: var(--rr);
+  font-family: var(--sa);
+}
+.combined-group-hdr {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 700; color: var(--mu);
+  margin: .9rem 0 .25rem;
+  padding-bottom: .2rem;
+  border-bottom: 1px solid var(--bd);
+}
+.combined-row {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .4rem 0;
+  font-size: .85rem;
+  border-bottom: 1px solid var(--bd);
+  cursor: pointer;
+}
+.combined-row .cr-name { flex: 1; color: var(--ink); font-weight: 600; }
+.combined-row .cr-form { color: var(--mu); font-size: .78rem; }
+
 /* ═══════════════════════════════════════════════════
    PRINT STYLES
 ═══════════════════════════════════════════════════ */
@@ -2010,7 +2060,16 @@ table.ct td {
       <!-- Top bar: heading + add button -->
       <div class="roster-topbar">
         <h2>My Clients</h2>
-        <button class="btn-primary btn-sm" onclick="openClientSheet('add')">+ Add Client</button>
+        <button class="btn-ghost btn-sm" id="btnBulkClients"
+          style="margin-left:auto" onclick="toggleBulkClients()">Bulk update</button>
+        <button class="btn-primary btn-sm" style="margin-left:.5rem"
+          onclick="openClientSheet('add')">+ Add Client</button>
+      </div>
+      <div id="bulkClientBar" class="bulk-bar hidden">
+        <span><strong id="bulkClientCount">0</strong> selected</span>
+        <button class="btn-primary btn-sm" id="bulkClientView"
+          onclick="openCombinedObligations()" disabled>View combined obligations</button>
+        <button class="btn-ghost btn-sm" onclick="toggleBulkClients()">Cancel</button>
       </div>
 
       <!-- Summary strip -->
@@ -2077,7 +2136,15 @@ table.ct td {
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="shareEnrollmentLink()">Share Enrollment Link</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
+        id="btnBulkObs" onclick="toggleBulkObs()">Select</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
+    </div>
+    <div id="bulkObBar" class="bulk-bar hidden">
+      <span><strong id="bulkObCount">0</strong> selected</span>
+      <button class="btn-primary btn-sm" id="bulkObMark"
+        onclick="openBulkFilingSheet()" disabled>Mark as Filed</button>
+      <button class="btn-ghost btn-sm" onclick="toggleBulkObs()">Cancel</button>
     </div>
 
     <div class="detail-meta-strip">
@@ -2548,6 +2615,34 @@ table.ct td {
 
   </div><!-- .sheet-card -->
 </div><!-- #addClientSheet -->
+
+
+<!-- ═══════════════════════════════════════════════
+     BULK FILING SHEET + COMBINED OBLIGATIONS SHEET
+═══════════════════════════════════════════════════ -->
+<div id="bulkFilingSheet" class="sheet-ov hidden"
+  onclick="if(event.target===this)closeBulkFilingSheet()"
+  role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-hdr">
+      <span class="sheet-title">Mark as Filed</span>
+      <button class="sheet-close" onclick="closeBulkFilingSheet()" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-body" id="bulkFilingBody"></div>
+  </div>
+</div>
+
+<div id="combinedObSheet" class="sheet-ov hidden"
+  onclick="if(event.target===this)closeCombinedObSheet()"
+  role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <div class="sheet-hdr">
+      <span class="sheet-title">Combined obligations</span>
+      <button class="sheet-close" onclick="closeCombinedObSheet()" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-body" id="combinedObBody"></div>
+  </div>
+</div>
 
 
 <!-- ═══════════════════════════════════════════════
@@ -3539,7 +3634,8 @@ function buildClientCard(client, stats) {
   return `<div class="client-card"
     data-status="${statusKey}"
     data-name="${esc(client.display_name.toLowerCase())}"
-    onclick="showClientDetail('${esc(client.id)}')"
+    data-client-id="${esc(client.id)}"
+    onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${esc(client.id)}')"
     role="button" tabindex="0"
     onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(client.id)}')"
     aria-label="${esc(client.display_name)}">
@@ -4902,6 +4998,196 @@ async function copyEnrollLink() {
   const prev = btn.textContent
   btn.textContent = 'Copied ✓'
   setTimeout(() => { btn.textContent = prev }, 1500)
+}
+
+// ── BULK SELECT: CLIENT DETAIL ────────────────────────────────
+const _bulkObs = { active: false, records: new Map(), selected: new Set() }
+
+async function toggleBulkObs() {
+  _bulkObs.active = !_bulkObs.active
+  _bulkObs.selected.clear(); _bulkObs.records.clear()
+  $('bulkObBar').classList.toggle('hidden', !_bulkObs.active)
+  $('btnBulkObs').textContent = _bulkObs.active ? 'Exit select mode' : 'Select'
+  document.querySelectorAll('#obligationsPanel .bulk-chk').forEach(el => el.remove())
+  document.querySelectorAll('#obligationsPanel .ob-card')
+    .forEach(el => el.classList.remove('bulk-selected', 'bulk-eligible'))
+  if (!_bulkObs.active) { _updateBulkObsBar(); return }
+  const { data } = await supa.from('compliance_records')
+    .select('id, form, period, due_date, filed_date')
+    .eq('client_id', activeClientId)
+  ;(data || []).forEach(r => {
+    if (r.filed_date) return
+    const card = $(`card_${r.id}`); if (!card) return
+    _bulkObs.records.set(r.id, r)
+    card.classList.add('bulk-eligible')
+    const chk = document.createElement('input')
+    chk.type = 'checkbox'; chk.className = 'bulk-chk'
+    chk.addEventListener('change', () => {
+      if (chk.checked) _bulkObs.selected.add(r.id); else _bulkObs.selected.delete(r.id)
+      card.classList.toggle('bulk-selected', chk.checked)
+      _updateBulkObsBar()
+    })
+    card.prepend(chk)
+  })
+  _updateBulkObsBar()
+}
+
+function _updateBulkObsBar() {
+  const n = _bulkObs.selected.size
+  $('bulkObCount').textContent = n
+  $('bulkObMark').disabled = n === 0
+}
+
+// ── BULK FILING SHEET ─────────────────────────────────────────
+function openBulkFilingSheet(records) {
+  records = records || [..._bulkObs.selected].map(id => _bulkObs.records.get(id)).filter(Boolean)
+  if (!records.length) return
+  const today = new Date().toISOString().slice(0, 10)
+  const rows  = records.map(r =>
+    `<tr data-id="${r.id}"><td>${esc(r.form || '—')}</td><td>${esc(r.period || '—')}</td>` +
+    `<td><input type="number" min="0" step="0.01" class="bf-tax" placeholder="0.00"></td></tr>`
+  ).join('')
+  $('bulkFilingBody').innerHTML = `
+    <p style="font-size:.82rem;color:var(--mu);margin-bottom:.85rem">
+      Applying to <strong>${records.length}</strong> obligation${records.length === 1 ? '' : 's'}.
+    </p>
+    <div class="fg">
+      <div class="fld"><label>Filed date</label><input type="date" id="bfDate" value="${today}"></div>
+      <div class="fld"><label>Filing reference</label>
+        <input type="text" id="bfRef" placeholder="Leave blank to fill individually later"></div>
+    </div>
+    <label class="check-inline" style="margin-top:.75rem">
+      <input type="checkbox" id="bfHasTax"
+        onchange="document.getElementById('bfTaxWrap').classList.toggle('hidden', !this.checked)">
+      Has tax due?
+    </label>
+    <div id="bfTaxWrap" class="hidden">
+      <table class="bulk-taxtable"><thead><tr><th>Form</th><th>Period</th><th>Tax due (₱)</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+      <button class="btn-primary btn-sm" id="bfSave" onclick="_saveBulkFiling()">Save all</button>
+      <span id="bfProgress" style="font-size:.8rem;color:var(--mu)"></span>
+    </div>`
+  $('bulkFilingSheet').dataset.ids = records.map(r => r.id).join(',')
+  $('bulkFilingSheet').classList.remove('hidden')
+}
+
+function closeBulkFilingSheet() { $('bulkFilingSheet').classList.add('hidden') }
+
+async function _saveBulkFiling() {
+  const ids = ($('bulkFilingSheet').dataset.ids || '').split(',').filter(Boolean)
+  if (!ids.length) return
+  const filedDate = $('bfDate').value
+  const ref       = $('bfRef').value.trim() || null
+  const hasTax    = $('bfHasTax').checked
+  const prog      = $('bfProgress')
+  if (!filedDate) { prog.style.color = 'var(--red)'; prog.textContent = 'Filed date is required.'; return }
+  prog.style.color = 'var(--mu)'
+  const taxByRow = {}
+  document.querySelectorAll('#bulkFilingBody tbody tr').forEach(tr => {
+    taxByRow[tr.dataset.id] = parseFloat(tr.querySelector('.bf-tax').value || '0') || 0
+  })
+  $('bfSave').disabled = true
+  let done = 0
+  prog.textContent = `Saving 0 of ${ids.length}…`
+  await Promise.all(ids.map(id =>
+    supa.from('compliance_records').update({
+      filed_date:       filedDate,
+      filing_reference: ref,
+      has_tax_due:      hasTax,
+      tax_due:          hasTax ? taxByRow[id] : null,
+      payment_status:   hasTax ? 'pending' : 'n/a',
+    }).eq('id', id).then(() => {
+      done++; prog.textContent = `Saving ${done} of ${ids.length}…`
+    })
+  ))
+  prog.textContent = `Saved ${done} of ${ids.length}.`
+  setTimeout(async () => {
+    closeBulkFilingSheet()
+    closeCombinedObSheet()
+    if (_bulkObs.active) toggleBulkObs()
+    if (_bulkClients.active) toggleBulkClients()
+    if (activeClientId && !$('clientView').classList.contains('hidden')) await loadObligations(activeClientId)
+    else loadRoster()
+  }, 400)
+}
+
+// ── BULK SELECT: ROSTER ───────────────────────────────────────
+const _bulkClients = { active: false, selected: new Set() }
+
+function toggleBulkClients() {
+  _bulkClients.active = !_bulkClients.active
+  _bulkClients.selected.clear()
+  $('bulkClientBar').classList.toggle('hidden', !_bulkClients.active)
+  $('btnBulkClients').textContent = _bulkClients.active ? 'Exit bulk mode' : 'Bulk update'
+  $('clientList').classList.toggle('bulk-mode', _bulkClients.active)
+  document.querySelectorAll('#clientList .bulk-chk').forEach(el => el.remove())
+  document.querySelectorAll('#clientList .client-card')
+    .forEach(el => el.classList.remove('bulk-selected', 'bulk-mode-card'))
+  if (!_bulkClients.active) { _updateBulkClientBar(); return }
+  document.querySelectorAll('#clientList .client-card').forEach(card => {
+    const id = card.dataset.clientId
+    if (!id) return
+    card.classList.add('bulk-mode-card')
+    const chk = document.createElement('input')
+    chk.type = 'checkbox'; chk.className = 'bulk-chk'
+    chk.addEventListener('click', e => e.stopPropagation())
+    chk.addEventListener('change', () => {
+      if (chk.checked) _bulkClients.selected.add(id); else _bulkClients.selected.delete(id)
+      card.classList.toggle('bulk-selected', chk.checked)
+      _updateBulkClientBar()
+    })
+    card.prepend(chk)
+  })
+  _updateBulkClientBar()
+}
+
+function _updateBulkClientBar() {
+  const n = _bulkClients.selected.size
+  $('bulkClientCount').textContent = n
+  $('bulkClientView').disabled = n === 0
+}
+
+async function openCombinedObligations() {
+  const ids = [..._bulkClients.selected]
+  if (!ids.length) return
+  const [{ data: clients }, { data: records }] = await Promise.all([
+    supa.from('clients').select('id, display_name').in('id', ids),
+    supa.from('compliance_records')
+      .select('id, client_id, form, period, due_date, filed_date')
+      .in('client_id', ids).is('filed_date', null).order('due_date'),
+  ])
+  const nameOf = {}; (clients || []).forEach(c => { nameOf[c.id] = c.display_name })
+  const byDate = {}
+  ;(records || []).forEach(r => { (byDate[r.due_date] = byDate[r.due_date] || []).push(r) })
+  const groups = Object.keys(byDate).sort().map(d => {
+    const label = new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+    const rows  = byDate[d].map(r =>
+      `<label class="combined-row">
+         <input type="checkbox" class="co-chk" data-id="${r.id}" checked>
+         <span class="cr-name">${esc(nameOf[r.client_id] || '—')}</span>
+         <span class="cr-form">${esc(r.form || '—')} · ${esc(r.period || '—')}</span>
+       </label>`
+    ).join('')
+    return `<div class="combined-group-hdr">${esc(label)}</div>${rows}`
+  }).join('') || '<p style="color:var(--mu);font-size:.85rem;padding:.5rem 0">No unfiled obligations for the selected clients.</p>'
+  const recMap = {}; (records || []).forEach(r => { recMap[r.id] = r })
+  $('combinedObBody').innerHTML = groups +
+    `<div style="margin-top:1rem;display:flex;gap:.5rem">
+       <button class="btn-primary btn-sm" onclick="_combinedMarkFiled()">Mark as Filed</button>
+     </div>`
+  $('combinedObSheet')._recMap = recMap
+  $('combinedObSheet').classList.remove('hidden')
+}
+
+function closeCombinedObSheet() { $('combinedObSheet').classList.add('hidden') }
+
+function _combinedMarkFiled() {
+  const recMap = $('combinedObSheet')._recMap || {}
+  const picked = [...document.querySelectorAll('#combinedObBody .co-chk:checked')]
+    .map(c => recMap[c.dataset.id]).filter(Boolean)
+  if (picked.length) openBulkFilingSheet(picked)
 }
 </script>
 </body>
