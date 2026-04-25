@@ -4540,7 +4540,13 @@ function datStepDone(r) {
 
 function getCardStatus(r) {
   const due = r.due_date ? new Date(r.due_date) : null
+  // Payment is closed either by an actual payment ('paid') OR by the
+  // taxpayer recording the filing with no tax due ('n/a' after a
+  // filed_date is set).  Both cases should mark the obligation as
+  // 'done' rather than leaving it stuck on "Payment pending".
   if (r.payment_status === 'paid') return 'done'
+  if (r.filed_date && r.trrc_saved && datStepDone(r)
+      && r.payment_status === 'n/a') return 'done'
   if (r.filed_date && r.trrc_saved && !datStepDone(r)) return 'dat-missing'
   if (r.filed_date && r.trrc_saved) return 'unpaid'
   if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
@@ -4641,12 +4647,18 @@ function buildObligationCard(r) {
     ? `DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}${editLink('openDatForm')}`
     : (needsDat ? `Pending: ${datAttach.join(', ')} DAT + validation${editLink('openDatForm')}` : '')
 
-  const step3Done   = r.payment_status === 'paid'
+  // Payment step is "done" when the user actually paid OR when they
+  // recorded the filing as having no tax due (payment_status='n/a'
+  // after filed_date is set). The plain 'n/a' default on an unfiled
+  // record is NOT treated as done — we don't yet know whether a
+  // payment will be required.
+  const noPaymentNeeded = r.payment_status === 'n/a' && step1Done
+  const step3Done   = r.payment_status === 'paid' || noPaymentNeeded
   const feeTxt      = r.transaction_fee != null && +r.transaction_fee > 0
     ? ` · Fee: ₱${Number(r.transaction_fee).toLocaleString()}` : ''
-  const step3Detail = step3Done
+  const step3Detail = r.payment_status === 'paid'
     ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
-    : (r.payment_status === 'n/a' ? 'No tax due — no payment needed' : '')
+    : (noPaymentNeeded ? `No tax due — no payment needed${editLink('openFilingForm')}` : '')
 
   let actionBtn = ''
   if (!step1Done) {
