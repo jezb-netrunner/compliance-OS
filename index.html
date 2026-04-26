@@ -3603,7 +3603,7 @@ let _historyLoaded      = false
 let _today              = null
 let _clientSheetMode    = 'add'
 let _editingClientId    = null
-let _dbTimeframeDays    = parseInt(localStorage.getItem('_dbTimeframeDays') || '7', 10)
+let _dbTimeframeDays    = (() => { const v = parseInt(localStorage.getItem('_dbTimeframeDays') || '7', 10); return [7,14,30,60,90].includes(v) ? v : 7 })()
 
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -3780,7 +3780,7 @@ function loadTodos() {
 }
 
 function saveTodos(items) {
-  localStorage.setItem(_todoKey(), JSON.stringify(items))
+  try { localStorage.setItem(_todoKey(), JSON.stringify(items)) } catch { /* quota exceeded */ }
 }
 
 function _getTodos() {
@@ -3837,10 +3837,11 @@ function startEditTodo(id) {
   const inp = document.createElement('input')
   inp.className = 'todo-text-edit'
   inp.value = current.text
-  inp.onblur = () => saveEditTodo(id, inp.value)
+  let _cancelled = false
+  inp.onblur = () => { if (!_cancelled) saveEditTodo(id, inp.value) }
   inp.onkeydown = e => {
-    if (e.key === 'Enter') inp.blur()
-    if (e.key === 'Escape') { renderTodos(_getTodos()) }
+    if (e.key === 'Enter') { inp.blur() }
+    if (e.key === 'Escape') { _cancelled = true; renderTodos(_getTodos()) }
   }
   textEl.replaceWith(inp)
   inp.focus()
