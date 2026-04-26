@@ -1440,6 +1440,130 @@ body {
   margin-top: .2rem;
 }
 
+/* ─── Dashboard timeframe control ─── */
+.db-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .75rem;
+}
+.db-section-title-row .db-section-title {
+  margin-bottom: 0;
+}
+.db-timeframe-select {
+  font-family: var(--sa);
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--mu);
+  background: var(--s2);
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rr);
+  padding: .18rem .45rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .14s;
+}
+.db-timeframe-select:hover,
+.db-timeframe-select:focus { border-color: var(--royal); color: var(--ink); }
+
+/* ─── To-Do list ─── */
+.todo-input-row {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: .6rem;
+}
+.todo-new-input {
+  flex: 1;
+  font-family: var(--sa);
+  font-size: .82rem;
+  color: var(--ink);
+  background: var(--s2);
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rr);
+  padding: .3rem .6rem;
+  outline: none;
+  transition: border-color .14s;
+}
+.todo-new-input:focus { border-color: var(--royal); background: #fff; }
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .35rem .4rem;
+  border-radius: var(--rr);
+  transition: background .12s;
+}
+.todo-item:hover { background: var(--s2); }
+.todo-item + .todo-item { border-top: 1px solid var(--bd); }
+.todo-check {
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 2px solid var(--bd);
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .65rem;
+  color: var(--green);
+  font-weight: 800;
+  transition: border-color .12s, background .12s;
+  padding: 0;
+}
+.todo-check:hover { border-color: var(--green); }
+.todo-item.todo-done .todo-check { border-color: var(--green); background: var(--gs); }
+.todo-text {
+  flex: 1;
+  font-size: .82rem;
+  color: var(--ink);
+  min-width: 0;
+  word-break: break-word;
+  outline: none;
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+.todo-item.todo-done .todo-text {
+  text-decoration: line-through;
+  color: var(--mu);
+}
+.todo-text-edit {
+  flex: 1;
+  font-family: var(--sa);
+  font-size: .82rem;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--royal);
+  border-radius: 3px;
+  padding: .1rem .35rem;
+  outline: none;
+  min-width: 0;
+}
+.todo-del {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--mu);
+  cursor: pointer;
+  font-size: .85rem;
+  line-height: 1;
+  padding: .1rem .25rem;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity .12s, color .12s;
+}
+.todo-item:hover .todo-del { opacity: 1; }
+.todo-del:hover { color: var(--red); }
+.todo-empty {
+  font-size: .82rem;
+  color: var(--mu);
+  font-style: italic;
+  text-align: center;
+  padding: .5rem 0;
+}
+
 /* ═══════════════════════════════════════════════════
    REPORTS  #pgReports
 ═══════════════════════════════════════════════════ */
@@ -2689,15 +2813,33 @@ table.ct thead { background: var(--s2); }
       </div>
       <div class="db-grid">
 
-        <!-- Left column: deadlines -->
+        <!-- Left column: deadlines + to-do -->
         <div>
           <div class="card">
-            <div class="db-section-title">This Week</div>
+            <div class="db-section-title-row">
+              <div class="db-section-title" id="dbUpcomingTitle">Upcoming Filings</div>
+              <select id="dbTimeframeSelect" class="db-timeframe-select" onchange="changeDashboardTimeframe(this.value)">
+                <option value="7">1 Week</option>
+                <option value="14">2 Weeks</option>
+                <option value="30">1 Month</option>
+                <option value="60">2 Months</option>
+                <option value="90">3 Months</option>
+              </select>
+            </div>
             <div id="dbThisWeekList"></div>
           </div>
           <div class="card" style="border-left:3px solid var(--red)">
             <div class="db-section-title">Overdue</div>
             <div id="dbOverdueList"></div>
+          </div>
+          <div class="card">
+            <div class="db-section-title">To-Do</div>
+            <div class="todo-input-row">
+              <input type="text" id="todoNewInput" class="todo-new-input" placeholder="Add a task…"
+                onkeydown="if(event.key==='Enter')addTodo()">
+              <button class="btn-primary btn-sm" onclick="addTodo()">Add</button>
+            </div>
+            <div id="todoList"></div>
           </div>
         </div>
 
@@ -3461,6 +3603,7 @@ let _historyLoaded      = false
 let _today              = null
 let _clientSheetMode    = 'add'
 let _editingClientId    = null
+let _dbTimeframeDays    = (() => { const v = parseInt(localStorage.getItem('_dbTimeframeDays') || '7', 10); return [7,14,30,60,90].includes(v) ? v : 7 })()
 
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -3527,8 +3670,14 @@ async function loadDashboard() {
   const yr       = new Date().getFullYear()
   const now      = new Date(); now.setHours(0,0,0,0)
   const todayStr = now.toISOString().slice(0,10)
-  const in7Str   = new Date(now.getTime() + 7*86400000).toISOString().slice(0,10)
+  const inNStr   = new Date(now.getTime() + _dbTimeframeDays*86400000).toISOString().slice(0,10)
   $('dbStatYear').textContent = yr
+
+  // Sync dropdown to current setting
+  const tfSel = $('dbTimeframeSelect')
+  if (tfSel) tfSel.value = String(_dbTimeframeDays)
+
+  loadTodos()
 
   const { data: clients, error: cErr } = await supa
     .from('clients')
@@ -3569,7 +3718,7 @@ async function loadDashboard() {
       else if (due < todayStr) { overdueCount++; pending++ }
       else                     { pending++ }
     }
-    if (!r.filed_date && due >= todayStr && due <= in7Str) thisWeek.push(r)
+    if (!r.filed_date && due >= todayStr && due <= inNStr) thisWeek.push(r)
     if (!r.filed_date && due && due < todayStr)            overdue.push(r)
     if (r.filed_date && !r.trrc_saved)                     trrcNeeded.push(r)
     if (r.filed_date && r.has_tax_due && r.payment_status !== 'paid') paymentPending.push(r)
@@ -3597,9 +3746,10 @@ async function loadDashboard() {
   }
   const _empty = t => `<p class="db-empty">${t}</p>`
 
+  const tfLabel = {7:'this week',14:'in the next 2 weeks',30:'this month',60:'in the next 2 months',90:'in the next 3 months'}[_dbTimeframeDays] || `in the next ${_dbTimeframeDays} days`
   $('dbThisWeekList').innerHTML = thisWeek.length
     ? thisWeek.map(r => _row(r, '<span class="badge badge-dim">Pending</span>')).join('')
-    : _empty('No filings due this week ✓')
+    : _empty(`No filings due ${tfLabel} ✓`)
   $('dbOverdueList').innerHTML = overdue.length
     ? overdue.map(r => _row(r, '<span class="badge badge-red">Overdue</span>')).join('')
     : _empty('Nothing overdue ✓')
@@ -3611,6 +3761,100 @@ async function loadDashboard() {
     : _empty('No payments pending ✓')
 }
 
+
+function changeDashboardTimeframe(val) {
+  _dbTimeframeDays = parseInt(val, 10)
+  localStorage.setItem('_dbTimeframeDays', _dbTimeframeDays)
+  loadDashboard()
+}
+
+// ── TO-DO LIST ────────────────────────────────────────────────
+function _todoKey() {
+  return `_todos_${currentPractitioner?.id || 'guest'}`
+}
+
+function loadTodos() {
+  let items = []
+  try { items = JSON.parse(localStorage.getItem(_todoKey()) || '[]') } catch {}
+  renderTodos(items)
+}
+
+function saveTodos(items) {
+  try { localStorage.setItem(_todoKey(), JSON.stringify(items)) } catch { /* quota exceeded */ }
+}
+
+function _getTodos() {
+  try { return JSON.parse(localStorage.getItem(_todoKey()) || '[]') } catch { return [] }
+}
+
+function renderTodos(items) {
+  const el = $('todoList')
+  if (!el) return
+  if (!items.length) {
+    el.innerHTML = '<p class="todo-empty">No tasks yet — add one above.</p>'
+    return
+  }
+  el.innerHTML = items.map(item => `
+    <div class="todo-item${item.done ? ' todo-done' : ''}" id="todo-${item.id}">
+      <button class="todo-check" onclick="toggleTodo('${item.id}')" title="${item.done ? 'Mark undone' : 'Mark done'}">
+        ${item.done ? '✓' : ''}
+      </button>
+      <span class="todo-text" ondblclick="startEditTodo('${item.id}')">${esc(item.text)}</span>
+      <button class="todo-del" onclick="deleteTodo('${item.id}')" title="Delete">×</button>
+    </div>`).join('')
+}
+
+function addTodo() {
+  const inp = $('todoNewInput')
+  const text = inp.value.trim()
+  if (!text) return
+  const items = _getTodos()
+  items.unshift({ id: Date.now().toString(36), text, done: false })
+  saveTodos(items)
+  renderTodos(items)
+  inp.value = ''
+  inp.focus()
+}
+
+function toggleTodo(id) {
+  const items = _getTodos().map(t => t.id === id ? { ...t, done: !t.done } : t)
+  saveTodos(items)
+  renderTodos(items)
+}
+
+function deleteTodo(id) {
+  const items = _getTodos().filter(t => t.id !== id)
+  saveTodos(items)
+  renderTodos(items)
+}
+
+function startEditTodo(id) {
+  const itemEl = $(`todo-${id}`)
+  if (!itemEl) return
+  const textEl = itemEl.querySelector('.todo-text')
+  const current = _getTodos().find(t => t.id === id)
+  if (!current) return
+  const inp = document.createElement('input')
+  inp.className = 'todo-text-edit'
+  inp.value = current.text
+  let _cancelled = false
+  inp.onblur = () => { if (!_cancelled) saveEditTodo(id, inp.value) }
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') { inp.blur() }
+    if (e.key === 'Escape') { _cancelled = true; renderTodos(_getTodos()) }
+  }
+  textEl.replaceWith(inp)
+  inp.focus()
+  inp.select()
+}
+
+function saveEditTodo(id, raw) {
+  const text = raw.trim()
+  if (!text) { renderTodos(_getTodos()); return }
+  const items = _getTodos().map(t => t.id === id ? { ...t, text } : t)
+  saveTodos(items)
+  renderTodos(items)
+}
 
 async function showClientDetail(clientId) {
   activeClientId  = clientId
