@@ -3015,69 +3015,9 @@ table.ct td {
 
 
 // ── SUPABASE ──────────────────────────────────────────────────
-const _IS_DEV  = new URLSearchParams(location.search).has('dev')
 const SUPA_URL = 'https://pqevddxxhlhiqzslzdsy.supabase.co'
 const SUPA_KEY = 'sb_publishable_2ExdGSjFVHUHnuVlAVAbmw_xflEibJE'
-const supa     = _IS_DEV ? _mkDevSupa() : supabase.createClient(SUPA_URL, SUPA_KEY)
-
-// Stub Supabase client used when ?dev is in the URL so the real
-// credentials are never needed and the script never crashes.
-// Uses an in-memory store so inserts, filters, and updates all work.
-function _mkDevSupa() {
-  const ok    = v  => Promise.resolve({ data: v, error: null })
-  const newId = () => 'dev-' + Math.random().toString(36).slice(2, 10)
-  const store = {}
-  const tbl   = n  => (store[n] = store[n] || [])
-
-  function q(name, rows, patch) {
-    const node = {
-      select:      ()             => q(name, rows),
-      eq:          (col, val)     => {
-        const arr = Array.isArray(rows) ? rows : []
-        const hit = arr.filter(r => r[col] == val)   // == catches null==null
-        if (patch) hit.forEach(r => Object.assign(r, patch))
-        return q(name, hit)
-      },
-      not:         (col, _op, val) => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] !== val)),
-      in:          (col, vals)    => q(name, (Array.isArray(rows) ? rows : []).filter(r => vals.includes(r[col]))),
-      gte:         (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] >= val)),
-      lte:         (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] <= val)),
-      gt:          (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] > val)),
-      lt:          (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r => r[col] < val)),
-      is:          (col, val)     => q(name, (Array.isArray(rows) ? rows : []).filter(r =>
-                                       val === null ? r[col] == null : r[col] === val)),
-      order:       (col, opts)    => {
-        const asc = opts?.ascending !== false
-        const arr = [...(Array.isArray(rows) ? rows : [])]
-        arr.sort((a, b) => a[col] < b[col] ? (asc ? -1 : 1) : a[col] > b[col] ? (asc ? 1 : -1) : 0)
-        return ok(arr)
-      },
-      single:      () => ok(Array.isArray(rows) ? (rows[0] ?? null) : (rows ?? null)),
-      maybeSingle: () => ok(Array.isArray(rows) ? (rows[0] ?? null) : (rows ?? null)),
-      insert: (payload) => {
-        const multi   = Array.isArray(payload)
-        const items   = (multi ? payload : [payload])
-          .map(r => ({ ...r, id: r.id ?? newId(), created_at: new Date().toISOString() }))
-        tbl(name).push(...items)
-        return q(name, multi ? items : items[0])
-      },
-      update: (p)   => q(name, rows, p),
-    }
-    node.then = (res, rej) => ok(rows).then(res, rej)
-    return node
-  }
-
-  return {
-    from: name => q(name, tbl(name)),
-    auth: {
-      onAuthStateChange: () => {},
-      getSession:        () => Promise.resolve({ data: { session: null } }),
-      getUser:           () => Promise.resolve({ data: { user: null } }),
-      signInWithOtp:     () => ok(null),
-      signOut:           () => ok(null),
-    }
-  }
-}
+const supa     = supabase.createClient(SUPA_URL, SUPA_KEY)
 
 
 // ── GLOBALS ───────────────────────────────────────────────────
@@ -3137,8 +3077,6 @@ function showDashboard() {
 }
 
 async function loadDashboard() {
-  console.log('loadDashboard called')
-
   const loading = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">Loading…</p>'
   ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList']
     .forEach(id => { $(id).innerHTML = loading })
@@ -3146,7 +3084,6 @@ async function loadDashboard() {
     .forEach(id => { $(id).textContent = '—' })
 
   const practitioner = currentPractitioner
-  console.log('practitioner:', practitioner)
 
   if (!practitioner) {
     const msg = '<p style="color:var(--red);font-size:.82rem">Not signed in.</p>'
@@ -3166,8 +3103,6 @@ async function loadDashboard() {
     .eq('practitioner_id', practitioner.id)
     .eq('is_active', true)
 
-  console.log('clients:', clients, 'error:', cErr)
-
   if (cErr || !clients?.length) {
     const msg = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">No active clients found.</p>'
     ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
@@ -3182,8 +3117,6 @@ async function loadDashboard() {
     .from('compliance_records')
     .select('*')
     .in('client_id', clients.map(c => c.id))
-
-  console.log('records:', records, 'error:', error)
 
   if (error) {
     const msg = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
@@ -3208,8 +3141,6 @@ async function loadDashboard() {
     if (r.filed_date && !r.trrc_saved)                     trrcNeeded.push(r)
     if (r.filed_date && r.has_tax_due && r.payment_status !== 'paid') paymentPending.push(r)
   })
-
-  console.log('thisWeek:', thisWeek.length, 'overdue:', overdue.length)
 
   thisWeek.sort((a,b) => a.due_date.localeCompare(b.due_date))
   overdue.sort((a,b)  => a.due_date.localeCompare(b.due_date))
@@ -3481,25 +3412,16 @@ async function _onSessionChange(session) {
 
 
 // ── BOOT ──────────────────────────────────────────────────────
-if (_IS_DEV) {
-  // DEV BYPASS — remove before shipping to production
-  currentPractitioner = { id: null, name: 'Dev User', email: 'dev@local', firm_name: 'Dev Mode' }
-  const _sp = $('sidebarPractName');  if (_sp) _sp.textContent = 'Dev Mode'
-  const _se = $('sidebarPractEmail'); if (_se) _se.textContent = 'dev@local'
-  const _hu = $('hdrUser');           if (_hu) _hu.textContent = 'Dev Mode'
-  showRosterView()
-} else {
-  supa.auth.onAuthStateChange((event, session) => {
-    // Ignore background token refreshes and the initial replay event —
-    // those don't represent a real sign-in/out and would otherwise yank
-    // the user back to the roster every time they tab away.
-    if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') return
-    _onSessionChange(session)
-  })
-  supa.auth.getSession().then(({ data: { session } }) => {
-    _onSessionChange(session)
-  })
-}
+supa.auth.onAuthStateChange((event, session) => {
+  // Ignore background token refreshes and the initial replay event —
+  // those don't represent a real sign-in/out and would otherwise yank
+  // the user back to the roster every time they tab away.
+  if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') return
+  _onSessionChange(session)
+})
+supa.auth.getSession().then(({ data: { session } }) => {
+  _onSessionChange(session)
+})
 
 // Allow Enter key to submit the login form
 ;['loginEmail', 'loginPassword'].forEach(id => {
@@ -4138,8 +4060,8 @@ let _rosterFilter = 'all'
 async function loadRoster() {
   if (!currentPractitioner) return
 
-  const today = new Date().toISOString().split('T')[0]
-  const week  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+  const today = _iso(new Date())
+  const week  = _iso(new Date(Date.now() + 7 * 86400000))
 
   const { data: clients, error } = await supa
     .from('clients')
@@ -4150,16 +4072,25 @@ async function loadRoster() {
 
   if (error) { console.error('loadRoster:', error); return }
 
+  // Fetch all compliance records for every client in one round-trip
+  const clientIds = (clients || []).map(c => c.id)
+  const { data: allRecs } = clientIds.length
+    ? await supa
+        .from('compliance_records')
+        .select('client_id,due_date,filed_date,trrc_saved,has_tax_due,payment_status')
+        .in('client_id', clientIds)
+    : { data: [] }
+
+  const recsByClient = {}
+  ;(allRecs || []).forEach(x => {
+    (recsByClient[x.client_id] = recsByClient[x.client_id] || []).push(x)
+  })
+
   // Aggregate counts for summary strip
   let sumOverdue = 0, sumUrgent = 0, sumTrrc = 0, sumPayment = 0
 
-  const cards = await Promise.all((clients || []).map(async client => {
-    const { data: recs } = await supa
-      .from('compliance_records')
-      .select('due_date,filed_date,trrc_saved,has_tax_due,payment_status')
-      .eq('client_id', client.id)
-
-    const r = recs || []
+  const cards = (clients || []).map(client => {
+    const r = recsByClient[client.id] || []
 
     const stats = {
       total:   r.length,
@@ -4169,14 +4100,14 @@ async function loadRoster() {
 
     // Accumulate summary-strip totals
     r.forEach(x => {
-      if (!x.filed_date && x.due_date < today)                                   sumOverdue++
-      if (!x.filed_date && x.due_date >= today && x.due_date <= week)            sumUrgent++
-      if (x.filed_date  && !x.trrc_saved)                                        sumTrrc++
-      if (x.filed_date  && x.has_tax_due && x.payment_status !== 'paid')         sumPayment++
+      if (!x.filed_date && x.due_date < today)                           sumOverdue++
+      if (!x.filed_date && x.due_date >= today && x.due_date <= week)   sumUrgent++
+      if (x.filed_date  && !x.trrc_saved)                               sumTrrc++
+      if (x.filed_date  && x.has_tax_due && x.payment_status !== 'paid') sumPayment++
     })
 
     return buildClientCard(client, stats)
-  }))
+  })
 
   // Update summary strip
   $('sumOverdue').textContent  = sumOverdue
@@ -4904,7 +4835,7 @@ async function saveFiling(recordId) {
     filed_date:     filedDate,
     has_tax_due:    hasTaxDue,
     tax_due:        taxDue,
-    payment_status: hasTaxDue ? 'pending' : 'n/a',
+    payment_status: hasTaxDue ? 'unpaid' : 'n/a',
   }
   if (cwtEl) payload.claims_cwt = cwtEl.checked
 
@@ -5937,7 +5868,7 @@ async function _saveBulkFiling() {
       filed_date:     filedDate,
       has_tax_due:    hasTax,
       tax_due:        hasTax ? taxByRow[id] : null,
-      payment_status: hasTax ? 'pending' : 'n/a',
+      payment_status: hasTax ? 'unpaid' : 'n/a',
     }).eq('id', id).then(() => {
       done++; prog.textContent = `Saving ${done} of ${ids.length}…`
     })
