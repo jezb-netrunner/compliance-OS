@@ -3132,7 +3132,7 @@ table.ct thead { background: var(--s2); }
                 <input type="checkbox" id="ac_has_employees">
                 <span class="check-text">
                   Has employees
-                  <span class="check-hint">1601-C · 1604-C · 2316</span>
+                  <span class="check-hint">1601-C · 1604-C · 2316 · SSS · PhilHealth · Pag-IBIG employer remittances</span>
                 </span>
               </label>
               <label class="check">
@@ -3157,6 +3157,62 @@ table.ct thead { background: var(--s2); }
                 </span>
               </label>
             </div>
+          </div>
+
+          <div class="fld span2">
+            <label>Owner / operator voluntary contributions</label>
+            <div class="check-list">
+              <label class="check">
+                <input type="checkbox" id="ac_sss_vol">
+                <span class="check-text">
+                  Pays SSS voluntarily
+                  <span class="check-hint">Self-employed / voluntary member — 15% of MSC (RA 11199, eff. Jan 2025)</span>
+                </span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="ac_phic_vol">
+                <span class="check-text">
+                  Pays PhilHealth voluntarily
+                  <span class="check-hint">Voluntary member — 5% of declared monthly income (RA 11223, 2025)</span>
+                </span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="ac_hdmf_vol">
+                <span class="check-text">
+                  Pays Pag-IBIG (HDMF) voluntarily
+                  <span class="check-hint">Voluntary member — minimum ₱200/month (RA 9679, HDMF Circular 460)</span>
+                </span>
+              </label>
+            </div>
+            <p class="hint" style="margin-top:.4rem">
+              Employer SSS · PhilHealth · Pag-IBIG remittances are automatically
+              tracked when <em>Has employees</em> is enabled above.
+            </p>
+            <details style="margin-top:.5rem">
+              <summary style="font-size:.72rem;color:var(--mu);cursor:pointer;user-select:none">
+                Rate reference (2025 — verify for updates after Aug 2025)
+              </summary>
+              <div style="font-size:.72rem;color:var(--ink);margin-top:.5rem;line-height:1.75;padding-left:.25rem;border-left:2px solid var(--s2)">
+                <strong>SSS</strong> (RA 11199, CI-2024-006 to CI-2024-010, effective Jan 2025)<br>
+                &nbsp;&nbsp;Rate: 15% of MSC · ER 10% + EE 5%<br>
+                &nbsp;&nbsp;MSC range: ₱5,000–₱35,000<br>
+                &nbsp;&nbsp;EC Fund: ₱10/mo (MSC &lt; ₱15,000) or ₱30/mo (MSC ≥ ₱15,000) — employer only<br>
+                &nbsp;&nbsp;MySSS Pension Booster / MPF: +1% of excess MSC above ₱20,000 (ER + EE shared)<br>
+                &nbsp;&nbsp;Voluntary: member pays full 15% of chosen MSC<br>
+                &nbsp;&nbsp;<em>Deadline: last business day of the month following the applicable month (staggered by employer SSS number)</em><br><br>
+                <strong>PhilHealth</strong> (RA 11223, 2025 rate)<br>
+                &nbsp;&nbsp;Rate: 5% of basic monthly salary · ER 2.5% + EE 2.5%<br>
+                &nbsp;&nbsp;Floor: ₱10,000/mo (₱500 total · ₱250 per side)<br>
+                &nbsp;&nbsp;Ceiling: ₱100,000/mo (₱5,000 total · ₱2,500 per side)<br>
+                &nbsp;&nbsp;Voluntary: member pays full 5% of declared monthly income<br>
+                &nbsp;&nbsp;<em>Deadline: last day of the month following the applicable month</em><br><br>
+                <strong>Pag-IBIG / HDMF</strong> (RA 9679)<br>
+                &nbsp;&nbsp;Rate: ER 2% + member 2% (compensation &gt; ₱1,500); ER 2% + member 1% (≤ ₱1,500)<br>
+                &nbsp;&nbsp;Contribution ceiling: ₱10,000/mo → max ₱200 each side (HDMF Circular 460, eff. Feb 2024)<br>
+                &nbsp;&nbsp;Voluntary: member may pay above the mandatory minimum<br>
+                &nbsp;&nbsp;<em>Deadline: 10th of the month following the applicable month</em>
+              </div>
+            </details>
           </div>
         </div>
         <div id="prospectiveNote" class="hint hidden"
@@ -3322,6 +3378,13 @@ table.ct thead { background: var(--s2); }
  *   is_rbe              boolean not null default false,   -- CREATE MORE flag (20% EDR, RBE
  *                                                         --   invoicing system under RR 1-2026;
  *                                                         --   forced false for Employee)
+ *   -- Government contributions (SSS · PhilHealth · Pag-IBIG):
+ *   -- Employer obligations are gated by has_employees above.
+ *   -- The three flags below gate the owner/operator's own voluntary
+ *   -- contributions (self-employed members not covered by an employer).
+ *   owner_pays_sss        boolean not null default false,
+ *   owner_pays_philhealth boolean not null default false,
+ *   owner_pays_pagibig    boolean not null default false,
  *   notes               text,
  *   is_active           boolean not null default true,
  *   created_at          timestamptz not null default now(),
@@ -3330,12 +3393,15 @@ table.ct thead { background: var(--s2); }
  *
  * -- Schema migration for existing deployments:
  * -- alter table clients
- * --   add column if not exists has_employees      boolean not null default false,
- * --   add column if not exists withholds_expanded boolean not null default false,
- * --   add column if not exists withholds_final    boolean not null default false,
- * --   add column if not exists is_rbe             boolean not null default false,
- * --   add column if not exists tax_classification text,
- * --   add column if not exists deduction_method   text;
+ * --   add column if not exists has_employees        boolean not null default false,
+ * --   add column if not exists withholds_expanded   boolean not null default false,
+ * --   add column if not exists withholds_final      boolean not null default false,
+ * --   add column if not exists is_rbe               boolean not null default false,
+ * --   add column if not exists tax_classification   text,
+ * --   add column if not exists deduction_method     text,
+ * --   add column if not exists owner_pays_sss        boolean not null default false,
+ * --   add column if not exists owner_pays_philhealth boolean not null default false,
+ * --   add column if not exists owner_pays_pagibig    boolean not null default false;
  *
  * alter table clients enable row level security;
  *
@@ -3932,14 +3998,17 @@ async function generateYearObligations() {
   if (!confirm(`Generate all ${yr} obligations for ${_currentClient.display_name}?`)) return
   btn.disabled = true
   await seedComplianceRecords(activeClientId, {
-    taxpayer_type:      _currentClient.taxpayer_type,
-    vat_status:         _currentClient.vat_status,
-    tax_classification: _currentClient.tax_classification,
-    deduction_method:   _currentClient.deduction_method,
-    has_employees:      _currentClient.has_employees,
-    withholds_expanded: _currentClient.withholds_expanded,
-    withholds_final:    _currentClient.withholds_final,
-    fiscal_year_start:  _currentClient.fiscal_start_month,
+    taxpayer_type:        _currentClient.taxpayer_type,
+    vat_status:           _currentClient.vat_status,
+    tax_classification:   _currentClient.tax_classification,
+    deduction_method:     _currentClient.deduction_method,
+    has_employees:        _currentClient.has_employees,
+    withholds_expanded:   _currentClient.withholds_expanded,
+    withholds_final:      _currentClient.withholds_final,
+    fiscal_year_start:    _currentClient.fiscal_start_month,
+    owner_pays_sss:       _currentClient.owner_pays_sss,
+    owner_pays_philhealth:_currentClient.owner_pays_philhealth,
+    owner_pays_pagibig:   _currentClient.owner_pays_pagibig,
   }, yr)
   btn.disabled = false
   await _updateGenerateYearBtn(activeClientId)
@@ -4255,10 +4324,13 @@ function generateObligations(profile, year) {
     vat_status,
     tax_classification,        // 'Micro' | 'Small' | 'Medium' | 'Large' | null  (RR 8-2024)
     deduction_method,          // 'Itemized' | 'OSD' | '8%' | null
-    has_employees      = false,
-    withholds_expanded = false,
-    withholds_final    = false,
-    fiscal_year_start  = 1,   // 1 = calendar year
+    has_employees        = false,
+    withholds_expanded   = false,
+    withholds_final      = false,
+    fiscal_year_start    = 1,  // 1 = calendar year
+    owner_pays_sss       = false,
+    owner_pays_philhealth= false,
+    owner_pays_pagibig   = false,
   } = profile
   const yr  = year ?? new Date().getFullYear()
   const obs = []
@@ -4534,6 +4606,58 @@ function generateObligations(profile, year) {
     obs.push(ob('1604F', 'BIR Form 1604-F',
       'Annual Final WT Summary (+ Alphalist)', `CY ${yr}`,
       d(1, 31, yr + 1), 'withholding'))
+  }
+
+  // ── Employer: government mandatory contributions ──────────────
+  // SSS (RA 11199, eff. Jan 2025): 15% of MSC (ER 10% + EE 5%).
+  //   Deadline: last business day of the month following the applicable month
+  //   (staggered by last digit of employer SSS number; tracked here at latest
+  //   possible deadline — verify your specific schedule with SSS).
+  // PhilHealth (RA 11223, 2025 rate): 5% of basic salary (ER 2.5% + EE 2.5%).
+  //   Floor ₱10,000 / Ceiling ₱100,000.
+  //   Deadline: last day of the month following the applicable month.
+  // Pag-IBIG / HDMF (RA 9679): 2% each (ER + member) for compensation > ₱1,500.
+  //   Contribution ceiling ₱10,000/month → max ₱200 each side (HDMF Circular 460, eff. Feb 2024).
+  //   Deadline: 10th of the month following the applicable month.
+  if (has_employees) {
+    for (let m = 1; m <= 12; m++) {
+      const mnth = _MONTHS[m - 1]
+      const mAbb = mnth.toLowerCase().slice(0, 3)
+      // SSS & PhilHealth: last day of the following month
+      const nx           = addMonths(m, 1, 1)
+      const followingEnd = new Date(nx.getFullYear(), nx.getMonth() + 1, 0)
+      obs.push(ob(`SSS-emp-${mAbb}`, 'SSS Employer Remittance',
+        'Monthly SSS Contribution Remittance', `${mnth} ${yr}`,
+        followingEnd, 'government'))
+      obs.push(ob(`PHIC-emp-${mAbb}`, 'PhilHealth Employer Remittance',
+        'Monthly PhilHealth Premium Remittance', `${mnth} ${yr}`,
+        followingEnd, 'government'))
+      // Pag-IBIG: 10th of the following month (same cadence as BIR 1601-C)
+      obs.push(ob(`HDMF-emp-${mAbb}`, 'Pag-IBIG Employer Remittance',
+        'Monthly Pag-IBIG Contribution Remittance', `${mnth} ${yr}`,
+        addMonths(m, 10, 1), 'government'))
+    }
+  }
+
+  // ── Owner/operator: voluntary government contributions ────────
+  // Self-employed individuals and sole operators not covered by an employer
+  // may voluntarily contribute to SSS, PhilHealth, and/or Pag-IBIG.
+  // SSS voluntary: 15% of the member's chosen MSC (RA 11199).
+  // PhilHealth voluntary: 5% of declared monthly income (RA 11223).
+  // Pag-IBIG voluntary: minimum ₱200/month (HDMF Circular 460, eff. Feb 2024); higher optional savings allowed.
+  // Deadline: last business day of the applicable month.
+  if (owner_pays_sss || owner_pays_philhealth || owner_pays_pagibig) {
+    for (let m = 1; m <= 12; m++) {
+      const mnth   = _MONTHS[m - 1]
+      const mAbb   = mnth.toLowerCase().slice(0, 3)
+      const volDue = new Date(yr, m, 0)  // last day of the applicable month
+      if (owner_pays_sss) obs.push(ob(`SSS-vol-${mAbb}`, 'SSS Voluntary Contribution',
+        'Monthly SSS Voluntary Contribution', `${mnth} ${yr}`, volDue, 'government'))
+      if (owner_pays_philhealth) obs.push(ob(`PHIC-vol-${mAbb}`, 'PhilHealth Voluntary Premium',
+        'Monthly PhilHealth Voluntary Premium', `${mnth} ${yr}`, volDue, 'government'))
+      if (owner_pays_pagibig) obs.push(ob(`HDMF-vol-${mAbb}`, 'Pag-IBIG Voluntary Savings',
+        'Monthly Pag-IBIG Voluntary Savings', `${mnth} ${yr}`, volDue, 'government'))
+    }
   }
 
   return obs
@@ -4868,6 +4992,9 @@ function openClientSheet(mode, clientId) {
     $('ac_ewt').checked           = !!_currentClient.withholds_expanded
     $('ac_fwt').checked           = !!_currentClient.withholds_final
     $('ac_rbe').checked           = !!_currentClient.is_rbe
+    $('ac_sss_vol').checked       = !!_currentClient.owner_pays_sss
+    $('ac_phic_vol').checked      = !!_currentClient.owner_pays_philhealth
+    $('ac_hdmf_vol').checked      = !!_currentClient.owner_pays_pagibig
     $('archiveRow').classList.remove('hidden')
     $('prospectiveNote').classList.remove('hidden')
   } else {
@@ -4882,6 +5009,9 @@ function openClientSheet(mode, clientId) {
     $('ac_ewt').checked           = false
     $('ac_fwt').checked           = false
     $('ac_rbe').checked           = false
+    $('ac_sss_vol').checked       = false
+    $('ac_phic_vol').checked      = false
+    $('ac_hdmf_vol').checked      = false
     $('archiveRow').classList.add('hidden')
     $('prospectiveNote').classList.add('hidden')
   }
@@ -5024,10 +5154,13 @@ async function saveClient() {
   // EWT/FWT/RBE are non-applicable to a pure-compensation Employee
   // (see _syncTaxProfileOptions); persist them as false regardless of
   // whatever the disabled checkbox happens to read.
-  const has_employees      = $('ac_has_employees').checked
-  const withholds_expanded = !isEmployee && $('ac_ewt').checked
-  const withholds_final    = !isEmployee && $('ac_fwt').checked
-  const is_rbe             = !isEmployee && $('ac_rbe').checked
+  const has_employees        = $('ac_has_employees').checked
+  const withholds_expanded   = !isEmployee && $('ac_ewt').checked
+  const withholds_final      = !isEmployee && $('ac_fwt').checked
+  const is_rbe               = !isEmployee && $('ac_rbe').checked
+  const owner_pays_sss       = $('ac_sss_vol').checked
+  const owner_pays_philhealth= $('ac_phic_vol').checked
+  const owner_pays_pagibig   = $('ac_hdmf_vol').checked
 
   const payload = {
     display_name:      name,
@@ -5044,6 +5177,9 @@ async function saveClient() {
     withholds_expanded,
     withholds_final,
     is_rbe,
+    owner_pays_sss,
+    owner_pays_philhealth,
+    owner_pays_pagibig,
   }
 
   let error
@@ -5058,7 +5194,10 @@ async function saveClient() {
     has_employees,
     withholds_expanded,
     withholds_final,
-    fiscal_year_start: fiscal_start_month,
+    fiscal_year_start:    fiscal_start_month,
+    owner_pays_sss,
+    owner_pays_philhealth,
+    owner_pays_pagibig,
   }
 
   if (isEdit) {
@@ -5223,8 +5362,10 @@ async function loadObligations(clientId, yearFilter) {
 }
 
 function buildObligationCard(r) {
-  const status          = getCardStatus(r)
-  const { label, cls }  = _statusMeta(status)
+  const status            = getCardStatus(r)
+  const isGovContrib      = /^(SSS |PhilHealth |Pag-IBIG )/.test(r.form || '')
+  const { label: rawLabel, cls } = _statusMeta(status)
+  const label = (status === 'trrc-missing' && isGovContrib) ? 'Receipt needed' : rawLabel
   const due             = r.due_date ? new Date(r.due_date) : null
   const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
   const isDueOver       = due && due < _today && !r.filed_date
@@ -5232,12 +5373,16 @@ function buildObligationCard(r) {
   let penaltyLine = ''
   if (status === 'overdue' && due) {
     const daysLate = Math.floor((_today - due) / 86400000)
-    const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
-    if (taxDue) {
-      const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
-      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+    if (isGovContrib) {
+      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Late contribution — penalties accumulating. Remit as soon as possible.</div>`
     } else {
-      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+      const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
+      if (taxDue) {
+        const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
+        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+      } else {
+        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+      }
     }
   }
 
@@ -5246,7 +5391,7 @@ function buildObligationCard(r) {
 
   const step1Done   = !!r.filed_date
   const step1Detail = step1Done
-    ? `${r.filed_date}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}${editLink('openFilingForm')}`
+    ? `${r.filed_date}${r.has_tax_due ? ` · ${isGovContrib ? 'Amount' : 'Tax due'}: ₱${Number(r.tax_due||0).toLocaleString()}` : (isGovContrib ? '' : ' · No tax due')}${editLink('openFilingForm')}`
     : ''
 
   const step2Done   = !!r.trrc_saved
@@ -5273,13 +5418,13 @@ function buildObligationCard(r) {
     ? ` · Fee: ₱${Number(r.transaction_fee).toLocaleString()}` : ''
   const step3Detail = r.payment_status === 'paid'
     ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
-    : (noPaymentNeeded ? `No tax due — no payment needed${editLink('openFilingForm')}` : '')
+    : (noPaymentNeeded ? `${isGovContrib ? 'No contribution amount recorded' : 'No tax due — no payment needed'}${editLink('openFilingForm')}` : '')
 
   let actionBtn = ''
   if (!step1Done) {
-    actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">Record filing</button>`
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">${isGovContrib ? 'Record remittance' : 'Record filing'}</button>`
   } else if (!step2Done) {
-    actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">Record TRRC</button>`
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">${isGovContrib ? 'Record receipt' : 'Record TRRC'}</button>`
   } else if (needsDat && !stepDatDone) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openDatForm('${r.id}')">Record DAT validation</button>`
   } else if (!step3Done && r.payment_status !== 'n/a') {
@@ -5287,7 +5432,7 @@ function buildObligationCard(r) {
   }
 
   return `
-<div class="ob-card ${status}" id="card_${r.id}">
+<div class="ob-card ${status}" id="card_${r.id}" data-form="${esc(r.form ?? '')}">
   <div class="ob-header">
     <div class="ob-left">
       <div class="ob-form">${esc(r.form)}</div>
@@ -5300,14 +5445,14 @@ function buildObligationCard(r) {
     <div class="ob-step${step1Done ? ' done' : ''}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">1. Filed</div>
+        <div class="ob-step-label">1. ${isGovContrib ? 'Remitted' : 'Filed'}</div>
         ${step1Detail ? `<div class="ob-step-detail mono">${step1Detail}</div>` : ''}
       </div>
     </div>
     <div class="ob-step${step2Done ? ' done' : step1Done ? '' : ' dimmed'}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">2. TRRC saved</div>
+        <div class="ob-step-label">2. ${isGovContrib ? 'Receipt saved' : 'TRRC saved'}</div>
         ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
       </div>
     </div>
@@ -5349,20 +5494,22 @@ async function openFilingForm(recordId, isEdit = false) {
     const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
     r = data
   }
-  const showCwt = canClaimCwt(r?.form)
+  const formName = r?.form || document.getElementById(`card_${recordId}`)?.dataset?.form || ''
+  const isGov    = /^(SSS |PhilHealth |Pag-IBIG )/.test(formName)
+  const showCwt  = canClaimCwt(formName)
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="fld">
-    <label>Date filed <span class="req">*</span></label>
+    <label>${isGov ? 'Date remitted' : 'Date filed'} <span class="req">*</span></label>
     <input type="date" id="ff_date_${recordId}" value="${r?.filed_date ?? ''}">
   </div>
   <label class="check-inline">
     <input type="checkbox" id="ff_taxdue_${recordId}" ${r?.has_tax_due ? 'checked' : ''} onchange="_toggleTaxDue('${recordId}')">
-    Has tax due?
+    ${isGov ? 'Has contribution amount?' : 'Has tax due?'}
   </label>
   <div class="fld ${r?.has_tax_due ? '' : 'hidden'}" id="ff_taxdue_wrap_${recordId}">
-    <label>Tax due amount (₱)</label>
+    <label>${isGov ? 'Contribution amount (₱)' : 'Tax due amount (₱)'}</label>
     <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00" value="${r?.tax_due ?? ''}">
   </div>
   ${showCwt ? `
@@ -5395,21 +5542,25 @@ async function openTRRCForm(recordId, isEdit = false) {
     const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
     r = data
   }
+  const formName = r?.form || document.getElementById(`card_${recordId}`)?.dataset?.form || ''
+  const isGov    = /^(SSS |PhilHealth |Pag-IBIG )/.test(formName)
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="inline-form-row">
     <div class="fld">
-      <label>TRRC date <span class="req">*</span></label>
+      <label>${isGov ? 'Receipt date' : 'TRRC date'} <span class="req">*</span></label>
       <input type="date" id="tf_date_${recordId}" value="${r?.trrc_date ?? ''}">
     </div>
     <div class="fld">
-      <label>TRRC file name</label>
-      <input type="text" id="tf_ref_${recordId}" placeholder="e.g. TRRC_2550Q_2026Q1.pdf" value="${esc(r?.trrc_reference ?? '')}">
+      <label>${isGov ? 'Receipt / confirmation file name' : 'TRRC file name'}</label>
+      <input type="text" id="tf_ref_${recordId}" placeholder="${isGov ? 'e.g. SSS_Jan2026_receipt.pdf' : 'e.g. TRRC_2550Q_2026Q1.pdf'}" value="${esc(r?.trrc_reference ?? '')}">
     </div>
   </div>
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
-    Keep the TRRC email (or BIR Filing app popup screenshot) on file — it is the only official proof of filing.
+    ${isGov
+      ? 'Keep the payment receipt or remittance confirmation on file as proof of contribution.'
+      : 'Keep the TRRC email (or BIR Filing app popup screenshot) on file — it is the only official proof of filing.'}
   </div>
   <div id="tf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
