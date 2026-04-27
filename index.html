@@ -5362,8 +5362,10 @@ async function loadObligations(clientId, yearFilter) {
 }
 
 function buildObligationCard(r) {
-  const status          = getCardStatus(r)
-  const { label, cls }  = _statusMeta(status)
+  const status            = getCardStatus(r)
+  const isGovContrib      = /^(SSS |PhilHealth |Pag-IBIG )/.test(r.form || '')
+  const { label: rawLabel, cls } = _statusMeta(status)
+  const label = (status === 'trrc-missing' && isGovContrib) ? 'Receipt needed' : rawLabel
   const due             = r.due_date ? new Date(r.due_date) : null
   const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
   const isDueOver       = due && due < _today && !r.filed_date
@@ -5371,12 +5373,16 @@ function buildObligationCard(r) {
   let penaltyLine = ''
   if (status === 'overdue' && due) {
     const daysLate = Math.floor((_today - due) / 86400000)
-    const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
-    if (taxDue) {
-      const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
-      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+    if (isGovContrib) {
+      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Late contribution — penalties accumulating. Remit as soon as possible.</div>`
     } else {
-      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+      const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
+      if (taxDue) {
+        const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
+        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+      } else {
+        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+      }
     }
   }
 
@@ -5385,7 +5391,7 @@ function buildObligationCard(r) {
 
   const step1Done   = !!r.filed_date
   const step1Detail = step1Done
-    ? `${r.filed_date}${r.has_tax_due ? ` · Tax due: ₱${Number(r.tax_due||0).toLocaleString()}` : ' · No tax due'}${editLink('openFilingForm')}`
+    ? `${r.filed_date}${r.has_tax_due ? ` · ${isGovContrib ? 'Amount' : 'Tax due'}: ₱${Number(r.tax_due||0).toLocaleString()}` : (isGovContrib ? '' : ' · No tax due')}${editLink('openFilingForm')}`
     : ''
 
   const step2Done   = !!r.trrc_saved
@@ -5412,13 +5418,13 @@ function buildObligationCard(r) {
     ? ` · Fee: ₱${Number(r.transaction_fee).toLocaleString()}` : ''
   const step3Detail = r.payment_status === 'paid'
     ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
-    : (noPaymentNeeded ? `No tax due — no payment needed${editLink('openFilingForm')}` : '')
+    : (noPaymentNeeded ? `${isGovContrib ? 'No contribution amount recorded' : 'No tax due — no payment needed'}${editLink('openFilingForm')}` : '')
 
   let actionBtn = ''
   if (!step1Done) {
-    actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">Record filing</button>`
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">${isGovContrib ? 'Record remittance' : 'Record filing'}</button>`
   } else if (!step2Done) {
-    actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">Record TRRC</button>`
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">${isGovContrib ? 'Record receipt' : 'Record TRRC'}</button>`
   } else if (needsDat && !stepDatDone) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openDatForm('${r.id}')">Record DAT validation</button>`
   } else if (!step3Done && r.payment_status !== 'n/a') {
@@ -5426,7 +5432,7 @@ function buildObligationCard(r) {
   }
 
   return `
-<div class="ob-card ${status}" id="card_${r.id}">
+<div class="ob-card ${status}" id="card_${r.id}" data-form="${esc(r.form ?? '')}">
   <div class="ob-header">
     <div class="ob-left">
       <div class="ob-form">${esc(r.form)}</div>
@@ -5439,14 +5445,14 @@ function buildObligationCard(r) {
     <div class="ob-step${step1Done ? ' done' : ''}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">1. Filed</div>
+        <div class="ob-step-label">1. ${isGovContrib ? 'Remitted' : 'Filed'}</div>
         ${step1Detail ? `<div class="ob-step-detail mono">${step1Detail}</div>` : ''}
       </div>
     </div>
     <div class="ob-step${step2Done ? ' done' : step1Done ? '' : ' dimmed'}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">2. TRRC saved</div>
+        <div class="ob-step-label">2. ${isGovContrib ? 'Receipt saved' : 'TRRC saved'}</div>
         ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
       </div>
     </div>
@@ -5488,20 +5494,22 @@ async function openFilingForm(recordId, isEdit = false) {
     const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
     r = data
   }
-  const showCwt = canClaimCwt(r?.form)
+  const formName = r?.form || document.getElementById(`card_${recordId}`)?.dataset?.form || ''
+  const isGov    = /^(SSS |PhilHealth |Pag-IBIG )/.test(formName)
+  const showCwt  = canClaimCwt(formName)
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="fld">
-    <label>Date filed <span class="req">*</span></label>
+    <label>${isGov ? 'Date remitted' : 'Date filed'} <span class="req">*</span></label>
     <input type="date" id="ff_date_${recordId}" value="${r?.filed_date ?? ''}">
   </div>
   <label class="check-inline">
     <input type="checkbox" id="ff_taxdue_${recordId}" ${r?.has_tax_due ? 'checked' : ''} onchange="_toggleTaxDue('${recordId}')">
-    Has tax due?
+    ${isGov ? 'Has contribution amount?' : 'Has tax due?'}
   </label>
   <div class="fld ${r?.has_tax_due ? '' : 'hidden'}" id="ff_taxdue_wrap_${recordId}">
-    <label>Tax due amount (₱)</label>
+    <label>${isGov ? 'Contribution amount (₱)' : 'Tax due amount (₱)'}</label>
     <input type="number" id="ff_taxamt_${recordId}" min="0" step="0.01" placeholder="0.00" value="${r?.tax_due ?? ''}">
   </div>
   ${showCwt ? `
@@ -5534,21 +5542,25 @@ async function openTRRCForm(recordId, isEdit = false) {
     const { data } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
     r = data
   }
+  const formName = r?.form || document.getElementById(`card_${recordId}`)?.dataset?.form || ''
+  const isGov    = /^(SSS |PhilHealth |Pag-IBIG )/.test(formName)
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div class="inline-form-row">
     <div class="fld">
-      <label>TRRC date <span class="req">*</span></label>
+      <label>${isGov ? 'Receipt date' : 'TRRC date'} <span class="req">*</span></label>
       <input type="date" id="tf_date_${recordId}" value="${r?.trrc_date ?? ''}">
     </div>
     <div class="fld">
-      <label>TRRC file name</label>
-      <input type="text" id="tf_ref_${recordId}" placeholder="e.g. TRRC_2550Q_2026Q1.pdf" value="${esc(r?.trrc_reference ?? '')}">
+      <label>${isGov ? 'Receipt / confirmation file name' : 'TRRC file name'}</label>
+      <input type="text" id="tf_ref_${recordId}" placeholder="${isGov ? 'e.g. SSS_Jan2026_receipt.pdf' : 'e.g. TRRC_2550Q_2026Q1.pdf'}" value="${esc(r?.trrc_reference ?? '')}">
     </div>
   </div>
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
-    Keep the TRRC email (or BIR Filing app popup screenshot) on file — it is the only official proof of filing.
+    ${isGov
+      ? 'Keep the payment receipt or remittance confirmation on file as proof of contribution.'
+      : 'Keep the TRRC email (or BIR Filing app popup screenshot) on file — it is the only official proof of filing.'}
   </div>
   <div id="tf_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
