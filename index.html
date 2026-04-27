@@ -3180,7 +3180,7 @@ table.ct thead { background: var(--s2); }
                 <input type="checkbox" id="ac_hdmf_vol">
                 <span class="check-text">
                   Pays Pag-IBIG (HDMF) voluntarily
-                  <span class="check-hint">Voluntary member — minimum ₱100/month (RA 9679)</span>
+                  <span class="check-hint">Voluntary member — minimum ₱200/month (RA 9679, HDMF Circular 460)</span>
                 </span>
               </label>
             </div>
@@ -3193,11 +3193,11 @@ table.ct thead { background: var(--s2); }
                 Rate reference (2025 — verify for updates after Aug 2025)
               </summary>
               <div style="font-size:.72rem;color:var(--ink);margin-top:.5rem;line-height:1.75;padding-left:.25rem;border-left:2px solid var(--s2)">
-                <strong>SSS</strong> (RA 11199, effective Jan 2025)<br>
+                <strong>SSS</strong> (RA 11199, CI-2024-006 to CI-2024-010, effective Jan 2025)<br>
                 &nbsp;&nbsp;Rate: 15% of MSC · ER 10% + EE 5%<br>
-                &nbsp;&nbsp;MSC range: ₱4,000–₱30,000<br>
-                &nbsp;&nbsp;EC Fund: ₱10/mo (MSC &lt; ₱14,750) or ₱30/mo (MSC ≥ ₱14,750) — employer only<br>
-                &nbsp;&nbsp;WISP: +1% each side for MSC ≥ ₱20,000<br>
+                &nbsp;&nbsp;MSC range: ₱5,000–₱35,000<br>
+                &nbsp;&nbsp;EC Fund: ₱10/mo (MSC &lt; ₱15,000) or ₱30/mo (MSC ≥ ₱15,000) — employer only<br>
+                &nbsp;&nbsp;MySSS Pension Booster / MPF: +1% of excess MSC above ₱20,000 (ER + EE shared)<br>
                 &nbsp;&nbsp;Voluntary: member pays full 15% of chosen MSC<br>
                 &nbsp;&nbsp;<em>Deadline: last business day of the month following the applicable month (staggered by employer SSS number)</em><br><br>
                 <strong>PhilHealth</strong> (RA 11223, 2025 rate)<br>
@@ -3208,7 +3208,7 @@ table.ct thead { background: var(--s2); }
                 &nbsp;&nbsp;<em>Deadline: last day of the month following the applicable month</em><br><br>
                 <strong>Pag-IBIG / HDMF</strong> (RA 9679)<br>
                 &nbsp;&nbsp;Rate: ER 2% + member 2% (compensation &gt; ₱1,500); ER 2% + member 1% (≤ ₱1,500)<br>
-                &nbsp;&nbsp;Contribution ceiling: ₱5,000/mo → max ₱100 each side (mandatory)<br>
+                &nbsp;&nbsp;Contribution ceiling: ₱10,000/mo → max ₱200 each side (HDMF Circular 460, eff. Feb 2024)<br>
                 &nbsp;&nbsp;Voluntary: member may pay above the mandatory minimum<br>
                 &nbsp;&nbsp;<em>Deadline: 10th of the month following the applicable month</em>
               </div>
@@ -4617,7 +4617,7 @@ function generateObligations(profile, year) {
   //   Floor ₱10,000 / Ceiling ₱100,000.
   //   Deadline: last day of the month following the applicable month.
   // Pag-IBIG / HDMF (RA 9679): 2% each (ER + member) for compensation > ₱1,500.
-  //   Contribution ceiling ₱5,000/month → max ₱100 each side (mandatory).
+  //   Contribution ceiling ₱10,000/month → max ₱200 each side (HDMF Circular 460, eff. Feb 2024).
   //   Deadline: 10th of the month following the applicable month.
   if (has_employees) {
     for (let m = 1; m <= 12; m++) {
@@ -4644,7 +4644,7 @@ function generateObligations(profile, year) {
   // may voluntarily contribute to SSS, PhilHealth, and/or Pag-IBIG.
   // SSS voluntary: 15% of the member's chosen MSC (RA 11199).
   // PhilHealth voluntary: 5% of declared monthly income (RA 11223).
-  // Pag-IBIG voluntary: minimum ₱100/month; higher optional savings allowed.
+  // Pag-IBIG voluntary: minimum ₱200/month (HDMF Circular 460, eff. Feb 2024); higher optional savings allowed.
   // Deadline: last business day of the applicable month.
   if (owner_pays_sss || owner_pays_philhealth || owner_pays_pagibig) {
     for (let m = 1; m <= 12; m++) {
