@@ -2467,20 +2467,27 @@ table.ct thead { background: var(--s2); }
    MOBILE LAYOUT FIXES  (≤ 768 px)
 ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Header: tighten side padding, hide redundant firm-name label */
+
+  /* ── Header ── */
   .hdr { padding: .5rem .75rem; }
   .hdr-user { display: none; }
 
-  /* Reports: release fixed viewport height so page can scroll */
+  /* ── Dashboard: release fixed height, single-col grid ── */
+  #pgDashboard .main-content {
+    height: auto;
+    overflow-y: visible;
+  }
+  .db-grid { grid-template-columns: 1fr; }
+
+  /* ── Reports: release fixed height, stack panels vertically ── */
   #pgReports .main-content {
     height: auto;
     min-height: 0;
     overflow-y: visible;
   }
-
-  /* Reports: stack selector above output panel */
   .rpt-body {
     flex-direction: column;
+    flex: initial;
     overflow: visible;
   }
   .rpt-selector {
@@ -2489,18 +2496,47 @@ table.ct thead { background: var(--s2); }
     border-bottom: 1px solid var(--bd);
     overflow-y: visible;
   }
-  .rpt-output { overflow-y: visible; }
-
-  /* Reports controls: un-stick the bar and reset any auto-margin on buttons */
+  .rpt-output {
+    flex: initial;
+    overflow-y: visible;
+  }
   .rpt-controls {
     position: static;
     padding: .75rem 1rem;
   }
   .rpt-controls button { margin-left: 0 !important; }
   .rpt-content { padding: 1rem; }
+  .rpt-table-wrap { -webkit-overflow-scrolling: touch; }
+  table.ct { font-size: .76rem; }
+  table.ct th,
+  table.ct td { padding: .35rem .5rem; }
 
-  /* Roster topbar: let buttons wrap below the heading on narrow screens */
+  /* ── Roster: wrap topbar buttons, full-width search ── */
   .roster-topbar { flex-wrap: wrap; }
+  .roster-search {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* ── Client detail: wrap back-bar buttons, horizontally scroll subtabs ── */
+  .detail-back-bar {
+    flex-wrap: wrap;
+    gap: .4rem;
+    padding: .5rem 1rem;
+  }
+  .detail-back-bar button[style] { margin-left: 0 !important; }
+  .detail-subtab-bar {
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  .detail-subtab-bar::-webkit-scrollbar { display: none; }
+
+  /* ── Notes panel & settings: full width ── */
+  .notes-panel-wrap { max-width: 100%; }
+  .settings-wrap { max-width: 100%; }
 }
 </style>
 </head>
