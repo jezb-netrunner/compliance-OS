@@ -2462,6 +2462,82 @@ table.ct thead { background: var(--s2); }
   box-shadow: 0 4px 16px rgba(30,43,74,.08), 0 24px 64px rgba(79,118,255,.14);
   border: 1px solid rgba(226,230,243,.8);
 }
+
+/* ═══════════════════════════════════════════════════
+   MOBILE LAYOUT FIXES  (≤ 768 px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* ── Header ── */
+  .hdr { padding: .5rem .75rem; }
+  .hdr-user { display: none; }
+
+  /* ── Dashboard: release fixed height, single-col grid ── */
+  #pgDashboard .main-content {
+    height: auto;
+    overflow-y: visible;
+  }
+  .db-grid { grid-template-columns: 1fr; }
+
+  /* ── Reports: release fixed height, stack panels vertically ── */
+  #pgReports .main-content {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+  }
+  .rpt-body {
+    flex-direction: column;
+    flex: initial;
+    overflow: visible;
+  }
+  .rpt-selector {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--bd);
+    overflow-y: visible;
+  }
+  .rpt-output {
+    flex: initial;
+    overflow-y: visible;
+  }
+  .rpt-controls {
+    position: static;
+    padding: .75rem 1rem;
+  }
+  .rpt-controls button { margin-left: 0 !important; }
+  .rpt-content { padding: 1rem; }
+  .rpt-table-wrap { -webkit-overflow-scrolling: touch; }
+  table.ct { font-size: .76rem; }
+  table.ct th,
+  table.ct td { padding: .35rem .5rem; }
+
+  /* ── Roster: wrap topbar buttons, full-width search ── */
+  .roster-topbar { flex-wrap: wrap; }
+  .roster-search {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* ── Client detail: wrap back-bar buttons, horizontally scroll subtabs ── */
+  .detail-back-bar {
+    flex-wrap: wrap;
+    gap: .4rem;
+    padding: .5rem 1rem;
+  }
+  .detail-back-bar button[style] { margin-left: 0 !important; }
+  .detail-subtab-bar {
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  .detail-subtab-bar::-webkit-scrollbar { display: none; }
+
+  /* ── Notes panel & settings: full width ── */
+  .notes-panel-wrap { max-width: 100%; }
+  .settings-wrap { max-width: 100%; }
+}
 </style>
 </head>
 <body>
