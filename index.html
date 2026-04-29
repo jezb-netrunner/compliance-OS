@@ -2462,6 +2462,46 @@ table.ct thead { background: var(--s2); }
   box-shadow: 0 4px 16px rgba(30,43,74,.08), 0 24px 64px rgba(79,118,255,.14);
   border: 1px solid rgba(226,230,243,.8);
 }
+
+/* ═══════════════════════════════════════════════════
+   MOBILE LAYOUT FIXES  (≤ 768 px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Header: tighten side padding, hide redundant firm-name label */
+  .hdr { padding: .5rem .75rem; }
+  .hdr-user { display: none; }
+
+  /* Reports: release fixed viewport height so page can scroll */
+  #pgReports .main-content {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+  }
+
+  /* Reports: stack selector above output panel */
+  .rpt-body {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .rpt-selector {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--bd);
+    overflow-y: visible;
+  }
+  .rpt-output { overflow-y: visible; }
+
+  /* Reports controls: un-stick the bar and reset any auto-margin on buttons */
+  .rpt-controls {
+    position: static;
+    padding: .75rem 1rem;
+  }
+  .rpt-controls button { margin-left: 0 !important; }
+  .rpt-content { padding: 1rem; }
+
+  /* Roster topbar: let buttons wrap below the heading on narrow screens */
+  .roster-topbar { flex-wrap: wrap; }
+}
 </style>
 </head>
 <body>
