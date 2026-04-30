@@ -3535,7 +3535,7 @@ table.ct thead { background: var(--s2); }
  *   --   QAP        — 1601-EQ/FQ
  *   --   SLSP       — all VAT-registered 2550Q (RR 1-2012; no threshold)
  *   --   SAWT       — any return claiming 2307 CWT credits: 1700, 1701,
- *   --                1701Q, 1702, 1702Q, 2550Q, 2551Q (RR 2-2006)
+ *   --                1701A, 1701Q, 1702, 1702Q, 2550Q, 2551Q (RR 2-2006)
  *   -- claims_cwt is the per-return switch for SAWT; the others are
  *   -- derived from the form code.
  *   claims_cwt            boolean not null default false,
@@ -5365,7 +5365,7 @@ async function archiveClient() {
  *   • QAP      — 1601-EQ/FQ
  *   • SLSP     — every VAT-registered 2550Q (RR 1-2012; no amount threshold)
  *   • SAWT     — returns that claim 2307 CWT credits (per-record flag):
- *                1700, 1701, 1701Q, 1702, 1702Q, 2550Q, 2551Q (RR 2-2006)
+ *                1700, 1701A, 1701, 1701Q, 1702, 1702Q, 2550Q, 2551Q (RR 2-2006)
  * Accepts either a compliance_records row or just a form string (the latter
  * can't surface SAWT since it depends on claims_cwt).
  */
@@ -5376,7 +5376,7 @@ function datAttachments(r) {
   if (/1601-?[EF]Q\b/i.test(form))                      out.push('QAP')
   if (/2550Q\b/i.test(form))                            out.push('SLSP')
   if (typeof r === 'object' && r?.claims_cwt
-      && /\b(1700|1701Q|1701|1702Q|1702|2550Q|2551Q)\b/i.test(form)) {
+      && /\b(1700|1701Q|1701A|1701|1702Q|1702|2550Q|2551Q)\b/i.test(form)) {
     out.push('SAWT')
   }
   return out
@@ -5384,7 +5384,7 @@ function datAttachments(r) {
 
 /** Returns true when the return could carry a SAWT attachment (gates the UI). */
 function canClaimCwt(form) {
-  return /\b(1700|1701Q|1701|1702Q|1702|2550Q|2551Q)\b/i.test(String(form || ''))
+  return /\b(1700|1701Q|1701A|1701|1702Q|1702|2550Q|2551Q)\b/i.test(String(form || ''))
 }
 
 function requiresDatSubmission(r) { return datAttachments(r).length > 0 }
