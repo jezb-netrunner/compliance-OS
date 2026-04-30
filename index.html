@@ -3232,6 +3232,13 @@ table.ct thead { background: var(--s2); }
                   <span class="check-hint">CREATE MORE — 20% EDR, RR 1-2026 invoicing</span>
                 </span>
               </label>
+              <label class="check">
+                <input type="checkbox" id="ac_receives_2307">
+                <span class="check-text">
+                  Receives creditable withholding tax (2307) certificates
+                  <span class="check-hint">Payor-withheld income — annual ITR requires SAWT via eSubmission + scanned 2307s via eAFS</span>
+                </span>
+              </label>
             </div>
           </div>
 
@@ -3461,6 +3468,11 @@ table.ct thead { background: var(--s2); }
  *   owner_pays_sss        boolean not null default false,
  *   owner_pays_philhealth boolean not null default false,
  *   owner_pays_pagibig    boolean not null default false,
+ *   receives_2307         boolean not null default false,
+ *     -- Client receives creditable withholding tax (2307) certificates
+ *     -- from payors. Pre-checks claims_cwt on annual ITR filing forms
+ *     -- and drives the eAFS scanned-2307 submission step.
+ *     -- (forced false for pure-compensation Employees)
  *   notes               text,
  *   is_active           boolean not null default true,
  *   created_at          timestamptz not null default now(),
@@ -3477,7 +3489,8 @@ table.ct thead { background: var(--s2); }
  * --   add column if not exists deduction_method     text,
  * --   add column if not exists owner_pays_sss        boolean not null default false,
  * --   add column if not exists owner_pays_philhealth boolean not null default false,
- * --   add column if not exists owner_pays_pagibig    boolean not null default false;
+ * --   add column if not exists owner_pays_pagibig    boolean not null default false,
+ * --   add column if not exists receives_2307         boolean not null default false;
  *
  * alter table clients enable row level security;
  *
@@ -3529,6 +3542,12 @@ table.ct thead { background: var(--s2); }
  *   dat_files_saved       boolean not null default false,
  *   validation_email      boolean not null default false,
  *   validation_email_date date,
+ *   eafs_2307_submitted   boolean not null default false,
+ *     -- Annual ITR records claiming CWT (claims_cwt = true): scanned
+ *     -- 2307 certificates uploaded via BIR eAFS. Required in addition
+ *     -- to SAWT via eSubmission — eAFS is a separate BIR portal.
+ *     -- Only surfaces for annual ITRs (1700/1701/1701A/1702…); quarterly
+ *     -- returns use SAWT only.
  *
  *   -- Step 3: Payment
  *   has_tax_due       boolean not null default false,
@@ -3554,7 +3573,8 @@ table.ct thead { background: var(--s2); }
  * --   add column if not exists dat_files_saved       boolean not null default false,
  * --   add column if not exists validation_email      boolean not null default false,
  * --   add column if not exists validation_email_date date,
- * --   add column if not exists transaction_fee       numeric(12,2);
+ * --   add column if not exists transaction_fee       numeric(12,2),
+ * --   add column if not exists eafs_2307_submitted   boolean not null default false;
  *
  * alter table compliance_records enable row level security;
  *
@@ -5068,6 +5088,7 @@ function openClientSheet(mode, clientId) {
     $('ac_ewt').checked           = !!_currentClient.withholds_expanded
     $('ac_fwt').checked           = !!_currentClient.withholds_final
     $('ac_rbe').checked           = !!_currentClient.is_rbe
+    $('ac_receives_2307').checked = !!_currentClient.receives_2307
     $('ac_sss_vol').checked       = !!_currentClient.owner_pays_sss
     $('ac_phic_vol').checked      = !!_currentClient.owner_pays_philhealth
     $('ac_hdmf_vol').checked      = !!_currentClient.owner_pays_pagibig
@@ -5085,6 +5106,7 @@ function openClientSheet(mode, clientId) {
     $('ac_ewt').checked           = false
     $('ac_fwt').checked           = false
     $('ac_rbe').checked           = false
+    $('ac_receives_2307').checked = false
     $('ac_sss_vol').checked       = false
     $('ac_phic_vol').checked      = false
     $('ac_hdmf_vol').checked      = false
@@ -5166,9 +5188,10 @@ function _syncTaxProfileOptions() {
     if (isEmployee) classSel.value = ''
   }
 
-  // (3) Withholding-agent flags
+  // (3) Withholding-agent flags + receives_2307
   const ewt = $('ac_ewt'), fwt = $('ac_fwt'), rbe = $('ac_rbe')
-  ;[ewt, fwt, rbe].forEach(cb => {
+  const r2307 = $('ac_receives_2307')
+  ;[ewt, fwt, rbe, r2307].forEach(cb => {
     if (!cb) return
     cb.disabled = isEmployee
     if (isEmployee) cb.checked = false
@@ -5234,6 +5257,7 @@ async function saveClient() {
   const withholds_expanded   = !isEmployee && $('ac_ewt').checked
   const withholds_final      = !isEmployee && $('ac_fwt').checked
   const is_rbe               = !isEmployee && $('ac_rbe').checked
+  const receives_2307        = !isEmployee && $('ac_receives_2307').checked
   const owner_pays_sss       = $('ac_sss_vol').checked
   const owner_pays_philhealth= $('ac_phic_vol').checked
   const owner_pays_pagibig   = $('ac_hdmf_vol').checked
@@ -5253,6 +5277,7 @@ async function saveClient() {
     withholds_expanded,
     withholds_final,
     is_rbe,
+    receives_2307,
     owner_pays_sss,
     owner_pays_philhealth,
     owner_pays_pagibig,
@@ -5368,6 +5393,20 @@ function datStepDone(r) {
   return !requiresDatSubmission(r) || (r.dat_files_saved && r.validation_email)
 }
 
+/**
+ * Returns true when the return requires eAFS submission of scanned 2307 certificates.
+ * Only annual ITRs with claims_cwt = true need this — quarterly returns use SAWT only.
+ * eAFS is a separate BIR portal from eSubmission; both steps must be completed.
+ */
+function requiresEafsSubmission(r) {
+  return !!r?.claims_cwt
+    && /\b(1700|1701A|1701-?MS|1701|1702-?RT|1702-?EX|1702-?MX|1702)\b/i.test(String(r?.form || ''))
+}
+
+function eafsStepDone(r) {
+  return !requiresEafsSubmission(r) || !!r.eafs_2307_submitted
+}
+
 function getCardStatus(r) {
   const due = r.due_date ? new Date(r.due_date) : null
   // Payment is closed either by an actual payment ('paid') OR by the
@@ -5375,9 +5414,9 @@ function getCardStatus(r) {
   // filed_date is set).  Both cases should mark the obligation as
   // 'done' rather than leaving it stuck on "Payment pending".
   if (r.payment_status === 'paid') return 'done'
-  if (r.filed_date && r.trrc_saved && datStepDone(r)
+  if (r.filed_date && r.trrc_saved && datStepDone(r) && eafsStepDone(r)
       && r.payment_status === 'n/a') return 'done'
-  if (r.filed_date && r.trrc_saved && !datStepDone(r)) return 'dat-missing'
+  if (r.filed_date && r.trrc_saved && (!datStepDone(r) || !eafsStepDone(r))) return 'dat-missing'
   if (r.filed_date && r.trrc_saved) return 'unpaid'
   if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
   if (!r.filed_date && due && due < _today) return 'overdue'
@@ -5477,11 +5516,27 @@ function buildObligationCard(r) {
 
   const datAttach    = datAttachments(r)
   const needsDat     = datAttach.length > 0
-  const stepDatDone  = r.dat_files_saved && r.validation_email
-  const stepDatLabel = needsDat ? `${datAttach.join(' + ')} — DAT files + validation email` : ''
-  const stepDatDetail = stepDatDone
-    ? `DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}${editLink('openDatForm')}`
-    : (needsDat ? `Pending: ${datAttach.join(', ')} DAT + validation${editLink('openDatForm')}` : '')
+  const needsEafs    = requiresEafsSubmission(r)
+  const needsDatStep = needsDat || needsEafs
+  const eSubDone     = datStepDone(r)
+  const eafsDone     = eafsStepDone(r)
+  const stepDatDone  = eSubDone && eafsDone
+  const stepDatLabel = needsDat
+    ? `${datAttach.join(' + ')} — DAT files + validation email${needsEafs ? ' · eAFS 2307' : ''}`
+    : (needsEafs ? 'eAFS — scanned 2307 certificates' : '')
+
+  let stepDatDetail = ''
+  if (stepDatDone) {
+    const doneParts = []
+    if (needsDat) doneParts.push(`DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}`)
+    if (needsEafs) doneParts.push('eAFS 2307 submitted')
+    stepDatDetail = doneParts.join(' · ') + editLink('openDatForm')
+  } else if (needsDatStep) {
+    const pending = []
+    if (needsDat && !eSubDone) pending.push(`${datAttach.join(', ')} DAT + validation`)
+    if (needsEafs && !eafsDone) pending.push('eAFS 2307 scan')
+    stepDatDetail = `Pending: ${pending.join(' + ')}${editLink('openDatForm')}`
+  }
 
   // Payment step is "done" when the user actually paid OR when they
   // recorded the filing as having no tax due (payment_status='n/a'
@@ -5501,8 +5556,9 @@ function buildObligationCard(r) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openFilingForm('${r.id}')">${isGovContrib ? 'Record remittance' : 'Record filing'}</button>`
   } else if (!step2Done) {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openTRRCForm('${r.id}')">${isGovContrib ? 'Record receipt' : 'Record TRRC'}</button>`
-  } else if (needsDat && !stepDatDone) {
-    actionBtn = `<button class="btn-primary btn-sm" onclick="openDatForm('${r.id}')">Record DAT validation</button>`
+  } else if (needsDatStep && !stepDatDone) {
+    const datBtnLabel = eSubDone ? 'Record eAFS submission' : 'Record DAT validation'
+    actionBtn = `<button class="btn-primary btn-sm" onclick="openDatForm('${r.id}')">${datBtnLabel}</button>`
   } else if (!step3Done && r.payment_status !== 'n/a') {
     actionBtn = `<button class="btn-primary btn-sm" onclick="openPaymentForm('${r.id}')">Record payment</button>`
   }
@@ -5532,7 +5588,7 @@ function buildObligationCard(r) {
         ${step2Detail ? `<div class="ob-step-detail mono">${step2Detail}</div>` : ''}
       </div>
     </div>
-    ${needsDat ? `
+    ${needsDatStep ? `
     <div class="ob-step${stepDatDone ? ' done' : step2Done ? '' : ' dimmed'}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
@@ -5540,10 +5596,10 @@ function buildObligationCard(r) {
         ${stepDatDetail ? `<div class="ob-step-detail mono">${stepDatDetail}</div>` : ''}
       </div>
     </div>` : ''}
-    <div class="ob-step${step3Done ? ' done' : (needsDat ? stepDatDone : step2Done) ? '' : ' dimmed'}">
+    <div class="ob-step${step3Done ? ' done' : (needsDatStep ? stepDatDone : step2Done) ? '' : ' dimmed'}">
       <span class="ob-step-icon"></span>
       <div class="ob-step-body">
-        <div class="ob-step-label">${needsDat ? '4' : '3'}. Payment</div>
+        <div class="ob-step-label">${needsDatStep ? '4' : '3'}. Payment</div>
         ${step3Detail ? `<div class="ob-step-detail mono">${step3Detail}</div>` : ''}
       </div>
     </div>
@@ -5590,7 +5646,7 @@ async function openFilingForm(recordId, isEdit = false) {
   </div>
   ${showCwt ? `
   <label class="check-inline">
-    <input type="checkbox" id="ff_cwt_${recordId}" ${r?.claims_cwt ? 'checked' : ''}>
+    <input type="checkbox" id="ff_cwt_${recordId}" ${r?.claims_cwt || (!r && !!_currentClient?.receives_2307) ? 'checked' : ''}>
     Claiming creditable withholding tax (2307 certificates) — SAWT required
   </label>` : ''}
   <div id="ff_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
@@ -5652,11 +5708,12 @@ async function openDatForm(recordId, isEdit = false) {
   const { data: r } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
   const attachments = datAttachments(r)
   const attachLabel = attachments.length ? attachments.join(' + ') : 'DAT'
+  const needsEafs   = requiresEafsSubmission(r)
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div style="font-size:.78rem;font-weight:600;margin-bottom:.35rem">
-    Attachments for this return: <span class="mono">${esc(attachLabel)}</span>
+    Attachments for this return: <span class="mono">${esc(attachLabel)}${needsEafs ? ' + eAFS 2307' : ''}</span>
   </div>
   <label class="check-inline">
     <input type="checkbox" id="df_saved_${recordId}" ${r?.dat_files_saved ? 'checked' : ''}>
@@ -5670,8 +5727,14 @@ async function openDatForm(recordId, isEdit = false) {
     <label>Validation email date</label>
     <input type="date" id="df_date_${recordId}" value="${r?.validation_email_date ?? ''}">
   </div>
+  ${needsEafs ? `
+  <div style="border-top:1px solid var(--bd);margin:.6rem 0 .4rem"></div>
+  <label class="check-inline">
+    <input type="checkbox" id="df_eafs_${recordId}" ${r?.eafs_2307_submitted ? 'checked' : ''}>
+    Scanned 2307 certificates submitted via BIR eAFS
+  </label>` : ''}
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
-    eSubmission DAT attachments: Alphalist (1604-C/E/F), QAP (1601-EQ/FQ), SLSP (all VAT 2550Q per RR 1-2012), SAWT (returns claiming 2307 CWT per RR 2-2006). Retain both the DAT files and the BIR validation email.
+    eSubmission DAT attachments: Alphalist (1604-C/E/F), QAP (1601-EQ/FQ), SLSP (all VAT 2550Q per RR 1-2012), SAWT (returns claiming 2307 CWT per RR 2-2006). Retain both the DAT files and the BIR validation email.${needsEafs ? ' For annual ITRs, also upload scanned 2307 originals via the separate BIR eAFS portal.' : ''}
   </div>
   <div id="df_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
@@ -5778,20 +5841,24 @@ async function saveDat(recordId) {
   const datSaved  = $(`df_saved_${recordId}`).checked
   const emailRcvd = $(`df_email_${recordId}`).checked
   const emailDate = $(`df_date_${recordId}`).value || null
+  const eafsEl    = $(`df_eafs_${recordId}`)
   const errEl     = $(`df_err_${recordId}`)
 
-  if (!datSaved && !emailRcvd) {
+  if (!datSaved && !emailRcvd && !(eafsEl?.checked)) {
     errEl.textContent = 'Tick at least one item to record partial progress.'
     errEl.style.display = 'block'
     return
   }
   errEl.style.display = 'none'
 
-  const { error } = await supa.from('compliance_records').update({
+  const updatePayload = {
     dat_files_saved:       datSaved,
     validation_email:      emailRcvd,
     validation_email_date: emailRcvd ? emailDate : null,
-  }).eq('id', recordId)
+  }
+  if (eafsEl) updatePayload.eafs_2307_submitted = eafsEl.checked
+
+  const { error } = await supa.from('compliance_records').update(updatePayload).eq('id', recordId)
 
   if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
@@ -5830,7 +5897,7 @@ async function savePayment(recordId) {
 async function loadHistory() {
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,payment_status,amount_paid')
+    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,eafs_2307_submitted,payment_status,amount_paid')
     .eq('client_id', activeClientId)
     .not('filed_date', 'is', null)
     .order('filed_date', { ascending: false })
@@ -5846,12 +5913,14 @@ async function loadHistory() {
   }
 
   const rows = records.map(r => {
-    const attach = datAttachments(r)
-    const datCell = attach.length === 0
+    const attach    = datAttachments(r)
+    const needsEafs = requiresEafsSubmission(r)
+    const eSubDone  = r.dat_files_saved && r.validation_email
+    const eafsDone  = eafsStepDone(r)
+    const attachStr = [attach.length ? attach.join('+') : null, needsEafs ? 'eAFS' : null].filter(Boolean).join('+')
+    const datCell   = !attach.length && !needsEafs
       ? '—'
-      : (r.dat_files_saved && r.validation_email
-          ? `${attach.join('+')} ✓`
-          : `${attach.join('+')} ⚠️`)
+      : (eSubDone && eafsDone ? `${attachStr} ✓` : `${attachStr} ⚠️`)
     return `
 <tr>
   <td class="mono">${esc(r.form)}</td>
