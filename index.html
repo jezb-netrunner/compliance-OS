@@ -1022,6 +1022,21 @@ body {
   flex-shrink: 0;
 }
 
+.archived-client-card {
+  background: var(--sf);
+  border-radius: var(--r);
+  box-shadow: var(--shs);
+  padding: .88rem 1rem;
+  margin-bottom: .45rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-left: 3px solid var(--bd);
+  opacity: .8;
+}
+.archived-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+
 /* Add-client step dots */
 .step-dots { display: flex; gap: .35rem; }
 .step-dot {
@@ -3066,6 +3081,8 @@ table.ct thead { background: var(--s2); }
             data-filter="urgent" onclick="_setFilter('urgent',this)">Urgent</button>
           <button class="filter-tab" role="tab" aria-selected="false"
             data-filter="active" onclick="_setFilter('active',this)">Active</button>
+          <button class="filter-tab" role="tab" aria-selected="false"
+            data-filter="archived" onclick="_setFilter('archived',this)">Archived</button>
         </div>
       </div>
 
@@ -4293,6 +4310,16 @@ function _showPage(name) {
 function showRosterView() {
   _showPage('rosterView')
   activeClientId = null
+  // Reset to active clients view if we were on the archived tab
+  if (_rosterFilter === 'archived') {
+    _rosterFilter = 'all'
+    document.querySelectorAll('.filter-tab').forEach(b => {
+      const isAll = b.dataset.filter === 'all'
+      b.classList.toggle('active', isAll)
+      b.setAttribute('aria-selected', isAll ? 'true' : 'false')
+    })
+    $('rosterSummary').style.display = ''
+  }
   loadRoster()   // refresh data whenever returning to the roster
 }
 
@@ -5717,17 +5744,34 @@ function _toggleBranchGroup(btn) {
 }
 
 function _setFilter(filter, btn) {
+  const wasArchived = _rosterFilter === 'archived'
   _rosterFilter = filter
   document.querySelectorAll('.filter-tab').forEach(b => {
     b.classList.remove('active')
     b.setAttribute('aria-selected', 'false')
   })
   if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true') }
-  _applyRosterFilter()
+
+  if (filter === 'archived') {
+    $('rosterSummary').style.display = 'none'
+    loadArchivedClients()
+  } else {
+    $('rosterSummary').style.display = ''
+    if (wasArchived) loadRoster()
+    else _applyRosterFilter()
+  }
 }
 
 function _applyRosterFilter() {
   const q = ($('rosterSearch')?.value || '').toLowerCase()
+
+  if (_rosterFilter === 'archived') {
+    document.querySelectorAll('.archived-client-card').forEach(card => {
+      const name = card.dataset.name || ''
+      card.classList.toggle('hidden', !!(q && !name.includes(q)))
+    })
+    return
+  }
 
   document.querySelectorAll('.client-card').forEach(card => {
     const status = card.dataset.status
@@ -6095,6 +6139,64 @@ async function archiveClient() {
   closeAddClient()
   showRosterView()
   loadRoster()
+}
+
+async function loadArchivedClients() {
+  if (!currentPractitioner) return
+  const { data: clients, error } = await supa
+    .from('clients')
+    .select('id, display_name, tin, rdo_code, taxpayer_type')
+    .eq('practitioner_id', currentPractitioner.id)
+    .eq('is_active', false)
+    .order('display_name')
+
+  const listEl = $('clientList')
+  if (error) { console.error('loadArchivedClients:', error); return }
+  if (!clients || !clients.length) {
+    listEl.innerHTML = `<div class="empty-state">No archived clients.</div>`
+    return
+  }
+  listEl.innerHTML = clients.map(buildArchivedCard).join('')
+  _applyRosterFilter()
+}
+
+function buildArchivedCard(client) {
+  const metaParts = [
+    client.tin      ? `TIN ${esc(client.tin)}`      : '',
+    client.rdo_code ? `RDO ${esc(client.rdo_code)}` : '',
+  ].filter(Boolean)
+
+  const typeBadge = client.taxpayer_type
+    ? `<span class="badge-dim">${esc(client.taxpayer_type)}</span>`
+    : ''
+
+  return `<div class="archived-client-card" data-name="${esc(client.display_name.toLowerCase())}">
+  <div class="cc-left">
+    <div class="cc-name">${esc(client.display_name)}</div>
+    ${metaParts.length ? `<div class="cc-meta">${metaParts.join(' · ')}</div>` : ''}
+  </div>
+  <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+    ${typeBadge}
+    <div class="archived-actions">
+      <button class="btn-ghost btn-sm" onclick="restoreClient('${esc(client.id)}','${esc(client.display_name)}')">Restore</button>
+      <button class="btn-ghost btn-ghost-danger btn-sm" onclick="permanentlyDeleteClient('${esc(client.id)}','${esc(client.display_name)}')">Delete</button>
+    </div>
+  </div>
+</div>`
+}
+
+async function restoreClient(id, name) {
+  if (!confirm(`Restore ${name}? They will return to your active client list.`)) return
+  const { error } = await supa.from('clients').update({ is_active: true }).eq('id', id)
+  if (error) { alert('Restore failed: ' + error.message); return }
+  loadArchivedClients()
+}
+
+async function permanentlyDeleteClient(id, name) {
+  if (!confirm(`Permanently delete "${name}"?\n\nThis cannot be undone. All compliance records and data for this client will be deleted.`)) return
+  const { error } = await supa.from('clients').delete().eq('id', id)
+  if (error) { alert('Delete failed: ' + error.message); return }
+  loadArchivedClients()
 }
 
 
