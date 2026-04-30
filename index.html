@@ -7239,6 +7239,180 @@ function _scBuildStep2(ct, effectiveDate, obligCode, newVatStatus, newDeduction,
   }
 }
 
+/**
+ * Persist the tax status change:
+ *   1. Build old/new profile snapshots
+ *   2. Insert a tax_status_changes row (audit trail)
+ *   3. Update the clients row with the new profile
+ *   4. Mutate the compliance calendar from effectiveDate forward
+ *   5. Close the sheet and reload the client view
+ */
+async function saveStatusChange() {
+  const btn = $('scNextBtn')
+  btn.disabled    = true
+  btn.textContent = 'Applying…'
+  $('scStep2Err').style.display = 'none'
+
+  const effectiveDate  = $('sc_effective_date').value
+  const ct             = $('sc_change_type').value
+  const obligCode      = $('sc_obligation').value       || null
+  const newVatStatus   = $('sc_new_vat_status').value   || null
+  const newDeduction   = $('sc_new_deduction').value    || null
+  const newVatAfter8   = $('sc_new_vat_after_8pct').value || null
+  const corRef         = ($('sc_cor_reference').value   || '').trim() || null
+  const notes          = ($('sc_notes').value           || '').trim() || null
+
+  // Checklist state — read whatever checkboxes _scBuildStep2 rendered
+  const checklistItems = _getStatusChangeChecklist(ct, obligCode)
+  const form1905Item   = checklistItems.find(i => i.id === 'form_1905')
+  const corItem        = checklistItems.find(i => i.id === 'cor')
+  const form1905Needed = !!form1905Item
+  const corNeeded      = !!corItem
+  const form1905Filed  = form1905Needed && !!($('sc_chk_form_1905')?.checked)
+  const corUploaded    = corNeeded      && !!($('sc_chk_cor')?.checked)
+
+  // Profile snapshots
+  const oldProfile = {
+    taxpayer_type:        _currentClient.taxpayer_type,
+    vat_status:           _currentClient.vat_status,
+    deduction_method:     _currentClient.deduction_method,
+    has_employees:        !!_currentClient.has_employees,
+    withholds_expanded:   !!_currentClient.withholds_expanded,
+    withholds_final:      !!_currentClient.withholds_final,
+    fiscal_year_start:    _currentClient.fiscal_start_month || 1,
+    owner_pays_sss:       !!_currentClient.owner_pays_sss,
+    owner_pays_philhealth:!!_currentClient.owner_pays_philhealth,
+    owner_pays_pagibig:   !!_currentClient.owner_pays_pagibig,
+    receives_2307:        !!_currentClient.receives_2307,
+  }
+  const newProfile = _buildNewProfile(_currentClient, ct, newVatStatus, newDeduction, newVatAfter8, obligCode)
+
+  // 1 — Insert audit record
+  const { error: logErr } = await supa.from('tax_status_changes').insert({
+    client_id:            activeClientId,
+    practitioner_id:      currentPractitioner.id,
+    effective_date:       effectiveDate,
+    change_type:          ct,
+    obligation_code:      obligCode,
+    old_profile:          oldProfile,
+    new_profile:          newProfile,
+    cor_amendment_needed: corNeeded,
+    cor_uploaded:         corUploaded,
+    cor_reference:        corRef,
+    form_1905_needed:     form1905Needed,
+    form_1905_filed:      form1905Filed,
+    notes,
+  })
+  if (logErr) {
+    $('scStep2Err').textContent   = 'Could not save audit record: ' + logErr.message
+    $('scStep2Err').style.display = 'block'
+    btn.disabled = false; btn.textContent = 'Apply Change'
+    return
+  }
+
+  // 2 — Update clients row with new profile
+  const clientPayload = {
+    vat_status:           newProfile.vat_status,
+    regime:               newProfile.vat_status,
+    deduction_method:     newProfile.deduction_method,
+    has_employees:        newProfile.has_employees,
+    withholds_expanded:   newProfile.withholds_expanded,
+    withholds_final:      newProfile.withholds_final,
+    owner_pays_sss:       newProfile.owner_pays_sss,
+    owner_pays_philhealth:newProfile.owner_pays_philhealth,
+    owner_pays_pagibig:   newProfile.owner_pays_pagibig,
+  }
+  const { error: upErr } = await supa.from('clients').update(clientPayload).eq('id', activeClientId)
+  if (upErr) {
+    $('scStep2Err').textContent   = 'Could not update client profile: ' + upErr.message
+    $('scStep2Err').style.display = 'block'
+    btn.disabled = false; btn.textContent = 'Apply Change'
+    return
+  }
+
+  // 3 — Mutate compliance calendar from effectiveDate forward
+  await applyStatusChangeCalendar(activeClientId, newProfile, effectiveDate)
+
+  btn.disabled = false; btn.textContent = 'Apply Change'
+  closeStatusChangeSheet()
+  await showClientDetail(activeClientId)
+}
+
+/**
+ * Reconcile compliance_records against the new profile, but only for
+ * obligations whose due_date falls on or after effectiveDateStr.
+ * Filed records are never touched regardless.
+ *
+ * Operates on every year already present in the DB from effectiveDate's
+ * year forward (same logic as syncComplianceRecords, but scoped to
+ * the effectiveDate boundary instead of the current calendar year).
+ */
+async function applyStatusChangeCalendar(clientId, newProfile, effectiveDateStr) {
+  const effYear = parseInt(effectiveDateStr.slice(0, 4), 10)
+
+  const { data: existing } = await supa
+    .from('compliance_records')
+    .select('id, obligation_id, form, period, due_date, filed_date')
+    .eq('client_id', clientId)
+
+  const allRows = existing || []
+
+  const yearOf = r => {
+    const m = String(r.obligation_id || '').match(/^(\d{4})/)
+    return m ? +m[1] : null
+  }
+
+  // Only touch records belonging to the affected year(s)
+  const inScope = allRows.filter(r => {
+    const y = yearOf(r)
+    return y !== null && y >= effYear
+  })
+
+  const years = [...new Set(inScope.map(yearOf))]
+  if (!years.length) return
+
+  const wanted    = years.flatMap(y => generateObligations(newProfile, y))
+  const wantedMap = new Map(wanted.map(o => [o.id, o]))
+  const haveMap   = new Map(inScope.map(r => [r.obligation_id, r]))
+
+  // (1) Delete unfiled records with due_date >= effectiveDate no longer required
+  const toDelete = inScope
+    .filter(r => !wantedMap.has(r.obligation_id) && !r.filed_date && r.due_date >= effectiveDateStr)
+    .map(r => r.id)
+  if (toDelete.length) {
+    const { error } = await supa.from('compliance_records').delete().in('id', toDelete)
+    if (error) console.error('applyStatusChangeCalendar (delete):', error)
+  }
+
+  // (2) Refresh unfiled records with due_date >= effectiveDate whose metadata changed
+  for (const o of wanted) {
+    const e = haveMap.get(o.id)
+    if (!e || e.filed_date || e.due_date < effectiveDateStr) continue
+    const due_iso = _iso(o.dueDate)
+    if (e.form === o.form && e.period === o.period && e.due_date === due_iso) continue
+    const { error } = await supa.from('compliance_records')
+      .update({ form: o.form, period: o.period, due_date: due_iso })
+      .eq('id', e.id)
+    if (error) console.error('applyStatusChangeCalendar (update):', error)
+  }
+
+  // (3) Insert newly required obligations with due_date >= effectiveDate
+  const toInsert = wanted
+    .filter(o => !haveMap.has(o.id) && _iso(o.dueDate) >= effectiveDateStr)
+    .map(o => ({
+      client_id:      clientId,
+      obligation_id:  o.id,
+      form:           o.form,
+      period:         o.period,
+      due_date:       _iso(o.dueDate),
+      payment_status: 'n/a',
+    }))
+  if (toInsert.length) {
+    const { error } = await supa.from('compliance_records').insert(toInsert)
+    if (error) console.error('applyStatusChangeCalendar (insert):', error)
+  }
+}
+
 
 // ── REPORTS ───────────────────────────────────────────────────
 
