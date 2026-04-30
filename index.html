@@ -1120,6 +1120,154 @@ body {
   gap: .75rem;
 }
 
+/* ── Branch Group (roster) ── */
+.branch-group {
+  display: flex;
+  flex-direction: column;
+}
+.branch-group-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.branch-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .75rem;
+  color: var(--mu);
+  padding: .2rem .4rem;
+  border-radius: var(--rr);
+  font-family: var(--sa);
+  white-space: nowrap;
+  transition: background .15s;
+}
+.branch-toggle-btn:hover { background: var(--s2); color: var(--ch); }
+.branch-children {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  padding-left: 1.25rem;
+  margin-top: .45rem;
+  border-left: 2px solid var(--bd);
+  margin-left: .75rem;
+}
+.branch-children.collapsed { display: none; }
+.branch-child-card {
+  position: relative;
+}
+
+/* ── Branch badges & indicators ── */
+.badge-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .68rem;
+  font-weight: 600;
+  padding: .2rem .5rem;
+  border-radius: 99px;
+  background: var(--rs);
+  color: var(--royal);
+  border: 1px solid var(--rm);
+  white-space: nowrap;
+}
+.badge-main-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .68rem;
+  font-weight: 600;
+  padding: .2rem .5rem;
+  border-radius: 99px;
+  background: rgba(65,105,225,.05);
+  color: var(--royal);
+  border: 1px solid rgba(65,105,225,.2);
+  white-space: nowrap;
+}
+
+/* ── Branches panel in client detail ── */
+#branchesPanel {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.branches-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .25rem;
+}
+.branches-topbar h3 {
+  font-family: var(--sa);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--ch);
+}
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+.branch-detail-card {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: .85rem 1rem;
+  box-shadow: var(--shs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  transition: box-shadow .15s, border-color .15s;
+}
+.branch-detail-card:hover {
+  box-shadow: var(--sh);
+  border-color: var(--royal);
+}
+.branch-detail-card-left {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  flex: 1;
+  min-width: 0;
+}
+.branch-detail-card-name {
+  font-weight: 600;
+  font-size: .9rem;
+  color: var(--ch);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.branch-detail-card-meta {
+  font-size: .75rem;
+  color: var(--mu);
+}
+.branch-detail-card-right {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-shrink: 0;
+}
+.branch-empty {
+  font-size: .84rem;
+  color: var(--mu);
+  padding: 1rem 0;
+}
+.branch-parent-link {
+  font-size: .78rem;
+  color: var(--royal);
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: var(--sa);
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.branch-parent-link:hover { color: var(--navy); }
+
 /* Obligations panel — stack of cards */
 #obligationsPanel {
   display: flex;
@@ -2718,7 +2866,7 @@ table.ct thead { background: var(--s2); }
   <div id="clientView" class="hidden">
 
     <div class="detail-back-bar">
-      <button class="btn-back" onclick="showRosterView()">← Clients</button>
+      <button class="btn-back" id="detailBackBtn" onclick="_detailBack()">← Clients</button>
       <span id="detailClientName"></span>
       <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
         onclick="generateYearObligations()">Generate Obligations</button>
@@ -2747,12 +2895,16 @@ table.ct thead { background: var(--s2); }
         data-tab="history" onclick="_switchSubtab('history')">History</button>
       <button class="subtab" role="tab" aria-selected="false"
         data-tab="notes" onclick="_switchSubtab('notes')">Notes</button>
+      <button class="subtab hidden" role="tab" aria-selected="false"
+        id="branchesTabBtn" data-tab="branches" onclick="_switchSubtab('branches')">Branches</button>
     </div>
 
     <div class="detail-panels">
       <div id="obligationsPanel"></div>
 
       <div id="historyPanel" class="hidden"></div>
+
+      <div id="branchesPanel" class="hidden"></div>
 
       <div id="notesPanel" class="hidden">
         <div class="notes-panel-wrap">
@@ -3125,6 +3277,12 @@ table.ct thead { background: var(--s2); }
             <label for="ac_industry">Line of Business</label>
             <input type="text" id="ac_industry" placeholder="e.g. Computer Programming Activities" autocomplete="off">
           </div>
+          <div class="fld span2" id="branchNameField" style="display:none">
+            <label for="ac_branch_name">Branch name <span class="req">*</span></label>
+            <input type="text" id="ac_branch_name" placeholder="e.g. Makati Branch, Cebu Office" autocomplete="off">
+            <span class="hint">Short name identifying this branch location or nature of business</span>
+          </div>
+          <input type="hidden" id="ac_parent_client_id">
         </div>
         <div id="step1Err" class="fld-error" role="alert"></div>
       </div>
@@ -3490,7 +3648,12 @@ table.ct thead { background: var(--s2); }
  * --   add column if not exists owner_pays_sss        boolean not null default false,
  * --   add column if not exists owner_pays_philhealth boolean not null default false,
  * --   add column if not exists owner_pays_pagibig    boolean not null default false,
- * --   add column if not exists receives_2307         boolean not null default false;
+ * --   add column if not exists receives_2307         boolean not null default false,
+ * --   add column if not exists parent_client_id      uuid references clients(id) on delete cascade,
+ * --   add column if not exists branch_name           text;
+ * --
+ * -- create index if not exists clients_parent_client_idx
+ * --   on clients (parent_client_id);
  *
  * alter table clients enable row level security;
  *
@@ -3690,6 +3853,8 @@ let _historyLoaded      = false
 let _today              = null
 let _clientSheetMode    = 'add'
 let _editingClientId    = null
+let _parentClientId     = null   // set when adding a branch; null otherwise
+let _viewingParentId    = null   // parent client id when viewing a branch detail
 let _dbTimeframeDays    = (() => { const v = parseInt(localStorage.getItem('_dbTimeframeDays') || '7', 10); return [7,14,30,60,90].includes(v) ? v : 7 })()
 let _dbActionRid        = null   // record being actioned in the dashboard quick-action modal
 let _dbRecordMeta       = {}     // { [recordId]: { clientName, form, period } } — rebuilt each loadDashboard
@@ -4029,6 +4194,7 @@ async function showClientDetail(clientId) {
   activeClientId  = clientId
   _currentClient  = null
   _historyLoaded  = false
+  _viewingParentId = null
   $('loginView').classList.add('hidden')
   $('appView').classList.remove('hidden')
   $('rosterView').classList.add('hidden')
@@ -4049,18 +4215,71 @@ async function showClientDetail(clientId) {
   }
 
   _currentClient = client
-  $('detailClientName').textContent = client.display_name
 
-  const meta = [
+  // ── Branch context ──────────────────────────────────────────
+  const isBranch = !!client.parent_client_id
+  _viewingParentId = isBranch ? client.parent_client_id : null
+
+  // Back button: branches navigate to their parent, others go to roster
+  const backBtn = $('detailBackBtn')
+  if (backBtn) {
+    if (isBranch) {
+      const { data: parentClient } = await supa
+        .from('clients').select('display_name').eq('id', client.parent_client_id).single()
+      backBtn.textContent = `← ${parentClient?.display_name ?? 'Main Branch'}`
+    } else {
+      backBtn.textContent = '← Clients'
+    }
+  }
+
+  // Branch tab: show for main clients (has branches) or when viewing any branch
+  const branchTabBtn = $('branchesTabBtn')
+  if (branchTabBtn) {
+    if (isBranch) {
+      // Viewing a branch — show tab so practitioner can navigate to sibling branches via parent
+      branchTabBtn.classList.add('hidden')
+    } else {
+      // Could be a main office — check if it has branches
+      const { count } = await supa
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_client_id', clientId)
+        .eq('is_active', true)
+      if (count > 0) {
+        branchTabBtn.classList.remove('hidden')
+        branchTabBtn.textContent = `Branches (${count})`
+      } else {
+        branchTabBtn.classList.remove('hidden')
+        branchTabBtn.textContent = 'Branches'
+      }
+    }
+  }
+
+  // Name and meta strip
+  let displayLabel = client.display_name
+  if (isBranch && client.branch_name) displayLabel = client.display_name
+  $('detailClientName').textContent = displayLabel
+
+  const metaParts = [
+    isBranch && client.branch_name ? `Branch: ${esc(client.branch_name)}` : '',
     client.tin           ? `TIN ${esc(client.tin)}`      : '',
     client.rdo_code      ? `RDO ${esc(client.rdo_code)}` : '',
     client.taxpayer_type ? esc(client.taxpayer_type)      : '',
     client.vat_status    ? esc(client.vat_status)         : '',
   ].filter(Boolean).join(' · ')
-  $('detailMetaStrip').textContent = meta
+  $('detailMetaStrip').textContent = metaParts
 
   await _updateGenerateYearBtn(clientId)
   await loadObligations(clientId)
+}
+
+/** Back navigation from client detail — branches go to their parent, others go to roster. */
+function _detailBack() {
+  if (_viewingParentId) {
+    showClientDetail(_viewingParentId)
+  } else {
+    showRosterView()
+  }
 }
 
 async function _updateGenerateYearBtn(clientId) {
@@ -4937,10 +5156,15 @@ function buildClientCard(client, stats) {
     ? `<span class="badge-blue">${esc(client.taxpayer_type)}</span>`
     : ''
 
+  const branchBadge = client.parent_client_id && client.branch_name
+    ? `<span class="badge-branch">${esc(client.branch_name)}</span>`
+    : ''
+
   return `<div class="client-card"
     data-status="${statusKey}"
     data-name="${esc(client.display_name.toLowerCase())}"
     data-client-id="${esc(client.id)}"
+    data-parent-id="${esc(client.parent_client_id || '')}"
     onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${esc(client.id)}')"
     role="button" tabindex="0"
     onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(client.id)}')"
@@ -4950,6 +5174,7 @@ function buildClientCard(client, stats) {
     ${metaParts.length ? `<div class="cc-meta">${metaParts.join(' · ')}</div>` : ''}
   </div>
   <div class="cc-right">
+    ${branchBadge}
     ${typeBadge}
     ${statusBadge}
   </div>
@@ -5023,17 +5248,64 @@ async function loadRoster() {
   const nb = $('navBadgeClients')
   if (nb) nb.textContent = (clients || []).length
 
-  // Render client list
+  // Render client list — group branches under their parent
   const listEl = $('clientList')
   if (!clients || !clients.length) {
     listEl.innerHTML = `<div class="empty-state">
       No clients yet.<br>
       <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
     </div>`
-  } else {
-    listEl.innerHTML = cards.join('')
-    _applyRosterFilter()
+    return
   }
+
+  // Separate top-level clients from branches
+  const clientMap = {}
+  ;(clients || []).forEach(c => { clientMap[c.id] = c })
+
+  const topLevel  = (clients || []).filter(c => !c.parent_client_id)
+  const branchMap = {}   // parentId → [client, ...]
+  ;(clients || []).filter(c => !!c.parent_client_id).forEach(c => {
+    ;(branchMap[c.parent_client_id] = branchMap[c.parent_client_id] || []).push(c)
+  })
+
+  // Build card HTML with branch grouping
+  const cardMapById = {}
+  ;(clients || []).forEach((client, i) => { cardMapById[client.id] = cards[i] })
+
+  const grouped = topLevel.map(client => {
+    const branches = branchMap[client.id] || []
+    const mainCard = cardMapById[client.id]
+    if (!branches.length) return mainCard
+
+    const branchCards = branches.map(b => {
+      const bCard = cardMapById[b.id] || ''
+      return `<div class="branch-child-card">${bCard}</div>`
+    }).join('')
+
+    const branchLabel = branches.length === 1 ? '1 branch' : `${branches.length} branches`
+    return `<div class="branch-group">
+      <div class="branch-group-header">
+        ${mainCard}
+        <button class="branch-toggle-btn" onclick="event.stopPropagation();_toggleBranchGroup(this)" title="Toggle branches">
+          ▸ ${branchLabel}
+        </button>
+      </div>
+      <div class="branch-children collapsed">
+        ${branchCards}
+      </div>
+    </div>`
+  })
+
+  listEl.innerHTML = grouped.join('')
+  _applyRosterFilter()
+}
+
+function _toggleBranchGroup(btn) {
+  const children = btn.closest('.branch-group').querySelector('.branch-children')
+  if (!children) return
+  const nowCollapsed = children.classList.toggle('collapsed')
+  // ▸ = collapsed (click to expand), ▾ = expanded (click to collapse)
+  btn.textContent = btn.textContent.replace(/^[▾▸]\s*/, (nowCollapsed ? '▸ ' : '▾ '))
 }
 
 function _setFilter(filter, btn) {
@@ -5048,6 +5320,7 @@ function _setFilter(filter, btn) {
 
 function _applyRosterFilter() {
   const q = ($('rosterSearch')?.value || '').toLowerCase()
+
   document.querySelectorAll('.client-card').forEach(card => {
     const status = card.dataset.status
     const name   = card.dataset.name || ''
@@ -5056,11 +5329,26 @@ function _applyRosterFilter() {
     const matchFilter =
       _rosterFilter === 'overdue' ? status === 'overdue' :
       _rosterFilter === 'urgent'  ? status === 'urgent'  :
-      _rosterFilter === 'active'  ? true                 : true   // 'active' = all active clients
+      _rosterFilter === 'active'  ? true                 : true
 
     const matchSearch = !q || name.includes(q) || meta.includes(q)
-
     card.classList.toggle('hidden', !(matchFilter && matchSearch))
+  })
+
+  // Show/hide entire branch groups based on whether any card inside is visible
+  document.querySelectorAll('.branch-group').forEach(group => {
+    const anyVisible = [...group.querySelectorAll('.client-card')]
+      .some(c => !c.classList.contains('hidden'))
+    group.classList.toggle('hidden', !anyVisible)
+    // If search is active and a branch card matches, expand the children
+    if (q) {
+      const children = group.querySelector('.branch-children')
+      if (children) {
+        const branchVisible = [...children.querySelectorAll('.client-card')]
+          .some(c => !c.classList.contains('hidden'))
+        if (branchVisible) children.classList.remove('collapsed')
+      }
+    }
   })
 }
 
@@ -5073,6 +5361,8 @@ function openClientSheet(mode, clientId) {
 
   $('step1Err').style.display = 'none'
   $('step2Err').style.display = 'none'
+
+  const isBranchMode = _clientSheetMode === 'add-branch'
 
   if (_clientSheetMode === 'edit' && _currentClient) {
     $('ac_name').value          = _currentClient.display_name        || ''
@@ -5094,6 +5384,14 @@ function openClientSheet(mode, clientId) {
     $('ac_hdmf_vol').checked      = !!_currentClient.owner_pays_pagibig
     $('archiveRow').classList.remove('hidden')
     $('prospectiveNote').classList.remove('hidden')
+    // Show branch name field when editing a branch client
+    const bnField = $('branchNameField')
+    if (bnField) {
+      const showBranch = !!_currentClient.parent_client_id
+      bnField.style.display = showBranch ? '' : 'none'
+      if (showBranch) $('ac_branch_name').value = _currentClient.branch_name || ''
+      $('ac_parent_client_id').value = _currentClient.parent_client_id || ''
+    }
   } else {
     ;['ac_name', 'ac_tin', 'ac_rdo'].forEach(id => { $(id).value = '' })
     $('ac_industry').value    = ''
@@ -5112,6 +5410,16 @@ function openClientSheet(mode, clientId) {
     $('ac_hdmf_vol').checked      = false
     $('archiveRow').classList.add('hidden')
     $('prospectiveNote').classList.add('hidden')
+    // Branch mode: show branch name field and pre-fill TIN from parent
+    const bnField = $('branchNameField')
+    if (bnField) {
+      bnField.style.display = isBranchMode ? '' : 'none'
+      $('ac_branch_name').value     = ''
+      $('ac_parent_client_id').value = _parentClientId || ''
+      if (isBranchMode && _currentClient) {
+        $('ac_tin').value = _currentClient.tin || ''
+      }
+    }
   }
 
   _syncTaxProfileOptions()
@@ -5208,6 +5516,15 @@ function _goAddStep(n) {
       $('ac_name').focus()
       return
     }
+    if (_clientSheetMode === 'add-branch') {
+      const branchName = ($('ac_branch_name').value || '').trim()
+      if (!branchName) {
+        $('step1Err').textContent   = 'Branch name is required.'
+        $('step1Err').style.display = 'block'
+        $('ac_branch_name').focus()
+        return
+      }
+    }
     $('step1Err').style.display = 'none'
   }
   _renderStep(n)
@@ -5215,20 +5532,21 @@ function _goAddStep(n) {
 
 /** Swap the visible step panel and update footer buttons */
 function _renderStep(n) {
-  const onStep1  = n === 1
-  const isEdit   = _clientSheetMode === 'edit'
+  const onStep1      = n === 1
+  const isEdit       = _clientSheetMode === 'edit'
+  const isBranchMode = _clientSheetMode === 'add-branch'
   $('addStep1').style.display   = onStep1 ? '' : 'none'
   $('addStep2').style.display   = onStep1 ? 'none' : ''
   $('stepDot1').classList.toggle('active', onStep1)
   $('stepDot2').classList.toggle('active', !onStep1)
   $('addSheetTitle').textContent = onStep1
-    ? (isEdit ? 'Edit Client' : 'Add Client')
+    ? (isEdit ? 'Edit Client' : (isBranchMode ? 'Add Branch' : 'Add Client'))
     : 'Tax Profile'
 
   const backBtn = $('addBackBtn')
   const nextBtn = $('addNextBtn')
   backBtn.classList.toggle('hidden', onStep1)
-  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : 'Save client')
+  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : (isBranchMode ? 'Save branch' : 'Save client'))
   nextBtn.onclick     = onStep1 ? () => _goAddStep(2) : saveClient
 }
 
@@ -5262,6 +5580,10 @@ async function saveClient() {
   const owner_pays_philhealth= $('ac_phic_vol').checked
   const owner_pays_pagibig   = $('ac_hdmf_vol').checked
 
+  const isBranchMode     = _clientSheetMode === 'add-branch'
+  const parentClientId   = ($('ac_parent_client_id').value || '').trim() || null
+  const branchNameVal    = ($('ac_branch_name').value || '').trim() || null
+
   const payload = {
     display_name:      name,
     tin:               $('ac_tin').value.trim()  || null,
@@ -5281,6 +5603,8 @@ async function saveClient() {
     owner_pays_sss,
     owner_pays_philhealth,
     owner_pays_pagibig,
+    parent_client_id:  parentClientId,
+    branch_name:       branchNameVal,
   }
 
   let error
@@ -5330,7 +5654,13 @@ async function saveClient() {
   closeAddClient()
   if (isEdit) {
     await showClientDetail(_editingClientId)
+  } else if (isBranchMode && parentClientId) {
+    // After adding a branch, return to the parent client's Branches tab
+    _parentClientId = null
+    await showClientDetail(parentClientId)
+    _switchSubtab('branches')
   } else {
+    _parentClientId = null
     loadRoster()
   }
 }
@@ -5954,7 +6284,7 @@ async function loadHistory() {
 // ── CLIENT DETAIL: SUB-TAB SWITCHER ──────────────────────────
 
 function _switchSubtab(name) {
-  ['obligations','history','notes'].forEach(tab => {
+  ['obligations','history','branches','notes'].forEach(tab => {
     const panel = $(`${tab}Panel`)
     if (panel) panel.classList.toggle('hidden', tab !== name)
   })
@@ -5963,7 +6293,8 @@ function _switchSubtab(name) {
     b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false')
   })
   if (name === 'history' && !_historyLoaded) { loadHistory(); _historyLoaded = true }
-  if (name === 'notes')   loadClientNotes()
+  if (name === 'notes')    loadClientNotes()
+  if (name === 'branches') loadBranches(activeClientId)
 }
 
 
@@ -5982,6 +6313,123 @@ async function loadClientNotes() {
 async function saveClientNotes() {
   const notes = $('clientNotesArea').value
   await supa.from('clients').update({ notes }).eq('id', activeClientId)
+}
+
+
+// ── BRANCH MANAGEMENT ─────────────────────────────────────────
+
+/**
+ * Load and render the Branches tab panel for a given client.
+ * Shows all active branches (child clients) plus an Add Branch button.
+ */
+async function loadBranches(clientId) {
+  const panel = $('branchesPanel')
+  if (!panel) return
+  panel.innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading branches…</p>'
+
+  const { data: branches, error } = await supa
+    .from('clients')
+    .select('*')
+    .eq('parent_client_id', clientId)
+    .eq('is_active', true)
+    .order('branch_name')
+
+  if (error) {
+    panel.innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
+    return
+  }
+
+  // Fetch compliance stats for each branch in one round-trip
+  const branchIds = (branches || []).map(b => b.id)
+  const today     = _iso(new Date())
+  const week      = _iso(new Date(Date.now() + 7 * 86400000))
+
+  const { data: allRecs } = branchIds.length
+    ? await supa
+        .from('compliance_records')
+        .select('client_id,due_date,filed_date,trrc_saved,has_tax_due,payment_status')
+        .in('client_id', branchIds)
+    : { data: [] }
+
+  const recsByBranch = {}
+  ;(allRecs || []).forEach(r => {
+    ;(recsByBranch[r.client_id] = recsByBranch[r.client_id] || []).push(r)
+  })
+
+  const addBranchBtn = `<button class="btn-primary btn-sm" onclick="openAddBranchSheet('${esc(clientId)}')">+ Add Branch</button>`
+
+  if (!branches || !branches.length) {
+    panel.innerHTML = `
+      <div class="branches-topbar">
+        <h3>Branches</h3>
+        ${addBranchBtn}
+      </div>
+      <p class="branch-empty">No branches yet. Use <strong>+ Add Branch</strong> to register a separate branch location or line of business under the same TIN.</p>`
+    return
+  }
+
+  const branchCards = branches.map(b => {
+    const recs    = recsByBranch[b.id] || []
+    const overdue = recs.filter(r => !r.filed_date && r.due_date < today).length
+    const urgent  = recs.filter(r => !r.filed_date && r.due_date >= today && r.due_date <= week).length
+
+    let statusBadge
+    if (overdue > 0)     statusBadge = `<span class="badge-red">${overdue} overdue</span>`
+    else if (urgent > 0) statusBadge = `<span class="badge-amber">${urgent} due soon</span>`
+    else if (recs.length) statusBadge = `<span class="badge-green">On track</span>`
+    else                 statusBadge = `<span class="badge-dim">No obligations</span>`
+
+    const metaParts = [
+      b.rdo_code      ? `RDO ${esc(b.rdo_code)}`      : '',
+      b.taxpayer_type ? esc(b.taxpayer_type)           : '',
+      b.vat_status    ? esc(b.vat_status)              : '',
+    ].filter(Boolean).join(' · ')
+
+    return `<div class="branch-detail-card"
+        onclick="showClientDetail('${esc(b.id)}')"
+        role="button" tabindex="0"
+        onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(b.id)}')"
+        aria-label="${esc(b.branch_name || b.display_name)}">
+      <div class="branch-detail-card-left">
+        <div class="branch-detail-card-name">${esc(b.branch_name || b.display_name)}</div>
+        ${metaParts ? `<div class="branch-detail-card-meta">${metaParts}</div>` : ''}
+      </div>
+      <div class="branch-detail-card-right">
+        ${statusBadge}
+      </div>
+    </div>`
+  }).join('')
+
+  panel.innerHTML = `
+    <div class="branches-topbar">
+      <h3>Branches <span style="color:var(--mu);font-weight:400;font-size:.82rem">(${branches.length})</span></h3>
+      ${addBranchBtn}
+    </div>
+    <div class="branch-list">${branchCards}</div>
+    <p style="font-size:.74rem;color:var(--lt);margin-top:.5rem">
+      Each branch has its own RDO code and compliance profile but shares the same TIN.
+      Click a branch to view its obligations.
+    </p>`
+}
+
+/**
+ * Open the Add Client sheet in branch mode.
+ * Pre-fills the parent client's TIN and shows the Branch Name field.
+ * @param {string} parentId  — UUID of the parent (main) client
+ */
+async function openAddBranchSheet(parentId) {
+  _parentClientId = parentId
+
+  // Fetch the parent client so we can pre-fill TIN
+  const { data: parent } = await supa
+    .from('clients').select('*').eq('id', parentId).single()
+  // Temporarily swap _currentClient so openClientSheet can read it for TIN pre-fill
+  const savedClient = _currentClient
+  _currentClient    = parent || _currentClient
+
+  openClientSheet('add-branch', null)
+
+  _currentClient = savedClient
 }
 
 
