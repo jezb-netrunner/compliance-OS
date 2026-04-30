@@ -7413,6 +7413,137 @@ async function applyStatusChangeCalendar(clientId, newProfile, effectiveDateStr)
   }
 }
 
+/**
+ * Load and render the Tax History timeline for the given client.
+ * Fetches all tax_status_changes rows (newest first) and builds a
+ * reverse-chronological timeline with inline COR / Form 1905 toggles.
+ */
+async function loadTaxHistory(clientId) {
+  const panel = $('taxHistoryPanel')
+  if (!panel) return
+  panel.innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading history…</p>'
+
+  const { data: changes, error } = await supa
+    .from('tax_status_changes')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('effective_date', { ascending: false })
+
+  if (error) {
+    panel.innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
+    return
+  }
+
+  const recordStatusChangeBtn = `
+    <button class="btn-primary btn-sm" onclick="openStatusChangeSheet()">+ Record Status Change</button>`
+
+  if (!changes || !changes.length) {
+    panel.innerHTML = `
+      <div class="tsh-topbar">
+        <h3>Tax Profile History</h3>
+        ${recordStatusChangeBtn}
+      </div>
+      <p class="tsh-empty">No status changes recorded yet. Use <strong>+ Record Status Change</strong> to log a profile amendment.</p>`
+    return
+  }
+
+  const _TSC_LABELS = {
+    vat_to_nonvat:     'VAT → Non-VAT De-registration',
+    nonvat_to_vat:     'Non-VAT → VAT Registration',
+    itemized_to_8pct:  'Regime: Itemised/OSD → 8% GIT',
+    '8pct_to_itemized':'Regime: 8% GIT → Itemised/OSD',
+    add_obligation:    'Obligation Added',
+    remove_obligation: 'Obligation Removed',
+  }
+
+  const entries = changes.map(ch => {
+    const old  = ch.old_profile || {}
+    const nw   = ch.new_profile || {}
+    const diff = _profileChangeSummary(old, nw)
+
+    const typeLabel = _TSC_LABELS[ch.change_type] || ch.change_type
+    const typeExtra = ch.obligation_code ? ` — ${ch.obligation_code}` : ''
+    const effDate   = ch.effective_date
+      ? new Date(ch.effective_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '—'
+    const recDate   = ch.created_at
+      ? new Date(ch.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+      : ''
+
+    // COR chip
+    let corChip = ''
+    if (ch.cor_amendment_needed) {
+      if (ch.cor_uploaded) {
+        const ref = ch.cor_reference ? ` · ${esc(ch.cor_reference)}` : ''
+        corChip = `<span class="tsh-action-chip tsh-action-done">✓ COR amended${ref}</span>`
+      } else {
+        corChip = `<button class="tsh-action-chip tsh-action-pending"
+          onclick="updateStatusChangeRecord('${esc(ch.id)}','cor_uploaded',true)"
+          title="Mark COR as uploaded">⏳ COR pending — mark done</button>`
+      }
+    }
+
+    // Form 1905 chip
+    let form1905Chip = ''
+    if (ch.form_1905_needed) {
+      if (ch.form_1905_filed) {
+        form1905Chip = `<span class="tsh-action-chip tsh-action-done">✓ Form 1905 filed</span>`
+      } else {
+        form1905Chip = `<button class="tsh-action-chip tsh-action-pending"
+          onclick="updateStatusChangeRecord('${esc(ch.id)}','form_1905_filed',true)"
+          title="Mark Form 1905 as filed">⏳ Form 1905 — mark filed</button>`
+      }
+    }
+
+    const diffHtml = diff.length
+      ? diff.map(l => `<div>· ${esc(l)}</div>`).join('')
+      : '<div style="color:var(--mu)">Profile recorded.</div>'
+
+    const notesHtml = ch.notes
+      ? `<div class="tsh-notes">${esc(ch.notes)}</div>`
+      : ''
+
+    const actionChips = [corChip, form1905Chip].filter(Boolean).join('')
+
+    return `
+      <div class="tsh-entry">
+        <div class="tsh-dot"></div>
+        <div class="tsh-card">
+          <div class="tsh-card-hdr">
+            <span class="tsh-type-badge">${esc(typeLabel + typeExtra)}</span>
+            <span class="tsh-effective-date">Effective ${esc(effDate)}${recDate ? ` · Recorded ${esc(recDate)}` : ''}</span>
+          </div>
+          <div class="tsh-change-summary">${diffHtml}</div>
+          ${actionChips ? `<div class="tsh-actions">${actionChips}</div>` : ''}
+          ${notesHtml}
+        </div>
+      </div>`
+  }).join('')
+
+  panel.innerHTML = `
+    <div class="tsh-topbar">
+      <h3>Tax Profile History <span style="color:var(--mu);font-weight:400;font-size:.82rem">(${changes.length})</span></h3>
+      ${recordStatusChangeBtn}
+    </div>
+    <div class="tsh-timeline">${entries}</div>`
+}
+
+/**
+ * Patch a single field on a tax_status_changes row and reload the
+ * Tax History panel — used by the inline "mark done" chips.
+ * @param {string} recordId  UUID of the tax_status_changes row
+ * @param {string} field     Column to update ('cor_uploaded' | 'form_1905_filed')
+ * @param {boolean} value    New value
+ */
+async function updateStatusChangeRecord(recordId, field, value) {
+  const { error } = await supa
+    .from('tax_status_changes')
+    .update({ [field]: value })
+    .eq('id', recordId)
+  if (error) { alert('Could not update: ' + error.message); return }
+  await loadTaxHistory(activeClientId)
+}
+
 
 // ── REPORTS ───────────────────────────────────────────────────
 
