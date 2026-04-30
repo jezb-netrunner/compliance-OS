@@ -1268,6 +1268,218 @@ body {
 }
 .branch-parent-link:hover { color: var(--navy); }
 
+/* ── Tax Status Change — Sheet step label ── */
+.step-label {
+  font-size: .75rem;
+  color: var(--mu);
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* ── Status Change Validation Boxes ── */
+.sc-error-box {
+  background: var(--rds);
+  border: 1px solid var(--rdm);
+  border-radius: var(--rr);
+  padding: .6rem .85rem;
+  font-size: .82rem;
+  color: var(--red);
+  margin-bottom: .75rem;
+}
+.sc-warning-box {
+  background: var(--as);
+  border: 1px solid var(--am);
+  border-radius: var(--rr);
+  padding: .6rem .85rem;
+  font-size: .82rem;
+  color: #7a4f00;
+  margin-bottom: .75rem;
+}
+.sc-warning-box strong { color: var(--ch); }
+.sc-summary-box {
+  background: var(--rs);
+  border: 1px solid var(--rm);
+  border-radius: var(--rr);
+  padding: .65rem .85rem;
+  font-size: .82rem;
+  color: var(--ch);
+  margin-bottom: .75rem;
+}
+.sc-summary-box h4 {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--royal);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .35rem;
+}
+.sc-summary-box ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  line-height: 1.7;
+}
+
+/* ── Downstream Action Checklist ── */
+.sc-checklist {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: var(--rr);
+  padding: .65rem .85rem;
+  margin-bottom: .75rem;
+}
+.sc-checklist-hdr {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--ch);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .5rem;
+}
+.sc-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  font-size: .81rem;
+  color: var(--ch);
+  cursor: pointer;
+  margin-bottom: .35rem;
+  line-height: 1.4;
+}
+.sc-checklist label input[type=checkbox] {
+  flex-shrink: 0;
+  margin-top: .15rem;
+  accent-color: var(--royal);
+}
+.sc-checklist-req {
+  font-size: .68rem;
+  color: var(--red);
+  font-weight: 600;
+  margin-left: .25rem;
+}
+
+/* ── Tax History Timeline ── */
+#taxHistoryPanel {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.tsh-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .25rem;
+}
+.tsh-topbar h3 {
+  font-family: var(--sa);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--ch);
+}
+.tsh-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  padding-left: 1.6rem;
+}
+.tsh-timeline::before {
+  content: '';
+  position: absolute;
+  left: .55rem;
+  top: .5rem;
+  bottom: .5rem;
+  width: 2px;
+  background: var(--bd);
+  border-radius: 2px;
+}
+.tsh-entry {
+  position: relative;
+  padding-bottom: 1rem;
+}
+.tsh-entry:last-child { padding-bottom: 0; }
+.tsh-dot {
+  position: absolute;
+  left: -1.2rem;
+  top: .7rem;
+  width: .65rem;
+  height: .65rem;
+  border-radius: 50%;
+  background: var(--royal);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1.5px var(--royal);
+}
+.tsh-card {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: .8rem 1rem;
+  box-shadow: var(--shs);
+}
+.tsh-card-hdr {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: .45rem;
+}
+.tsh-effective-date {
+  font-size: .73rem;
+  color: var(--mu);
+  font-weight: 500;
+}
+.tsh-type-badge {
+  font-size: .71rem;
+  font-weight: 700;
+  padding: .15rem .5rem;
+  border-radius: 99px;
+  background: var(--rs);
+  color: var(--royal);
+  border: 1px solid var(--rm);
+  white-space: nowrap;
+}
+.tsh-change-summary {
+  font-size: .81rem;
+  color: var(--ch);
+  margin-bottom: .45rem;
+  line-height: 1.5;
+}
+.tsh-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-top: .45rem;
+}
+.tsh-action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .71rem;
+  font-weight: 600;
+  padding: .18rem .5rem;
+  border-radius: 4px;
+}
+.tsh-action-done    { background: var(--gs); color: var(--green); }
+.tsh-action-pending { background: var(--as); color: var(--amber); }
+.tsh-notes {
+  font-size: .73rem;
+  color: var(--mu);
+  font-style: italic;
+  margin-top: .4rem;
+  border-top: 1px solid var(--s2);
+  padding-top: .35rem;
+}
+.tsh-update-row {
+  margin-top: .5rem;
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.tsh-empty {
+  font-size: .84rem;
+  color: var(--mu);
+  padding: 1rem 0;
+}
+
 /* Obligations panel — stack of cards */
 #obligationsPanel {
   display: flex;
@@ -2875,6 +3087,8 @@ table.ct thead { background: var(--s2); }
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         id="btnBulkObs" onclick="toggleBulkObs()">Select</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
+        onclick="openStatusChangeSheet()">Status Change</button>
+      <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
     </div>
     <div id="bulkObBar" class="bulk-bar hidden">
@@ -2897,6 +3111,8 @@ table.ct thead { background: var(--s2); }
         data-tab="notes" onclick="_switchSubtab('notes')">Notes</button>
       <button class="subtab hidden" role="tab" aria-selected="false"
         id="branchesTabBtn" data-tab="branches" onclick="_switchSubtab('branches')">Branches</button>
+      <button class="subtab" role="tab" aria-selected="false"
+        data-tab="tax-history" onclick="_switchSubtab('tax-history')">Tax History</button>
     </div>
 
     <div class="detail-panels">
@@ -2905,6 +3121,8 @@ table.ct thead { background: var(--s2); }
       <div id="historyPanel" class="hidden"></div>
 
       <div id="branchesPanel" class="hidden"></div>
+
+      <div id="taxHistoryPanel" class="hidden"></div>
 
       <div id="notesPanel" class="hidden">
         <div class="notes-panel-wrap">
@@ -3511,6 +3729,135 @@ table.ct thead { background: var(--s2); }
 
 
 <!-- ═══════════════════════════════════════════════
+     TAX STATUS CHANGE SHEET
+═══════════════════════════════════════════════════ -->
+<div id="statusChangeSheet" class="sheet-ov hidden"
+  onclick="if(event.target===this)closeStatusChangeSheet()"
+  role="dialog" aria-modal="true" aria-labelledby="scSheetTitle">
+
+  <div class="sheet-card">
+
+    <div class="sheet-hdr">
+      <span class="sheet-title" id="scSheetTitle">Record Tax Status Change</span>
+      <span class="sheet-meta">
+        <span class="step-dots" aria-hidden="true">
+          <span class="step-dot active" id="scDot1"></span>
+          <span class="step-dot"        id="scDot2"></span>
+        </span>
+      </span>
+      <button class="sheet-close" onclick="closeStatusChangeSheet()" aria-label="Close">×</button>
+    </div>
+
+    <div class="sheet-body">
+
+      <!-- ── STEP 1: Change Details ── -->
+      <div id="scStep1">
+        <p class="step-label">Step 1 of 2 — Change Details</p>
+        <div class="fg">
+          <div class="fld">
+            <label for="sc_effective_date">Effective date <span class="req">*</span></label>
+            <input type="date" id="sc_effective_date" onchange="_scUpdateDynamic()">
+            <span class="hint">Date the change takes effect per BIR records</span>
+          </div>
+          <div class="fld">
+            <label for="sc_change_type">Change type <span class="req">*</span></label>
+            <select id="sc_change_type" onchange="_scUpdateDynamic()">
+              <option value="">— Select —</option>
+              <optgroup label="VAT Registration">
+                <option value="nonvat_to_vat">Non-VAT → VAT (Registration)</option>
+                <option value="vat_to_nonvat">VAT → Non-VAT (De-registration)</option>
+              </optgroup>
+              <optgroup label="Income Tax Regime">
+                <option value="itemized_to_8pct">Itemized / OSD → 8% GIT Option</option>
+                <option value="8pct_to_itemized">8% GIT Option → Itemized / OSD</option>
+              </optgroup>
+              <optgroup label="Obligations">
+                <option value="add_obligation">Add Obligation</option>
+                <option value="remove_obligation">Remove Obligation</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- vat_to_nonvat: ask which Non-VAT type -->
+          <div class="fld" id="scNewVatStatusWrap" style="display:none">
+            <label for="sc_new_vat_status">New VAT / income tax status</label>
+            <select id="sc_new_vat_status">
+              <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax (3%)</option>
+              <option value="Non-VAT (8% Option)">Non-VAT — 8% GIT Option</option>
+              <option value="Non-VAT (Graduated)">Non-VAT — Graduated Tax (no business tax)</option>
+            </select>
+          </div>
+
+          <!-- 8pct_to_itemized: ask new deduction method + vat status -->
+          <div class="fld" id="scNewDeductionWrap" style="display:none">
+            <label for="sc_new_deduction">New deduction method</label>
+            <select id="sc_new_deduction">
+              <option value="Itemized">Itemized Deduction</option>
+              <option value="OSD">Optional Standard Deduction (OSD)</option>
+            </select>
+          </div>
+          <div class="fld" id="scNewVatAfter8PctWrap" style="display:none">
+            <label for="sc_new_vat_after_8pct">New VAT / income tax status</label>
+            <select id="sc_new_vat_after_8pct">
+              <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax (3%)</option>
+              <option value="Non-VAT (Graduated)">Non-VAT — Graduated Tax</option>
+            </select>
+          </div>
+
+          <!-- add/remove_obligation: obligation picker -->
+          <div class="fld" id="scObligationWrap" style="display:none">
+            <label for="sc_obligation">Obligation</label>
+            <select id="sc_obligation">
+              <option value="EWT">EWT — Expanded Withholding Tax (0619-E · 1601-EQ · 1604-E)</option>
+              <option value="FWT">FWT — Final Withholding Tax (0619-F · 1601-FQ · 1604-F)</option>
+              <option value="Employer">Employer obligations (1601-C · 1604-C · 2316 · Gov't remittances)</option>
+              <option value="SSS-Vol">Voluntary SSS contributions</option>
+              <option value="PhilHealth-Vol">Voluntary PhilHealth premiums</option>
+              <option value="Pag-IBIG-Vol">Voluntary Pag-IBIG / HDMF savings</option>
+            </select>
+          </div>
+
+          <div class="fld span2">
+            <label for="sc_notes">Notes</label>
+            <textarea id="sc_notes" rows="2"
+              placeholder="BIR letter reference, LOA number, COR amendment batch, remarks…"></textarea>
+          </div>
+        </div>
+        <div id="scStep1Err" class="fld-error" role="alert"></div>
+      </div>
+
+      <!-- ── STEP 2: Review & Actions ── -->
+      <div id="scStep2" style="display:none">
+        <p class="step-label">Step 2 of 2 — Review & Compliance Actions</p>
+
+        <div id="scValidationBox"></div>
+        <div id="scSummaryBox"></div>
+
+        <div id="scChecklistBox"></div>
+
+        <div class="fld">
+          <label for="sc_cor_reference">COR reference / document number</label>
+          <input type="text" id="sc_cor_reference"
+            placeholder="e.g. COR-2026-BIR RDO 040 or BIR document number">
+          <span class="hint">Reference number of the amended Certificate of Registration once issued</span>
+        </div>
+
+        <div id="scStep2Err" class="fld-error" role="alert"></div>
+      </div>
+
+    </div><!-- .sheet-body -->
+
+    <div class="sheet-footer">
+      <button id="scBackBtn"  class="btn-ghost btn-sm hidden" onclick="_scGoStep(1)">← Back</button>
+      <button id="scNextBtn"  class="btn-primary btn-sm" style="margin-left:auto"
+        onclick="_scGoStep(2)">Next →</button>
+    </div>
+
+  </div><!-- .sheet-card -->
+</div><!-- #statusChangeSheet -->
+
+
+<!-- ═══════════════════════════════════════════════
      ENROLLMENT LINK MODAL
 ═══════════════════════════════════════════════════ -->
 <div id="enrollLinkModal" class="modal-ov hidden"
@@ -3654,6 +4001,60 @@ table.ct thead { background: var(--s2); }
  * --
  * -- create index if not exists clients_parent_client_idx
  * --   on clients (parent_client_id);
+ *
+ *
+ * ── 5. TAX STATUS CHANGES ─────────────────────────────────────
+ *
+ * Versioned log of every tax profile amendment. Each row captures the
+ * full before/after profile snapshot so the history tab can reconstruct
+ * exactly what changed, when, and by whom.
+ *
+ * create table if not exists tax_status_changes (
+ *   id                   uuid primary key default gen_random_uuid(),
+ *   client_id            uuid not null
+ *                          references clients(id) on delete cascade,
+ *   practitioner_id      uuid not null
+ *                          references practitioners(id),
+ *   effective_date       date not null,
+ *   change_type          text not null,
+ *     -- 'vat_to_nonvat' | 'nonvat_to_vat'
+ *     -- | 'itemized_to_8pct' | '8pct_to_itemized'
+ *     -- | 'add_obligation' | 'remove_obligation'
+ *   obligation_code      text,
+ *     -- For add/remove_obligation: 'EWT' | 'FWT' | 'Employer'
+ *     -- | 'SSS-Vol' | 'PhilHealth-Vol' | 'Pag-IBIG-Vol'
+ *   old_profile          jsonb not null,   -- snapshot before change
+ *   new_profile          jsonb not null,   -- snapshot after change
+ *   cor_amendment_needed boolean not null default true,
+ *   cor_uploaded         boolean not null default false,
+ *   cor_reference        text,             -- document ref / BIR cert no.
+ *   form_1905_needed     boolean not null default true,
+ *   form_1905_filed      boolean not null default false,
+ *   notes                text,
+ *   created_at           timestamptz not null default now()
+ * );
+ *
+ * create index if not exists tsc_client_idx
+ *   on tax_status_changes (client_id, effective_date desc);
+ *
+ * alter table tax_status_changes enable row level security;
+ *
+ * create policy "tax_status_changes: own clients"
+ *   on tax_status_changes for all
+ *   using (
+ *     client_id in (
+ *       select c.id from clients c
+ *       join practitioners p on p.id = c.practitioner_id
+ *       where p.auth_id = auth.uid()
+ *     )
+ *   )
+ *   with check (
+ *     client_id in (
+ *       select c.id from clients c
+ *       join practitioners p on p.id = c.practitioner_id
+ *       where p.auth_id = auth.uid()
+ *     )
+ *   );
  *
  * alter table clients enable row level security;
  *
@@ -6284,17 +6685,22 @@ async function loadHistory() {
 // ── CLIENT DETAIL: SUB-TAB SWITCHER ──────────────────────────
 
 function _switchSubtab(name) {
-  ['obligations','history','branches','notes'].forEach(tab => {
-    const panel = $(`${tab}Panel`)
+  ['obligations','history','branches','tax-history','notes'].forEach(tab => {
+    const panel = $(`${tab}Panel`) ?? $(`${tab.replace('-','_')}Panel`)
     if (panel) panel.classList.toggle('hidden', tab !== name)
   })
+  // taxHistoryPanel uses camelCase id
+  const thp = $('taxHistoryPanel')
+  if (thp) thp.classList.toggle('hidden', name !== 'tax-history')
+
   document.querySelectorAll('.subtab').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === name)
     b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false')
   })
   if (name === 'history' && !_historyLoaded) { loadHistory(); _historyLoaded = true }
-  if (name === 'notes')    loadClientNotes()
-  if (name === 'branches') loadBranches(activeClientId)
+  if (name === 'notes')       loadClientNotes()
+  if (name === 'branches')    loadBranches(activeClientId)
+  if (name === 'tax-history') loadTaxHistory(activeClientId)
 }
 
 
@@ -6430,6 +6836,40 @@ async function openAddBranchSheet(parentId) {
   openClientSheet('add-branch', null)
 
   _currentClient = savedClient
+}
+
+
+// ── TAX STATUS CHANGE MANAGEMENT ─────────────────────────────
+
+function openStatusChangeSheet() {
+  if (!_currentClient) return
+  // Reset step 1 fields
+  const today = new Date(); today.setHours(0,0,0,0)
+  $('sc_effective_date').value = _iso(today)
+  $('sc_change_type').value    = ''
+  $('sc_notes').value          = ''
+  $('sc_cor_reference').value  = ''
+  $('scStep1Err').style.display = 'none'
+  ;['scNewVatStatusWrap','scNewDeductionWrap','scNewVatAfter8PctWrap','scObligationWrap']
+    .forEach(id => { $(id).style.display = 'none' })
+  // Reset step 2
+  ;['scValidationBox','scSummaryBox','scChecklistBox','scStep2Err']
+    .forEach(id => { const el = $(id); if (el) { el.innerHTML = ''; el.style.display = 'none' } })
+  _scRenderStep(1)
+  $('statusChangeSheet').classList.remove('hidden')
+  setTimeout(() => $('sc_effective_date').focus(), 60)
+}
+
+function closeStatusChangeSheet() {
+  $('statusChangeSheet').classList.add('hidden')
+}
+
+function _scUpdateDynamic() {
+  const ct = $('sc_change_type').value
+  $('scNewVatStatusWrap').style.display    = ct === 'vat_to_nonvat'    ? '' : 'none'
+  $('scNewDeductionWrap').style.display    = ct === '8pct_to_itemized' ? '' : 'none'
+  $('scNewVatAfter8PctWrap').style.display = ct === '8pct_to_itemized' ? '' : 'none'
+  $('scObligationWrap').style.display      = (ct === 'add_obligation' || ct === 'remove_obligation') ? '' : 'none'
 }
 
 
