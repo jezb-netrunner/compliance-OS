@@ -4637,7 +4637,8 @@ async function showClientDetail(clientId) {
   const branchTabBtn = $('branchesTabBtn')
   if (branchTabBtn) {
     if (isBranch) {
-      // Viewing a branch — show tab so practitioner can navigate to sibling branches via parent
+      // Branch clients have no sub-branches; hide the tab.
+      // Navigate to siblings via the back button → parent's Branches tab.
       branchTabBtn.classList.add('hidden')
     } else {
       // Could be a main office — check if it has branches
@@ -6685,14 +6686,17 @@ async function loadHistory() {
 // ── CLIENT DETAIL: SUB-TAB SWITCHER ──────────────────────────
 
 function _switchSubtab(name) {
-  ['obligations','history','branches','tax-history','notes'].forEach(tab => {
-    const panel = $(`${tab}Panel`) ?? $(`${tab.replace('-','_')}Panel`)
-    if (panel) panel.classList.toggle('hidden', tab !== name)
+  const PANELS = {
+    'obligations': 'obligationsPanel',
+    'history':     'historyPanel',
+    'branches':    'branchesPanel',
+    'tax-history': 'taxHistoryPanel',
+    'notes':       'notesPanel',
+  }
+  Object.entries(PANELS).forEach(([tab, panelId]) => {
+    const el = $(panelId)
+    if (el) el.classList.toggle('hidden', tab !== name)
   })
-  // taxHistoryPanel uses camelCase id
-  const thp = $('taxHistoryPanel')
-  if (thp) thp.classList.toggle('hidden', name !== 'tax-history')
-
   document.querySelectorAll('.subtab').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === name)
     b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false')
