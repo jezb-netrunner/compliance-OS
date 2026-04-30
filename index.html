@@ -7114,6 +7114,131 @@ function _profileChangeSummary(old, nw) {
   return lines
 }
 
+/**
+ * Returns an array of downstream action items for the given change type.
+ * Each item: { id, label, required, hint? }
+ * `required` true = shown with a red asterisk; false = advisory note.
+ */
+function _getStatusChangeChecklist(ct, obligCode) {
+  const items = []
+
+  // COR amendment — required for every registration change
+  const corNeeded = ct !== 'itemized_to_8pct' && ct !== '8pct_to_itemized'
+  if (corNeeded)
+    items.push({ id: 'cor', label: 'Obtain amended Certificate of Registration (COR) from BIR', required: true })
+
+  // Form 1905 — required for registration changes, advisory for regime changes
+  if (['vat_to_nonvat','nonvat_to_vat','add_obligation','remove_obligation'].includes(ct))
+    items.push({ id: 'form_1905', label: 'File BIR Form 1905 — Application for Registration Information Update', required: true })
+  if (['itemized_to_8pct','8pct_to_itemized'].includes(ct))
+    items.push({ id: 'form_1905', label: 'File BIR Form 1905 (some RDOs require this for 8% regime changes — confirm with your RDO)', required: false })
+
+  // Change-specific items
+  if (ct === 'vat_to_nonvat') {
+    items.push({ id: 'final_2550q', label: 'File final 2550Q covering the period up to the de-registration date', required: true })
+    items.push({ id: 'vat_cancel', label: 'Submit VAT cancellation supporting documents to RDO (inventory list, unused ORs, etc.)', required: true })
+  }
+
+  if (ct === 'nonvat_to_vat')
+    items.push({ id: 'vat_cert', label: 'Obtain VAT Registration Certificate and update official receipts / invoices', required: true })
+
+  if (ct === 'itemized_to_8pct')
+    items.push({ id: '8pct_lock', label: 'Note: 8% GIT election is irrevocable for the taxable year — declare on Q1 1701Q', required: false,
+      hint: 'NIRC Sec. 24(A)(2)(b) as amended by TRAIN' })
+
+  if (ct === '8pct_to_itemized')
+    items.push({ id: '8pct_revoke', label: 'Note: Revocation of 8% election takes effect the following taxable year — reflect on next annual ITR', required: false })
+
+  if (ct === 'add_obligation' && obligCode === 'Employer')
+    items.push({ id: 'employer_reg', label: 'Register as employer with SSS, PhilHealth, and Pag-IBIG (if not already registered)', required: true })
+
+  if (ct === 'add_obligation' && ['EWT','FWT'].includes(obligCode))
+    items.push({ id: 'wt_cert', label: 'Update employee / vendor 2307 templates to reflect new withholding registration', required: false })
+
+  return items
+}
+
+/**
+ * Builds and injects all Step 2 content:
+ *   1. Advisory warnings (amber box)
+ *   2. Change summary (blue box — old → new profile diff)
+ *   3. Downstream action checklist
+ * Called by _scGoStep(2) before _scRenderStep(2).
+ */
+function _scBuildStep2(ct, effectiveDate, obligCode, newVatStatus, newDeduction, newVatAfter8, warnings) {
+  // 1 — Warnings box
+  const warnEl = $('scValidationBox')
+  if (warnings.length) {
+    warnEl.innerHTML = warnings
+      .map(w => `<div class="sc-warning-box"><strong>Advisory:</strong> ${esc(w)}</div>`)
+      .join('')
+    warnEl.style.display = ''
+  } else {
+    warnEl.innerHTML = ''
+    warnEl.style.display = 'none'
+  }
+
+  // 2 — Change summary
+  const oldProfile = {
+    vat_status:           _currentClient.vat_status,
+    deduction_method:     _currentClient.deduction_method,
+    withholds_expanded:   !!_currentClient.withholds_expanded,
+    withholds_final:      !!_currentClient.withholds_final,
+    has_employees:        !!_currentClient.has_employees,
+    owner_pays_sss:       !!_currentClient.owner_pays_sss,
+    owner_pays_philhealth:!!_currentClient.owner_pays_philhealth,
+    owner_pays_pagibig:   !!_currentClient.owner_pays_pagibig,
+  }
+  const newProfile = _buildNewProfile(_currentClient, ct, newVatStatus, newDeduction, newVatAfter8, obligCode)
+  const diffLines  = _profileChangeSummary(oldProfile, newProfile)
+
+  const _TSC_LABELS = {
+    vat_to_nonvat:    'VAT → Non-VAT De-registration',
+    nonvat_to_vat:    'Non-VAT → VAT Registration',
+    itemized_to_8pct: 'Income Tax Regime: Itemised/OSD → 8% GIT',
+    '8pct_to_itemized':'Income Tax Regime: 8% GIT → Itemised/OSD',
+    add_obligation:   `Add Obligation — ${obligCode || ''}`,
+    remove_obligation:`Remove Obligation — ${obligCode || ''}`,
+  }
+
+  const summaryEl = $('scSummaryBox')
+  summaryEl.innerHTML = `
+    <div class="sc-summary-box">
+      <h4>Change Summary</h4>
+      <div style="font-size:.78rem;color:var(--mu);margin-bottom:.35rem">
+        <strong>${esc(_TSC_LABELS[ct] || ct)}</strong> &mdash; effective ${esc(effectiveDate)}
+      </div>
+      <ul>${diffLines.map(l => `<li>${esc(l)}</li>`).join('') || '<li style="color:var(--mu)">No profile fields changed.</li>'}</ul>
+    </div>`
+  summaryEl.style.display = ''
+
+  // 3 — Downstream action checklist
+  const checklistItems = _getStatusChangeChecklist(ct, obligCode)
+  const checklistEl    = $('scChecklistBox')
+  if (checklistItems.length) {
+    const rows = checklistItems.map(item => `
+      <label>
+        <input type="checkbox" id="sc_chk_${esc(item.id)}">
+        <span>${esc(item.label)}${item.required ? '<span class="sc-checklist-req"> *</span>' : ''}
+          ${item.hint ? `<br><span style="font-size:.7rem;color:var(--mu)">${esc(item.hint)}</span>` : ''}
+        </span>
+      </label>`).join('')
+    checklistEl.innerHTML = `
+      <div class="sc-checklist">
+        <div class="sc-checklist-hdr">Downstream Actions</div>
+        ${rows}
+        <p style="font-size:.7rem;color:var(--mu);margin-top:.5rem">
+          Items marked <span class="sc-checklist-req">*</span> are required by BIR rules.
+          Check each as you complete it — status is saved with the record.
+        </p>
+      </div>`
+    checklistEl.style.display = ''
+  } else {
+    checklistEl.innerHTML = ''
+    checklistEl.style.display = 'none'
+  }
+}
+
 
 // ── REPORTS ───────────────────────────────────────────────────
 
