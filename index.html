@@ -7012,6 +7012,108 @@ function _validateTaxStatusChange(client, ct, effectiveDate, newVatStatus, newDe
   return { errors, warnings }
 }
 
+/**
+ * Derive the post-change profile object from the current client row
+ * and the values collected in the Step 1 form fields.
+ *
+ * Returns a plain object shaped like the profile argument accepted by
+ * generateObligations — used both for calendar mutation and for the
+ * JSON snapshot stored in tax_status_changes.new_profile.
+ */
+function _buildNewProfile(client, ct, newVatStatus, newDeduction, newVatAfter8, obligCode) {
+  const p = {
+    taxpayer_type:        client.taxpayer_type,
+    vat_status:           client.vat_status,
+    tax_classification:   client.tax_classification,
+    deduction_method:     client.deduction_method,
+    has_employees:        !!client.has_employees,
+    withholds_expanded:   !!client.withholds_expanded,
+    withholds_final:      !!client.withholds_final,
+    fiscal_year_start:    client.fiscal_start_month || 1,
+    owner_pays_sss:       !!client.owner_pays_sss,
+    owner_pays_philhealth:!!client.owner_pays_philhealth,
+    owner_pays_pagibig:   !!client.owner_pays_pagibig,
+    receives_2307:        !!client.receives_2307,
+  }
+
+  switch (ct) {
+    case 'vat_to_nonvat':
+      p.vat_status = newVatStatus
+      if (newVatStatus === 'Non-VAT (8% Option)') p.deduction_method = '8%'
+      else if (p.deduction_method === '8%')       p.deduction_method = 'Itemized'
+      break
+
+    case 'nonvat_to_vat':
+      p.vat_status = 'VAT-Registered'
+      if (p.deduction_method === '8%') p.deduction_method = 'Itemized'
+      break
+
+    case 'itemized_to_8pct':
+      p.vat_status      = 'Non-VAT (8% Option)'
+      p.deduction_method = '8%'
+      break
+
+    case '8pct_to_itemized':
+      p.vat_status       = newVatAfter8 || 'Non-VAT (Graduated)'
+      p.deduction_method = newDeduction || 'Itemized'
+      break
+
+    case 'add_obligation':
+      if (obligCode === 'EWT')          p.withholds_expanded   = true
+      if (obligCode === 'FWT')          p.withholds_final      = true
+      if (obligCode === 'Employer')     p.has_employees        = true
+      if (obligCode === 'SSS-Vol')      p.owner_pays_sss       = true
+      if (obligCode === 'PhilHealth-Vol') p.owner_pays_philhealth = true
+      if (obligCode === 'Pag-IBIG-Vol') p.owner_pays_pagibig   = true
+      break
+
+    case 'remove_obligation':
+      if (obligCode === 'EWT')          p.withholds_expanded   = false
+      if (obligCode === 'FWT')          p.withholds_final      = false
+      if (obligCode === 'Employer')     p.has_employees        = false
+      if (obligCode === 'SSS-Vol')      p.owner_pays_sss       = false
+      if (obligCode === 'PhilHealth-Vol') p.owner_pays_philhealth = false
+      if (obligCode === 'Pag-IBIG-Vol') p.owner_pays_pagibig   = false
+      break
+  }
+
+  return p
+}
+
+/**
+ * Produce an array of human-readable diff strings describing what
+ * changed between oldProfile and newProfile — e.g.:
+ *   "VAT status: VAT-Registered → Non-VAT (Percentage Tax)"
+ * Used in the step 2 summary box and stored in the audit record.
+ */
+function _profileChangeSummary(old, nw) {
+  const lines = []
+  const cmp = (label, a, b) => {
+    if (a !== b) lines.push(`${label}: ${a || '—'} → ${b || '—'}`)
+  }
+  cmp('VAT / income tax status', old.vat_status,           nw.vat_status)
+  cmp('Deduction method',        old.deduction_method,      nw.deduction_method)
+  cmp('Expanded withholding (EWT)',
+    old.withholds_expanded   ? 'Active' : 'Inactive',
+    nw.withholds_expanded    ? 'Active' : 'Inactive')
+  cmp('Final withholding (FWT)',
+    old.withholds_final      ? 'Active' : 'Inactive',
+    nw.withholds_final       ? 'Active' : 'Inactive')
+  cmp('Employer obligations',
+    old.has_employees        ? 'Active' : 'Inactive',
+    nw.has_employees         ? 'Active' : 'Inactive')
+  cmp('Voluntary SSS',
+    old.owner_pays_sss       ? 'Active' : 'Inactive',
+    nw.owner_pays_sss        ? 'Active' : 'Inactive')
+  cmp('Voluntary PhilHealth',
+    old.owner_pays_philhealth ? 'Active' : 'Inactive',
+    nw.owner_pays_philhealth  ? 'Active' : 'Inactive')
+  cmp('Voluntary Pag-IBIG',
+    old.owner_pays_pagibig   ? 'Active' : 'Inactive',
+    nw.owner_pays_pagibig    ? 'Active' : 'Inactive')
+  return lines
+}
+
 
 // ── REPORTS ───────────────────────────────────────────────────
 
