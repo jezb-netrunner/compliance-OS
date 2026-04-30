@@ -6872,6 +6872,146 @@ function _scUpdateDynamic() {
   $('scObligationWrap').style.display      = (ct === 'add_obligation' || ct === 'remove_obligation') ? '' : 'none'
 }
 
+function _scRenderStep(n) {
+  const onStep1 = n === 1
+  $('scStep1').style.display = onStep1 ? '' : 'none'
+  $('scStep2').style.display = onStep1 ? 'none' : ''
+  $('scDot1').classList.toggle('active',  onStep1)
+  $('scDot2').classList.toggle('active', !onStep1)
+  $('scSheetTitle').textContent = onStep1 ? 'Record Tax Status Change' : 'Review & Actions'
+  $('scBackBtn').classList.toggle('hidden', onStep1)
+  $('scNextBtn').textContent = onStep1 ? 'Next →' : 'Apply Change'
+  $('scNextBtn').onclick     = onStep1 ? () => _scGoStep(2) : saveStatusChange
+}
+
+function _scGoStep(n) {
+  if (n === 2) {
+    // ── Step 1 validation ───────────────────────────────────
+    const errEl = $('scStep1Err')
+    errEl.style.display = 'none'
+
+    const effectiveDate = $('sc_effective_date').value
+    if (!effectiveDate) {
+      errEl.textContent = 'Effective date is required.'
+      errEl.style.display = 'block'
+      $('sc_effective_date').focus()
+      return
+    }
+    const ct = $('sc_change_type').value
+    if (!ct) {
+      errEl.textContent = 'Please select a change type.'
+      errEl.style.display = 'block'
+      $('sc_change_type').focus()
+      return
+    }
+    if ((ct === 'add_obligation' || ct === 'remove_obligation') && !$('sc_obligation').value) {
+      errEl.textContent = 'Please select an obligation.'
+      errEl.style.display = 'block'
+      $('sc_obligation').focus()
+      return
+    }
+
+    // Run business-logic guardrails and build step 2 content
+    const obligationCode  = $('sc_obligation').value || null
+    const newVatStatus    = $('sc_new_vat_status').value || null
+    const newDeduction    = $('sc_new_deduction').value || null
+    const newVatAfter8    = $('sc_new_vat_after_8pct').value || null
+    const { errors, warnings } = _validateTaxStatusChange(
+      _currentClient, ct, effectiveDate, newVatStatus, newDeduction, newVatAfter8, obligationCode
+    )
+    if (errors.length) {
+      errEl.innerHTML = errors.map(e => `<div>⚠ ${esc(e)}</div>`).join('')
+      errEl.style.display = 'block'
+      return
+    }
+
+    _scBuildStep2(ct, effectiveDate, obligationCode, newVatStatus, newDeduction, newVatAfter8, warnings)
+    _scRenderStep(2)
+    return
+  }
+  _scRenderStep(n)
+}
+
+/**
+ * Validation guardrails — returns { errors: string[], warnings: string[] }.
+ * Errors block progression; warnings are shown as advisory notices.
+ */
+function _validateTaxStatusChange(client, ct, effectiveDate, newVatStatus, newDeduction, newVatAfter8, obligCode) {
+  const errors   = []
+  const warnings = []
+  const {
+    vat_status, taxpayer_type, deduction_method,
+    withholds_expanded, withholds_final, has_employees,
+    owner_pays_sss, owner_pays_philhealth, owner_pays_pagibig,
+  } = client
+
+  const isVat      = vat_status === 'VAT-Registered'
+  const is8Pct     = vat_status === 'Non-VAT (8% Option)'
+  const isSEOrMix  = ['Self-Employed', 'Mixed Income'].includes(taxpayer_type)
+  const isEmployee = taxpayer_type === 'Employee'
+
+  // Mid-quarter warning for VAT changes
+  if (effectiveDate && (ct === 'vat_to_nonvat' || ct === 'nonvat_to_vat')) {
+    const d = new Date(effectiveDate)
+    const m = d.getMonth() + 1
+    const isQtrStart = [1, 4, 7, 10].includes(m) && d.getDate() === 1
+    if (!isQtrStart)
+      warnings.push('This date falls mid-quarter. BIR generally recognises VAT changes at the start of a taxable quarter. Confirm the exact effectivity with your RDO before proceeding.')
+  }
+
+  // Full-year lock warning for 8% changes
+  if (ct === 'itemized_to_8pct' || ct === '8pct_to_itemized') {
+    const d = new Date(effectiveDate)
+    if (!(d.getMonth() === 0 && d.getDate() === 1))
+      warnings.push('The 8% GIT election (and its revocation) applies for the entire taxable year. This change should ideally be effective January 1. Ensure the election is declared on the Q1 1701Q.')
+  }
+
+  switch (ct) {
+    case 'vat_to_nonvat':
+      if (!isVat) errors.push('Client is not currently VAT-registered.')
+      if (newVatStatus === 'Non-VAT (8% Option)' && !isSEOrMix)
+        errors.push('8% GIT option is only available to Self-Employed or Mixed Income individuals (NIRC Sec. 24(A)(2)(b)).')
+      break
+
+    case 'nonvat_to_vat':
+      if (isVat)  errors.push('Client is already VAT-registered.')
+      if (is8Pct) errors.push('Cannot register for VAT while on the 8% GIT option. Revoke the 8% election first, then register for VAT.')
+      break
+
+    case 'itemized_to_8pct':
+      if (!isSEOrMix)                    errors.push('8% GIT option is only available to Self-Employed or Mixed Income individuals.')
+      if (isVat)                          errors.push('VAT-registered taxpayers cannot avail of the 8% GIT option. De-register from VAT first.')
+      if (is8Pct || deduction_method === '8%') errors.push('Client is already on the 8% GIT option.')
+      break
+
+    case '8pct_to_itemized':
+      if (!is8Pct && deduction_method !== '8%') errors.push('Client is not currently on the 8% GIT option.')
+      break
+
+    case 'add_obligation':
+      if (isEmployee && ['EWT','FWT'].includes(obligCode))
+        errors.push('Pure-compensation employees cannot be registered as withholding agents.')
+      if (obligCode === 'EWT' && withholds_expanded)   errors.push('EWT is already active for this client.')
+      if (obligCode === 'FWT' && withholds_final)      errors.push('FWT is already active for this client.')
+      if (obligCode === 'Employer' && has_employees)   errors.push('Employer obligations are already active.')
+      if (obligCode === 'SSS-Vol'        && owner_pays_sss)        errors.push('Voluntary SSS is already tracked.')
+      if (obligCode === 'PhilHealth-Vol' && owner_pays_philhealth) errors.push('Voluntary PhilHealth is already tracked.')
+      if (obligCode === 'Pag-IBIG-Vol'   && owner_pays_pagibig)    errors.push('Voluntary Pag-IBIG is already tracked.')
+      break
+
+    case 'remove_obligation':
+      if (obligCode === 'EWT' && !withholds_expanded)   errors.push('EWT is not currently active for this client.')
+      if (obligCode === 'FWT' && !withholds_final)      errors.push('FWT is not currently active for this client.')
+      if (obligCode === 'Employer' && !has_employees)   errors.push('Employer obligations are not currently active.')
+      if (obligCode === 'SSS-Vol'        && !owner_pays_sss)        errors.push('Voluntary SSS is not tracked for this client.')
+      if (obligCode === 'PhilHealth-Vol' && !owner_pays_philhealth) errors.push('Voluntary PhilHealth is not tracked for this client.')
+      if (obligCode === 'Pag-IBIG-Vol'   && !owner_pays_pagibig)    errors.push('Voluntary Pag-IBIG is not tracked for this client.')
+      break
+  }
+
+  return { errors, warnings }
+}
+
 
 // ── REPORTS ───────────────────────────────────────────────────
 
