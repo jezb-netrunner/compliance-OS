@@ -28,7 +28,7 @@ const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: f
 
 const iso     = (d: Date) => d.toISOString().slice(0, 10)
 const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+  new Date(s + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 
 async function sendEmail(to: string, subject: string, text: string) {
   const res = await fetch('https://api.resend.com/emails', {
