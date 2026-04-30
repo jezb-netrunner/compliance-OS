@@ -14,13 +14,18 @@
 <style>
 :root {
   --royal:#4169e1; --rs:rgba(65,105,225,.07); --rm:rgba(65,105,225,.14);
+  --navy:#1a2f7a;
   --green:#2d8a4e; --red:#c0392b;
   --bg:#f9f9fa; --sf:#fff; --s2:#f0f1f3; --s3:#e8e9ec; --bd:#e0e2e6;
-  --ink:#111; --ch:#333; --mu:#707070; --lt:#9a9a9a;
+  --ink:#111; --ch:#333; --mu:#707070; --lt:#9a9a9a; --dim:#9a9a9a;
   --r:8px; --rr:5px;
   --sh:0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --shs:0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
   --se:'Source Serif 4',Georgia,serif;
   --sa:'Inter',system-ui,sans-serif;
+  --bl:#2563eb; --gs:#16a34a; --gm:rgba(22,163,74,.12);
+  --as:#d97706; --am:rgba(217,119,6,.12);
+  --rdm:rgba(192,57,43,.08);
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 body {
@@ -290,7 +295,11 @@ async function init() {
     .eq('token', token)
     .maybeSingle()
 
-  if (error || !data || data.used || new Date(data.expires_at) <= new Date()) {
+  if (error) {
+    renderNetworkError(error.message)
+    return
+  }
+  if (!data || data.used || new Date(data.expires_at) <= new Date()) {
     renderInvalid()
     return
   }
@@ -302,6 +311,14 @@ function renderInvalid() {
     <div class="status err-block">
       This link has expired or already been used.<br>
       <span style="color:var(--mu);font-size:.8rem">Please ask your accountant for a new one.</span>
+    </div>`
+}
+
+function renderNetworkError(msg) {
+  $('card').innerHTML = `
+    <div class="status err-block">
+      Could not load the enrollment form. Please check your connection and try again.<br>
+      <span style="color:var(--mu);font-size:.8rem">${msg || 'Network error'}</span>
     </div>`
 }
 
@@ -421,7 +438,7 @@ async function submit(tok) {
     .eq('token', token)
   if (updErr) console.warn('token update failed:', updErr.message)
 
-  $('card').innerHTML = $('successTpl').innerHTML
+  $('card').replaceChildren($('successTpl').content.cloneNode(true))
 }
 
 init()

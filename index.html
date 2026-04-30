@@ -892,7 +892,10 @@ body {
   box-shadow: var(--shs);
   padding: .72rem .9rem;
   border-left: 3px solid var(--bd);
+  cursor: pointer;
+  user-select: none;
 }
+.sum-chip:hover { background: var(--s2); }
 .sum-chip.overdue { border-left-color: var(--red);   }
 .sum-chip.urgent  { border-left-color: var(--amber); }
 .sum-chip.trrc    { border-left-color: var(--royal); }
@@ -2592,7 +2595,10 @@ body { background: var(--bg); }
   background: var(--sf);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
+  user-select: none;
 }
+.sum-chip:hover { background: var(--s2); }
 
 /* Coloured top strip instead of left border */
 .sum-chip::before {
@@ -3023,19 +3029,19 @@ table.ct thead { background: var(--s2); }
 
       <!-- Summary strip -->
       <div id="rosterSummary" class="roster-summary" aria-label="Summary">
-        <div class="sum-chip overdue">
+        <div class="sum-chip overdue" role="button" tabindex="0" onclick="_setFilter('overdue',this)" onkeydown="if(event.key==='Enter')_setFilter('overdue',this)" title="Filter: overdue">
           <div class="sum-chip-n" id="sumOverdue">—</div>
           <div class="sum-chip-l">Overdue</div>
         </div>
-        <div class="sum-chip urgent">
+        <div class="sum-chip urgent" role="button" tabindex="0" onclick="_setFilter('urgent',this)" onkeydown="if(event.key==='Enter')_setFilter('urgent',this)" title="Filter: due this week">
           <div class="sum-chip-n" id="sumUrgent">—</div>
           <div class="sum-chip-l">Due this week</div>
         </div>
-        <div class="sum-chip trrc">
+        <div class="sum-chip trrc" role="button" tabindex="0" onclick="_setFilter('trrc',this)" onkeydown="if(event.key==='Enter')_setFilter('trrc',this)" title="Filter: TRRC needed">
           <div class="sum-chip-n" id="sumTrrc">—</div>
           <div class="sum-chip-l">TRRC needed</div>
         </div>
-        <div class="sum-chip payment">
+        <div class="sum-chip payment" role="button" tabindex="0" onclick="_setFilter('payment',this)" onkeydown="if(event.key==='Enter')_setFilter('payment',this)" title="Filter: payment pending">
           <div class="sum-chip-n" id="sumPayment">—</div>
           <div class="sum-chip-l">Payment pending</div>
         </div>
@@ -3322,7 +3328,7 @@ table.ct thead { background: var(--s2); }
               <label for="rptYear">Year</label>
               <select id="rptYear"></select>
             </span>
-            <button class="btn-primary btn-sm" onclick="generateReport1()">Generate</button>
+            <button class="btn-primary btn-sm" id="btnGen1" onclick="generateReport1()">Generate</button>
             <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
@@ -3338,7 +3344,7 @@ table.ct thead { background: var(--s2); }
               <label for="rptYear2">Year</label>
               <select id="rptYear2"></select>
             </span>
-            <button class="btn-primary btn-sm" onclick="generateReport2()">Generate</button>
+            <button class="btn-primary btn-sm" id="btnGen2" onclick="generateReport2()">Generate</button>
             <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
@@ -3350,7 +3356,7 @@ table.ct thead { background: var(--s2); }
               <label for="rptAsOf">As-of date</label>
               <input type="date" id="rptAsOf">
             </span>
-            <button class="btn-primary btn-sm" onclick="generateReport3()">Generate</button>
+            <button class="btn-primary btn-sm" id="btnGen3" onclick="generateReport3()">Generate</button>
             <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
@@ -3364,14 +3370,9 @@ table.ct thead { background: var(--s2); }
             </span>
             <span class="rpt-ctrl-group">
               <label for="rptYear4">Year</label>
-              <select id="rptYear4">
-                <option value="2024">2024</option>
-                <option value="2025">2025</option>
-                <option value="2026" selected>2026</option>
-                <option value="2027">2027</option>
-              </select>
+              <select id="rptYear4"></select>
             </span>
-            <button class="btn-primary btn-sm" onclick="generateReport4()">Generate</button>
+            <button class="btn-primary btn-sm" id="btnGen4" onclick="generateReport4()">Generate</button>
             <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
@@ -4251,7 +4252,6 @@ let currentPractitioner = null
 let activeClientId      = null
 let _currentClient      = null
 let _historyLoaded      = false
-let _today              = null
 let _clientSheetMode    = 'add'
 let _editingClientId    = null
 let _parentClientId     = null   // set when adding a branch; null otherwise
@@ -4281,26 +4281,23 @@ function showLoginView() {
   $('appView').classList.add('hidden')
 }
 
-function showRosterView() {
+/** Show one named page panel; hide all others and reveal the app shell. */
+function _showPage(name) {
+  ;['rosterView','clientView','pgDashboard','pgReports','pgSettings'].forEach(id => {
+    const el = $(id); if (el) el.classList.toggle('hidden', id !== name)
+  })
   $('loginView').classList.add('hidden')
   $('appView').classList.remove('hidden')
-  $('rosterView').classList.remove('hidden')
-  $('clientView').classList.add('hidden')
-  $('pgDashboard').classList.add('hidden')
-  $('pgReports').classList.add('hidden')
-  $('pgSettings').classList.add('hidden')
+}
+
+function showRosterView() {
+  _showPage('rosterView')
   activeClientId = null
   loadRoster()   // refresh data whenever returning to the roster
 }
 
 function showDashboard() {
-  $('loginView').classList.add('hidden')
-  $('appView').classList.remove('hidden')
-  $('rosterView').classList.add('hidden')
-  $('clientView').classList.add('hidden')
-  $('pgDashboard').classList.remove('hidden')
-  $('pgReports').classList.add('hidden')
-  $('pgSettings').classList.add('hidden')
+  _showPage('pgDashboard')
   const n = $('dbSidebarName'), e = $('dbSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   if (e) e.textContent = currentPractitioner?.email || ''
@@ -4327,6 +4324,7 @@ async function loadDashboard() {
   const todayStr = _iso(now)
   const inNDate  = new Date(now); inNDate.setDate(inNDate.getDate() + _dbTimeframeDays)
   const inNStr   = _iso(inNDate)
+  const yearStart = `${yr}-01-01`, yearEnd = `${yr}-12-31`
   $('dbStatYear').textContent = yr
 
   // Sync dropdown to current setting
@@ -4349,10 +4347,17 @@ async function loadDashboard() {
   const clientMap = {}
   clients.forEach(c => { clientMap[c.id] = c.display_name })
 
+  // Fetch only the records that can appear on the dashboard:
+  //   (a) any record due in the current calendar year (for stats + upcoming),
+  //   (b) any unfiled record that is already past-due (overdue from any year),
+  //   (c) any filed record still needing TRRC (from any year),
+  //   (d) any filed record with outstanding payment (from any year).
+  // This avoids loading the entire history as data accumulates.
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('*')
+    .select('id,client_id,form,period,due_date,filed_date,trrc_saved,has_tax_due,payment_status')
     .in('client_id', clients.map(c => c.id))
+    .or(`due_date.gte.${yearStart},and(filed_date.is.null,due_date.lt.${todayStr}),and(filed_date.not.is.null,trrc_saved.is.false),and(filed_date.not.is.null,has_tax_due.is.true,payment_status.eq.unpaid)`)
 
   if (error) {
     const msg = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
@@ -4360,7 +4365,6 @@ async function loadDashboard() {
     return
   }
 
-  const yearStart = `${yr}-01-01`, yearEnd = `${yr}-12-31`
   const thisWeek = [], overdue = [], trrcNeeded = [], paymentPending = []
   let totalYear = 0, filed = 0, pending = 0, overdueCount = 0
 
@@ -4539,6 +4543,7 @@ async function _dbaSaveFiling() {
   const taxDue    = hasTaxDue ? parseFloat($('dba_taxamt')?.value || '0') : null
   const errEl     = $('dba_err')
   if (!filedDate) { errEl.textContent = 'Date filed is required.'; errEl.style.display = 'block'; return }
+  if (hasTaxDue && !(taxDue > 0)) { errEl.textContent = 'Enter a tax due amount greater than zero.'; errEl.style.display = 'block'; return }
   errEl.style.display = 'none'
   const { error } = await supa.from('compliance_records').update({
     filed_date:     filedDate,
@@ -4596,13 +4601,7 @@ async function showClientDetail(clientId) {
   _currentClient  = null
   _historyLoaded  = false
   _viewingParentId = null
-  $('loginView').classList.add('hidden')
-  $('appView').classList.remove('hidden')
-  $('rosterView').classList.add('hidden')
-  $('pgDashboard').classList.add('hidden')
-  $('pgReports').classList.add('hidden')
-  $('pgSettings').classList.add('hidden')
-  $('clientView').classList.remove('hidden')
+  _showPage('clientView')
 
   _switchSubtab('obligations')
   $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading…</p>'
@@ -5018,6 +5017,7 @@ function _nextBusinessDay(date) {
     if (wd !== 0 && wd !== 6 && !_PH_HOLIDAYS.has(_iso(d))) return d
     d.setDate(d.getDate() + 1)
   }
+  console.warn('_nextBusinessDay: exceeded 14-day cap for', _iso(date))
   return d
 }
 
@@ -5387,6 +5387,7 @@ function generateObligations(profile, year) {
  */
 async function applyRMC30_2026Override() {
   if (!supa) return
+  if (localStorage.getItem('rmc30_2026_applied')) return
   const { error } = await supa
     .from('compliance_records')
     .update({ due_date: '2026-05-15' })
@@ -5399,6 +5400,7 @@ async function applyRMC30_2026Override() {
     .eq('due_date', '2026-04-15')
     .is('filed_date', null)
   if (error) console.error('applyRMC30_2026Override:', error)
+  else localStorage.setItem('rmc30_2026_applied', '1')
 }
 
 /** Insert compliance_records for a newly added client, skipping any that already exist */
@@ -5533,7 +5535,7 @@ async function syncComplianceRecords(clientId, profile) {
  * @param {object} stats   — { total, overdue, urgent }
  */
 function buildClientCard(client, stats) {
-  const { overdue, urgent, total } = stats
+  const { overdue, urgent, total, trrc, payment } = stats
 
   let statusKey, statusBadge
   if (overdue > 0) {
@@ -5564,6 +5566,8 @@ function buildClientCard(client, stats) {
 
   return `<div class="client-card"
     data-status="${statusKey}"
+    data-trrc="${trrc > 0 ? '1' : '0'}"
+    data-payment="${payment > 0 ? '1' : '0'}"
     data-name="${esc(client.display_name.toLowerCase())}"
     data-client-id="${esc(client.id)}"
     data-parent-id="${esc(client.parent_client_id || '')}"
@@ -5627,6 +5631,8 @@ async function loadRoster() {
       total:   r.length,
       overdue: r.filter(x => !x.filed_date && x.due_date < today).length,
       urgent:  r.filter(x => !x.filed_date && x.due_date >= today && x.due_date <= week).length,
+      trrc:    r.filter(x => x.filed_date && !x.trrc_saved).length,
+      payment: r.filter(x => x.filed_date && x.has_tax_due && x.payment_status !== 'paid').length,
     }
 
     // Accumulate summary-strip totals
@@ -5729,9 +5735,11 @@ function _applyRosterFilter() {
     const meta   = (card.querySelector('.cc-meta')?.textContent || '').toLowerCase()
 
     const matchFilter =
-      _rosterFilter === 'overdue' ? status === 'overdue' :
-      _rosterFilter === 'urgent'  ? status === 'urgent'  :
-      _rosterFilter === 'active'  ? true                 : true
+      _rosterFilter === 'overdue'  ? status === 'overdue'     :
+      _rosterFilter === 'urgent'   ? status === 'urgent'      :
+      _rosterFilter === 'trrc'     ? card.dataset.trrc === '1'    :
+      _rosterFilter === 'payment'  ? card.dataset.payment === '1' :
+      _rosterFilter === 'active'   ? true                     : true
 
     const matchSearch = !q || name.includes(q) || meta.includes(q)
     card.classList.toggle('hidden', !(matchFilter && matchSearch))
@@ -6079,7 +6087,8 @@ async function archiveClient() {
     .eq('id', _editingClientId)
 
   if (error) {
-    alert('Archive failed: ' + error.message)
+    $('step2Err').textContent   = 'Archive failed: ' + error.message
+    $('step2Err').style.display = 'block'
     return
   }
 
@@ -6140,7 +6149,8 @@ function eafsStepDone(r) {
 }
 
 function getCardStatus(r) {
-  const due = r.due_date ? new Date(r.due_date) : null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due   = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
   // Payment is closed either by an actual payment ('paid') OR by the
   // taxpayer recording the filing with no tax due ('n/a' after a
   // filed_date is set).  Both cases should mark the obligation as
@@ -6151,7 +6161,7 @@ function getCardStatus(r) {
   if (r.filed_date && r.trrc_saved && (!datStepDone(r) || !eafsStepDone(r))) return 'dat-missing'
   if (r.filed_date && r.trrc_saved) return 'unpaid'
   if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
-  if (!r.filed_date && due && due < _today) return 'overdue'
+  if (!r.filed_date && due && due < today) return 'overdue'
   return 'pending'
 }
 
@@ -6186,10 +6196,9 @@ async function loadObligations(clientId, yearFilter) {
     return
   }
 
-  _today = new Date(); _today.setHours(0,0,0,0)
   _historyLoaded = false
 
-  const years   = [...new Set(records.map(r => r.due_date && r.due_date.slice(0, 4)).filter(Boolean))].sort()
+  const years   = [...new Set(records.map(r => { const m = r.obligation_id && r.obligation_id.match(/^(\d{4})/); return m ? m[1] : null }).filter(Boolean))].sort()
   const nowYr   = String(new Date().getFullYear())
   const activeY = yearFilter ? String(yearFilter)
                              : (years.includes(nowYr) ? nowYr : years[years.length - 1])
@@ -6200,7 +6209,7 @@ async function loadObligations(clientId, yearFilter) {
       ).join('')}</div>`
     : ''
 
-  const filtered = records.filter(r => r.due_date && r.due_date.startsWith(activeY))
+  const filtered = records.filter(r => r.obligation_id && r.obligation_id.startsWith(activeY + '-'))
   const body     = filtered.length
     ? filtered.map(buildObligationCard).join('')
     : `<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">No obligations for ${esc(activeY)}.</p>`
@@ -6209,17 +6218,18 @@ async function loadObligations(clientId, yearFilter) {
 }
 
 function buildObligationCard(r) {
+  const today             = new Date(); today.setHours(0, 0, 0, 0)
   const status            = getCardStatus(r)
   const isGovContrib      = /^(SSS |PhilHealth |Pag-IBIG )/.test(r.form || '')
   const { label: rawLabel, cls } = _statusMeta(status)
   const label = (status === 'trrc-missing' && isGovContrib) ? 'Receipt needed' : rawLabel
-  const due             = r.due_date ? new Date(r.due_date) : null
+  const due             = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
   const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
-  const isDueOver       = due && due < _today && !r.filed_date
+  const isDueOver       = due && due < today && !r.filed_date
 
   let penaltyLine = ''
   if (status === 'overdue' && due) {
-    const daysLate = Math.floor((_today - due) / 86400000)
+    const daysLate = Math.floor((today - due) / 86400000)
     if (isGovContrib) {
       penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Late contribution — penalties accumulating. Remit as soon as possible.</div>`
     } else {
@@ -6437,7 +6447,9 @@ async function openTRRCForm(recordId, isEdit = false) {
 
 async function openDatForm(recordId, isEdit = false) {
   _closeAllInlineForms()
-  const { data: r } = await supa.from('compliance_records').select('*').eq('id', recordId).single()
+  const { data: r } = await supa.from('compliance_records')
+    .select('id,form,period,dat_files_saved,validation_email,validation_email_date,eafs_submitted,eafs_submission_date,eafs_reference')
+    .eq('id', recordId).single()
   const attachments = datAttachments(r)
   const attachLabel = attachments.length ? attachments.join(' + ') : 'DAT'
   const needsEafs   = requiresEafsSubmission(r)
@@ -6535,6 +6547,7 @@ async function saveFiling(recordId) {
   const errEl     = $(`ff_err_${recordId}`)
 
   if (!filedDate) { errEl.textContent = 'Date filed is required.'; errEl.style.display = 'block'; return }
+  if (hasTaxDue && !(taxDue > 0)) { errEl.textContent = 'Enter a tax due amount greater than zero.'; errEl.style.display = 'block'; return }
   errEl.style.display = 'none'
 
   const payload = {
@@ -7337,8 +7350,9 @@ async function saveStatusChange() {
   // 3 — Mutate compliance calendar from effectiveDate forward
   await applyStatusChangeCalendar(activeClientId, newProfile, effectiveDate)
 
-  btn.disabled = false; btn.textContent = 'Apply Change'
+  Object.assign(_currentClient, clientPayload)
   closeStatusChangeSheet()
+  btn.disabled = false; btn.textContent = 'Apply Change'
   await showClientDetail(activeClientId)
 }
 
@@ -7544,7 +7558,15 @@ async function updateStatusChangeRecord(recordId, field, value) {
     .from('tax_status_changes')
     .update({ [field]: value })
     .eq('id', recordId)
-  if (error) { alert('Could not update: ' + error.message); return }
+  if (error) {
+    const panel = $('taxHistoryPanel')
+    const errDiv = document.createElement('div')
+    errDiv.className = 'fld-error'; errDiv.style.marginBottom = '.5rem'
+    errDiv.textContent = 'Could not update: ' + error.message
+    panel.prepend(errDiv)
+    setTimeout(() => errDiv.remove(), 5000)
+    return
+  }
   await loadTaxHistory(activeClientId)
 }
 
@@ -7552,13 +7574,7 @@ async function updateStatusChangeRecord(recordId, field, value) {
 // ── REPORTS ───────────────────────────────────────────────────
 
 function showReports() {
-  $('loginView').classList.add('hidden')
-  $('appView').classList.remove('hidden')
-  $('rosterView').classList.add('hidden')
-  $('clientView').classList.add('hidden')
-  $('pgDashboard').classList.add('hidden')
-  $('pgSettings').classList.add('hidden')
-  $('pgReports').classList.remove('hidden')
+  _showPage('pgReports')
   const n = $('rptSidebarName'), e = $('rptSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   if (e) e.textContent = currentPractitioner?.email || ''
@@ -7575,8 +7591,10 @@ async function _initReportControls() {
     .map(y => `<option value="${y}"${y === yr ? ' selected' : ''}>${y}</option>`).join('')
   const ySel  = $('rptYear')
   const y2Sel = $('rptYear2')
+  const y4Sel = $('rptYear4')
   if (ySel  && !ySel.childElementCount) ySel.innerHTML  = yearOpts
   if (y2Sel && !y2Sel.childElementCount) y2Sel.innerHTML = yearOpts
+  if (y4Sel && !y4Sel.childElementCount) y4Sel.innerHTML = yearOpts
 
   // Month dropdown (static — populate once)
   const mSel = $('rptMonth')
@@ -7644,6 +7662,13 @@ function _rptError(msg) {
   $('rptContent').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(msg)}</p>`
 }
 
+function _rptBusy(btnId, busy) {
+  const btn = $(btnId)
+  if (!btn) return
+  btn.disabled = busy
+  btn.textContent = busy ? 'Generating…' : 'Generate'
+}
+
 function _rptFmtDate(s) {
   return s ? new Date(s).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}) : '—'
 }
@@ -7684,12 +7709,25 @@ function _csvEmitTable(tbl, lines) {
   const totalCols = Math.max(1, ...rows.map(tr =>
     [...tr.cells].reduce((s, c) => s + (c.colSpan || 1), 0)
   ))
-  rows.forEach(tr => {
+  // occupied[rowIdx][colIdx] = remaining rowSpan count
+  const occupied = {}
+  rows.forEach((tr, rowIdx) => {
+    occupied[rowIdx] = occupied[rowIdx] || {}
     const row = new Array(totalCols).fill('')
     let col = 0
     for (const cell of tr.cells) {
-      row[col] = _csvCellText(cell)
-      col += (cell.colSpan || 1)
+      // Skip columns already occupied by a rowspan from above
+      while (occupied[rowIdx][col]) col++
+      const text    = _csvCellText(cell)
+      const colSpan = cell.colSpan || 1
+      const rowSpan = cell.rowSpan || 1
+      row[col] = text
+      // Mark future rows as occupied for this cell's rowSpan
+      for (let r = 1; r < rowSpan; r++) {
+        occupied[rowIdx + r] = occupied[rowIdx + r] || {}
+        for (let c = 0; c < colSpan; c++) occupied[rowIdx + r][col + c] = true
+      }
+      col += colSpan
     }
     lines.push(row)
   })
@@ -7699,7 +7737,7 @@ function _csvEmitTable(tbl, lines) {
 function exportCurrentReportToCsv() {
   const content = $('rptContent')
   if (!content || !content.querySelector('table')) {
-    alert('Generate a report first.')
+    _rptError('Generate a report first.')
     return
   }
   const title = document.querySelector('.rpt-controls:not(.hidden) .rpt-controls-title')
@@ -7757,6 +7795,7 @@ async function generateReport1() {
   const year     = +$('rptYear').value
   if (!clientId) { _rptError('Select a client first.'); return }
 
+  _rptBusy('btnGen1', true)
   $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
 
   const [{ data: client }, { data: records, error }] = await Promise.all([
@@ -7766,8 +7805,7 @@ async function generateReport1() {
     supa.from('compliance_records')
       .select('*')
       .eq('client_id', clientId)
-      .gte('due_date', `${year}-01-01`)
-      .lte('due_date', `${year}-12-31`)
+      .like('obligation_id', `${year}-%`)
       .order('due_date')
   ])
 
@@ -7779,7 +7817,7 @@ async function generateReport1() {
   }
 
   const today    = new Date(); today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().slice(0, 10)
+  const todayStr = _iso(today)
 
   const _daysLate = r => {
     if (!r.due_date) return 0
@@ -7879,6 +7917,7 @@ async function generateReport1() {
   html += `</tbody></table></div>`
 
   $('rptContent').innerHTML = html
+  _rptBusy('btnGen1', false)
 }
 
 // ── REPORT 2: Monthly Filing Summary ──────────────────────────
@@ -7887,6 +7926,7 @@ async function generateReport2() {
   const month = +$('rptMonth').value
   const year  = +$('rptYear2').value
 
+  _rptBusy('btnGen2', true)
   $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
 
   const pad        = n => String(n).padStart(2, '0')
@@ -7895,13 +7935,11 @@ async function generateReport2() {
   const lastDay    = new Date(year, month, 0).getDate()
   const rangeEnd   = `${year}-${mo}-${pad(lastDay)}`
 
-  const [{ data: clients, error: cErr }, ] = await Promise.all([
-    supa.from('clients')
-      .select('id, display_name')
-      .eq('practitioner_id', currentPractitioner.id)
-      .eq('is_active', true)
-      .order('display_name')
-  ])
+  const { data: clients, error: cErr } = await supa.from('clients')
+    .select('id, display_name')
+    .eq('practitioner_id', currentPractitioner.id)
+    .eq('is_active', true)
+    .order('display_name')
 
   if (cErr || !clients?.length) {
     $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
@@ -7922,7 +7960,7 @@ async function generateReport2() {
   if (error) { _rptError(error.message); return }
 
   const today    = new Date(); today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().slice(0, 10)
+  const todayStr = _iso(today)
 
   // Group by client
   const byClient = {}
@@ -7993,6 +8031,7 @@ async function generateReport2() {
   })
 
   $('rptContent').innerHTML = html
+  _rptBusy('btnGen2', false)
 }
 
 // ── REPORT 3: Penalty Exposure Report ─────────────────────────
@@ -8000,6 +8039,7 @@ async function generateReport2() {
 async function generateReport3() {
   const asOf = $('rptAsOf').value || new Date().toISOString().slice(0, 10)
 
+  _rptBusy('btnGen3', true)
   $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
 
   const { data: clients, error: cErr } = await supa
@@ -8103,10 +8143,11 @@ async function generateReport3() {
   </div>`
 
   html += `<div class="rpt-warning">
-    Estimates based on NIRC Sec. 248–249. Actual penalties may vary. Verify with BIR.
+    <strong>Important:</strong> Estimates are computed under NIRC Sec. 248 (25% surcharge) and Sec. 249 (20% interest p.a.) on the last recorded tax due amount. Actual BIR assessments may differ due to compromise penalties, deficiency interest adjustments, or additional assessments issued after filing. These figures are for practitioner reference only and do not constitute a formal BIR computation. Always reconcile with official BIR notices before advising clients.
   </div>`
 
   $('rptContent').innerHTML = html
+  _rptBusy('btnGen3', false)
 }
 
 // ── REPORT 4: Compliance Audit Trail ──────────────────────────
@@ -8116,6 +8157,7 @@ async function generateReport4() {
   const year     = +$('rptYear4').value
   if (!clientId) { _rptError('Select a client first.'); return }
 
+  _rptBusy('btnGen4', true)
   $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
 
   const [{ data: client }, { data: records, error }] = await Promise.all([
@@ -8125,8 +8167,7 @@ async function generateReport4() {
     supa.from('compliance_records')
       .select('*')
       .eq('client_id', clientId)
-      .gte('due_date', `${year}-01-01`)
-      .lte('due_date', `${year}-12-31`)
+      .like('obligation_id', `${year}-%`)
       .order('due_date')
   ])
 
@@ -8206,18 +8247,13 @@ async function generateReport4() {
     <div class="rpt-print-footer">Generated on ${esc(genTs)} · The Present Value Practitioner Suite · ${esc(firmName)}</div>`
 
   $('rptContent').innerHTML = html
+  _rptBusy('btnGen4', false)
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────
 
 function showSettings() {
-  $('loginView').classList.add('hidden')
-  $('appView').classList.remove('hidden')
-  $('rosterView').classList.add('hidden')
-  $('clientView').classList.add('hidden')
-  $('pgDashboard').classList.add('hidden')
-  $('pgReports').classList.add('hidden')
-  $('pgSettings').classList.remove('hidden')
+  _showPage('pgSettings')
   const n = $('stSidebarName'), e = $('stSidebarEmail')
   if (n) n.textContent = currentPractitioner?.firm_name || currentPractitioner?.name || ''
   if (e) e.textContent = currentPractitioner?.email || ''
@@ -8258,7 +8294,7 @@ async function saveSettings() {
     return
   }
   Object.assign(currentPractitioner, payload)
-  const nEls = ['sidebarPractName', 'dbSidebarName', 'rptSidebarName', 'stSidebarName']
+  const nEls = ['sidebarPractName', 'dbSidebarName', 'rptSidebarName', 'stSidebarName', 'hdrUser']
   nEls.forEach(id => { const el = $(id); if (el) el.textContent = payload.firm_name || payload.name || '' })
   msg.style.color = 'var(--green)'
   msg.textContent = 'Saved ✓'
@@ -8405,18 +8441,25 @@ async function _saveBulkFiling() {
     taxByRow[tr.dataset.id] = parseFloat(tr.querySelector('.bf-tax').value || '0') || 0
   })
   $('bfSave').disabled = true
-  let done = 0
+  let done = 0, failed = 0
   prog.textContent = `Saving 0 of ${ids.length}…`
-  await Promise.all(ids.map(id =>
-    supa.from('compliance_records').update({
+  await Promise.all(ids.map(async id => {
+    const { error } = await supa.from('compliance_records').update({
       filed_date:     filedDate,
       has_tax_due:    hasTax,
       tax_due:        hasTax ? taxByRow[id] : null,
       payment_status: hasTax ? 'unpaid' : 'n/a',
-    }).eq('id', id).then(() => {
-      done++; prog.textContent = `Saving ${done} of ${ids.length}…`
-    })
-  ))
+    }).eq('id', id)
+    if (error) { failed++; console.error('bulk save error', id, error.message) }
+    else done++
+    prog.textContent = `Saving ${done + failed} of ${ids.length}…`
+  }))
+  if (failed) {
+    prog.style.color = 'var(--red)'
+    prog.textContent = `${done} saved, ${failed} failed — check console for details.`
+    $('bfSave').disabled = false
+    return
+  }
   prog.textContent = `Saved ${done} of ${ids.length}.`
   setTimeout(async () => {
     closeBulkFilingSheet()
