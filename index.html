@@ -3634,7 +3634,21 @@ table.ct thead { background: var(--s2); }
                 <input type="checkbox" id="ac_receives_2307">
                 <span class="check-text">
                   Receives creditable withholding tax (2307) certificates
-                  <span class="check-hint">Payor-withheld income — annual ITR requires SAWT via eSubmission + scanned 2307s via eAFS</span>
+                  <span class="check-hint">Payor-withheld income — requires SAWT via eSubmission + Tax Credits upload via AFS eSubmission</span>
+                </span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="ac_requires_afs">
+                <span class="check-text">
+                  Requires Audited Financial Statement (AFS) attachment
+                  <span class="check-hint">Corporations/OPC/partnerships always; individuals/SE above gross sales FS threshold — gates AFS + ITR upload boxes on AFS eSubmission</span>
+                </span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="ac_has_rpt">
+                <span class="check-text">
+                  Has Related Party Transactions — Form 1709 required
+                  <span class="check-hint">Large taxpayers, tax incentive entities, or entities with RPT above threshold — gates Form 1709 (RPT) upload box on AFS eSubmission</span>
                 </span>
               </label>
             </div>
@@ -3998,8 +4012,17 @@ table.ct thead { background: var(--s2); }
  *   receives_2307         boolean not null default false,
  *     -- Client receives creditable withholding tax (2307) certificates
  *     -- from payors. Pre-checks claims_cwt on annual ITR filing forms
- *     -- and drives the eAFS scanned-2307 submission step.
+ *     -- and drives the Tax Credits upload box in AFS eSubmission.
  *     -- (forced false for pure-compensation Employees)
+ *   requires_audited_fs   boolean not null default false,
+ *     -- Client must attach Financial Statements to the annual ITR via
+ *     -- AFS eSubmission (corporations always; individuals/SE above the
+ *     -- gross sales FS threshold; set manually per applicable rules).
+ *     -- Gates the AFS upload box and ITR upload box on AFS eSubmission.
+ *   has_related_party_txn boolean not null default false,
+ *     -- Client has related-party transactions requiring BIR Form 1709
+ *     -- (large taxpayers, incentivised entities, RPT above threshold).
+ *     -- Gates the Form 1709 (RPT) upload box on AFS eSubmission.
  *   notes               text,
  *   is_active           boolean not null default true,
  *   created_at          timestamptz not null default now(),
@@ -4018,6 +4041,8 @@ table.ct thead { background: var(--s2); }
  * --   add column if not exists owner_pays_philhealth boolean not null default false,
  * --   add column if not exists owner_pays_pagibig    boolean not null default false,
  * --   add column if not exists receives_2307         boolean not null default false,
+ * --   add column if not exists requires_audited_fs   boolean not null default false,
+ * --   add column if not exists has_related_party_txn boolean not null default false,
  * --   add column if not exists parent_client_id      uuid references clients(id) on delete cascade,
  * --   add column if not exists branch_name           text;
  * --
@@ -4134,9 +4159,23 @@ table.ct thead { background: var(--s2); }
  *     -- to SAWT via eSubmission — eAFS is a separate BIR portal.
  *     -- Only surfaces for annual ITRs (1700/1701/1701A/1702…); quarterly
  *     -- returns use SAWT only.
+ *   afs_itr_uploaded      boolean not null default false,
+ *     -- ITR upload box on AFS eSubmission completed (filing reference +
+ *     -- proof of payment). Required for any AFS eSubmission filer.
+ *   afs_afs_uploaded      boolean not null default false,
+ *     -- AFS upload box completed (FS + SMR). Required when client has
+ *     -- requires_audited_fs = true.
+ *   afs_1709_uploaded     boolean not null default false,
+ *     -- Form 1709 (RPT) upload box completed. Required when client has
+ *     -- has_related_party_txn = true.
+ *   afs_others_uploaded   boolean not null default false,
+ *     -- Others upload box completed (2304 / Tax Debit Memo / prior-year
+ *     -- ITR / SAWT proof / original return if amended). Optional — not
+ *     -- blocking for eafsStepDone; tracked for recordkeeping.
  *   eafs_trn              text,
  *     -- Transaction Reference Number / Confirmation Receipt issued by
- *     -- BIR eAFS upon successful submission. Serves as proof of upload.
+ *     -- BIR AFS eSubmission upon successful upload. Single TRN covers
+ *     -- all upload boxes (ITR, AFS, RPT, Tax Credits, Others).
  *
  *   -- Step 3: Payment
  *   has_tax_due       boolean not null default false,
@@ -4164,7 +4203,11 @@ table.ct thead { background: var(--s2); }
  * --   add column if not exists validation_email_date date,
  * --   add column if not exists transaction_fee       numeric(12,2),
  * --   add column if not exists eafs_2307_submitted   boolean not null default false,
- * --   add column if not exists eafs_trn              text;
+ * --   add column if not exists eafs_trn              text,
+ * --   add column if not exists afs_itr_uploaded      boolean not null default false,
+ * --   add column if not exists afs_afs_uploaded      boolean not null default false,
+ * --   add column if not exists afs_1709_uploaded     boolean not null default false,
+ * --   add column if not exists afs_others_uploaded   boolean not null default false;
  *
  * alter table compliance_records enable row level security;
  *
@@ -5841,6 +5884,8 @@ function openClientSheet(mode, clientId) {
     $('ac_fwt').checked           = !!_currentClient.withholds_final
     $('ac_rbe').checked           = !!_currentClient.is_rbe
     $('ac_receives_2307').checked = !!_currentClient.receives_2307
+    $('ac_requires_afs').checked  = !!_currentClient.requires_audited_fs
+    $('ac_has_rpt').checked       = !!_currentClient.has_related_party_txn
     $('ac_sss_vol').checked       = !!_currentClient.owner_pays_sss
     $('ac_phic_vol').checked      = !!_currentClient.owner_pays_philhealth
     $('ac_hdmf_vol').checked      = !!_currentClient.owner_pays_pagibig
@@ -5867,6 +5912,8 @@ function openClientSheet(mode, clientId) {
     $('ac_fwt').checked           = false
     $('ac_rbe').checked           = false
     $('ac_receives_2307').checked = false
+    $('ac_requires_afs').checked  = false
+    $('ac_has_rpt').checked       = false
     $('ac_sss_vol').checked       = false
     $('ac_phic_vol').checked      = false
     $('ac_hdmf_vol').checked      = false
@@ -5958,10 +6005,10 @@ function _syncTaxProfileOptions() {
     if (isEmployee) classSel.value = ''
   }
 
-  // (3) Withholding-agent flags + receives_2307
+  // (3) Withholding-agent flags + AFS eSubmission profile flags
   const ewt = $('ac_ewt'), fwt = $('ac_fwt'), rbe = $('ac_rbe')
-  const r2307 = $('ac_receives_2307')
-  ;[ewt, fwt, rbe, r2307].forEach(cb => {
+  const r2307 = $('ac_receives_2307'), reqAfs = $('ac_requires_afs'), hasRpt = $('ac_has_rpt')
+  ;[ewt, fwt, rbe, r2307, reqAfs, hasRpt].forEach(cb => {
     if (!cb) return
     cb.disabled = isEmployee
     if (isEmployee) cb.checked = false
@@ -6038,6 +6085,8 @@ async function saveClient() {
   const withholds_final      = !isEmployee && $('ac_fwt').checked
   const is_rbe               = !isEmployee && $('ac_rbe').checked
   const receives_2307        = !isEmployee && $('ac_receives_2307').checked
+  const requires_audited_fs  = !isEmployee && $('ac_requires_afs').checked
+  const has_related_party_txn= !isEmployee && $('ac_has_rpt').checked
   const owner_pays_sss       = $('ac_sss_vol').checked
   const owner_pays_philhealth= $('ac_phic_vol').checked
   const owner_pays_pagibig   = $('ac_hdmf_vol').checked
@@ -6062,6 +6111,8 @@ async function saveClient() {
     withholds_final,
     is_rbe,
     receives_2307,
+    requires_audited_fs,
+    has_related_party_txn,
     owner_pays_sss,
     owner_pays_philhealth,
     owner_pays_pagibig,
@@ -6245,17 +6296,28 @@ function datStepDone(r) {
 }
 
 /**
- * Returns true when the return requires eAFS submission of scanned 2307 certificates.
- * Only annual ITRs with claims_cwt = true need this — quarterly returns use SAWT only.
- * eAFS is a separate BIR portal from eSubmission; both steps must be completed.
+ * Returns true when the return requires submission via BIR AFS eSubmission
+ * (eafs.bir.gov.ph). Applies only to annual ITRs when any of:
+ *   • claims_cwt — Tax Credits upload box (2307/2306/2316/1606)
+ *   • _currentClient.requires_audited_fs — AFS + ITR upload boxes
+ *   • _currentClient.has_related_party_txn — Form 1709 (RPT) upload box
  */
 function requiresEafsSubmission(r) {
-  return !!r?.claims_cwt
-    && /\b(1700|1701A|1701-?MS|1701|1702-?RT|1702-?EX|1702-?MX|1702)\b/i.test(String(r?.form || ''))
+  const isAnnualItr = /\b(1700|1701A|1701-?MS|1701|1702-?RT|1702-?EX|1702-?MX|1702)\b/i.test(String(r?.form || ''))
+  if (!isAnnualItr) return false
+  const cl = typeof _currentClient !== 'undefined' ? (_currentClient ?? {}) : {}
+  return !!r?.claims_cwt || !!cl.requires_audited_fs || !!cl.has_related_party_txn
 }
 
 function eafsStepDone(r) {
-  return !requiresEafsSubmission(r) || (!!r.eafs_2307_submitted && !!r.eafs_trn)
+  if (!requiresEafsSubmission(r)) return true
+  if (!r?.eafs_trn) return false
+  const cl = typeof _currentClient !== 'undefined' ? (_currentClient ?? {}) : {}
+  if (!r?.afs_itr_uploaded) return false
+  if (!!r?.claims_cwt && !r?.eafs_2307_submitted) return false
+  if (!!cl.requires_audited_fs && !r?.afs_afs_uploaded) return false
+  if (!!cl.has_related_party_txn && !r?.afs_1709_uploaded) return false
+  return true
 }
 
 function getCardStatus(r) {
@@ -6373,20 +6435,35 @@ function buildObligationCard(r) {
   const eSubDone     = datStepDone(r)
   const eafsDone     = eafsStepDone(r)
   const stepDatDone  = eSubDone && eafsDone
+  const cl = typeof _currentClient !== 'undefined' ? (_currentClient ?? {}) : {}
   const stepDatLabel = needsDat
-    ? `${datAttach.join(' + ')} — DAT files + validation email${needsEafs ? ' · eAFS 2307' : ''}`
-    : (needsEafs ? 'eAFS — scanned 2307 certificates' : '')
+    ? `${datAttach.join(' + ')} — DAT files + validation email${needsEafs ? ' · AFS eSubmission' : ''}`
+    : (needsEafs ? 'AFS eSubmission' : '')
 
   let stepDatDetail = ''
   if (stepDatDone) {
     const doneParts = []
     if (needsDat) doneParts.push(`DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}`)
-    if (needsEafs) doneParts.push(`eAFS 2307 submitted${r.eafs_trn ? ` · TRN: ${esc(r.eafs_trn)}` : ''}`)
+    if (needsEafs) {
+      const afsItems = ['ITR']
+      if (cl.requires_audited_fs) afsItems.push('AFS')
+      if (cl.has_related_party_txn) afsItems.push('Form 1709')
+      if (r.claims_cwt) afsItems.push('Tax Credits')
+      doneParts.push(`AFS eSubmission: ${afsItems.join(' + ')}${r.eafs_trn ? ` · TRN: ${esc(r.eafs_trn)}` : ''}`)
+    }
     stepDatDetail = doneParts.join(' · ') + editLink('openDatForm')
   } else if (needsDatStep) {
     const pending = []
     if (needsDat && !eSubDone) pending.push(`${datAttach.join(', ')} DAT + validation`)
-    if (needsEafs && !eafsDone) pending.push('eAFS — scanned 2307 + TRN')
+    if (needsEafs && !eafsDone) {
+      const missingAfs = []
+      if (!r.afs_itr_uploaded) missingAfs.push('ITR')
+      if (cl.requires_audited_fs && !r.afs_afs_uploaded) missingAfs.push('AFS')
+      if (cl.has_related_party_txn && !r.afs_1709_uploaded) missingAfs.push('Form 1709')
+      if (r.claims_cwt && !r.eafs_2307_submitted) missingAfs.push('Tax Credits')
+      if (!r.eafs_trn) missingAfs.push('TRN')
+      pending.push(`AFS eSubmission: ${missingAfs.join(' + ')} pending`)
+    }
     stepDatDetail = `Pending: ${pending.join(' + ')}${editLink('openDatForm')}`
   }
 
@@ -6558,16 +6635,21 @@ async function openTRRCForm(recordId, isEdit = false) {
 async function openDatForm(recordId, isEdit = false) {
   _closeAllInlineForms()
   const { data: r } = await supa.from('compliance_records')
-    .select('id,form,period,claims_cwt,dat_files_saved,validation_email,validation_email_date,eafs_2307_submitted,eafs_trn')
+    .select('id,form,period,claims_cwt,dat_files_saved,validation_email,validation_email_date,eafs_2307_submitted,eafs_trn,afs_itr_uploaded,afs_afs_uploaded,afs_1709_uploaded,afs_others_uploaded')
     .eq('id', recordId).single()
   const attachments = datAttachments(r)
   const attachLabel = attachments.length ? attachments.join(' + ') : 'DAT'
   const needsEafs   = requiresEafsSubmission(r)
+  const cl          = typeof _currentClient !== 'undefined' ? (_currentClient ?? {}) : {}
+  const tin         = cl.tin ? cl.tin.replace(/\D/g, '') : 'TIN'
+  const periodMatch = String(r?.period ?? '').match(/(\d{4})/)
+  const taxYear     = periodMatch ? periodMatch[1] : 'YYYY'
+  const filePrefix  = `${tin}-${taxYear}-12`
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
   <div style="font-size:.78rem;font-weight:600;margin-bottom:.35rem">
-    Attachments for this return: <span class="mono">${esc(attachLabel)}${needsEafs ? ' + eAFS 2307' : ''}</span>
+    Attachments for this return: <span class="mono">${esc(attachLabel)}${needsEafs ? ' + AFS eSubmission' : ''}</span>
   </div>
   <label class="check-inline">
     <input type="checkbox" id="df_saved_${recordId}" ${r?.dat_files_saved ? 'checked' : ''}>
@@ -6582,18 +6664,60 @@ async function openDatForm(recordId, isEdit = false) {
     <input type="date" id="df_date_${recordId}" value="${r?.validation_email_date ?? ''}">
   </div>
   ${needsEafs ? `
-  <div style="border-top:1px solid var(--bd);margin:.6rem 0 .4rem"></div>
-  <div style="font-size:.78rem;font-weight:600;margin-bottom:.3rem">eAFS — Scanned 2307 Submission</div>
+  <div style="border-top:1px solid var(--bd);margin:.7rem 0 .5rem"></div>
+  <div style="font-size:.78rem;font-weight:600;margin-bottom:.1rem">AFS eSubmission — eafs.bir.gov.ph</div>
+  <div style="font-size:.71rem;color:var(--mu);margin-bottom:.5rem">
+    File naming: <span class="mono">${esc(filePrefix)}-{TYPE}.pdf</span>
+    &nbsp;·&nbsp; Types: <span class="mono">ITR · AFS · RPT · TCR-01…TCR-99 · OTH</span>
+  </div>
+
+  <div style="font-size:.75rem;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:.3rem 0 .2rem">Required uploads</div>
+
+  <label class="check-inline">
+    <input type="checkbox" id="df_afs_itr_${recordId}" ${r?.afs_itr_uploaded ? 'checked' : ''}>
+    <span>Income Tax Return (ITR) uploaded
+      <span class="check-hint">Filing reference (eFPS) or TRRC confirmation (eBIRForms) + proof of payment · filename: <span class="mono">${esc(filePrefix)}-ITR.pdf</span></span>
+    </span>
+  </label>
+
+  ${cl.requires_audited_fs ? `
+  <label class="check-inline">
+    <input type="checkbox" id="df_afs_afs_${recordId}" ${r?.afs_afs_uploaded ? 'checked' : ''}>
+    <span>Audited Financial Statement (AFS) uploaded
+      <span class="check-hint">Unaudited or Audited FS + Statement of Management Responsibility (SMR) · filename: <span class="mono">${esc(filePrefix)}-AFS.pdf</span></span>
+    </span>
+  </label>` : ''}
+
+  ${cl.has_related_party_txn ? `
+  <label class="check-inline">
+    <input type="checkbox" id="df_afs_1709_${recordId}" ${r?.afs_1709_uploaded ? 'checked' : ''}>
+    <span>Form 1709 — Related Party Transactions (RPT) uploaded
+      <span class="check-hint">Applicable for large taxpayers, tax incentive entities, or entities with RPT above threshold · filename: <span class="mono">${esc(filePrefix)}-RPT.pdf</span></span>
+    </span>
+  </label>` : ''}
+
+  ${r?.claims_cwt ? `
   <label class="check-inline">
     <input type="checkbox" id="df_eafs_${recordId}" ${r?.eafs_2307_submitted ? 'checked' : ''}>
-    Scanned copies of Form 2307 uploaded via BIR eAFS
+    <span>Tax Credits uploaded (Form 2307 / 2306 / 2316 / 1606 / other)
+      <span class="check-hint">Scanned copies of all creditable tax certificates; each file named <span class="mono">${esc(filePrefix)}-TCR-01.pdf</span> through TCR-99</span>
+    </span>
+  </label>` : ''}
+
+  <div style="font-size:.75rem;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:.5rem 0 .2rem">Optional uploads</div>
+  <label class="check-inline">
+    <input type="checkbox" id="df_afs_others_${recordId}" ${r?.afs_others_uploaded ? 'checked' : ''}>
+    <span>Others uploaded
+      <span class="check-hint">BIR Form 2304 (payments not subject to WT) · Tax Debit Memo · Prior year ITR (excess credits) · Original return if amended · SAWT eSubmission proof · filename: <span class="mono">${esc(filePrefix)}-OTH.pdf</span></span>
+    </span>
   </label>
-  <div class="fld" style="margin-top:.4rem">
-    <label>Transaction Reference Number / Confirmation Receipt</label>
-    <input type="text" id="df_eafs_trn_${recordId}" placeholder="eAFS TRN or confirmation number" value="${esc(r?.eafs_trn ?? '')}">
+
+  <div class="fld" style="margin-top:.5rem">
+    <label>Transaction Reference Number / Confirmation Receipt <span class="req">*</span></label>
+    <input type="text" id="df_eafs_trn_${recordId}" placeholder="AFS eSubmission TRN or confirmation number" value="${esc(r?.eafs_trn ?? '')}">
   </div>` : ''}
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
-    eSubmission DAT attachments: Alphalist (1604-C/E/F), QAP (1601-EQ/FQ), SLSP (all VAT 2550Q per RR 1-2012), SAWT (returns claiming 2307 CWT per RR 2-2006). Retain both the DAT files and the BIR validation email.${needsEafs ? ' For annual ITRs, also upload scanned 2307 originals via the separate BIR eAFS portal.' : ''}
+    eSubmission DAT: Alphalist (1604-C/E/F), QAP (1601-EQ/FQ), SLSP (2550Q, RR 1-2012), SAWT (returns claiming CWT, RR 2-2006). Retain DAT files and BIR validation email.${needsEafs ? ' AFS eSubmission is a separate BIR portal — one TRN covers all upload boxes.' : ''}
   </div>
   <div id="df_err_${recordId}" style="color:var(--red);font-size:.78rem;display:none"></div>
   <div class="inline-form-actions">
@@ -6698,21 +6822,27 @@ async function saveTRRC(recordId) {
 }
 
 async function saveDat(recordId) {
-  const datSaved  = $(`df_saved_${recordId}`).checked
-  const emailRcvd = $(`df_email_${recordId}`).checked
-  const emailDate = $(`df_date_${recordId}`).value || null
-  const eafsEl    = $(`df_eafs_${recordId}`)
-  const eafsTrnEl = $(`df_eafs_trn_${recordId}`)
-  const eafsTrn   = eafsTrnEl?.value.trim() || null
-  const errEl     = $(`df_err_${recordId}`)
+  const datSaved    = $(`df_saved_${recordId}`).checked
+  const emailRcvd   = $(`df_email_${recordId}`).checked
+  const emailDate   = $(`df_date_${recordId}`).value || null
+  const afsItrEl    = $(`df_afs_itr_${recordId}`)
+  const afsAfsEl    = $(`df_afs_afs_${recordId}`)
+  const afs1709El   = $(`df_afs_1709_${recordId}`)
+  const eafsEl      = $(`df_eafs_${recordId}`)
+  const afsOthersEl = $(`df_afs_others_${recordId}`)
+  const eafsTrnEl   = $(`df_eafs_trn_${recordId}`)
+  const eafsTrn     = eafsTrnEl?.value.trim() || null
+  const errEl       = $(`df_err_${recordId}`)
 
-  if (!datSaved && !emailRcvd && !(eafsEl?.checked) && !eafsTrn) {
+  const anyAfsBox = afsItrEl?.checked || afsAfsEl?.checked || afs1709El?.checked
+                    || eafsEl?.checked || afsOthersEl?.checked
+  if (!datSaved && !emailRcvd && !anyAfsBox && !eafsTrn) {
     errEl.textContent = 'Tick at least one item or enter a TRN to record partial progress.'
     errEl.style.display = 'block'
     return
   }
-  if (eafsEl?.checked && !eafsTrn) {
-    errEl.textContent = 'Enter the Transaction Reference Number from BIR eAFS as proof of submission.'
+  if (anyAfsBox && !eafsTrn) {
+    errEl.textContent = 'Enter the Transaction Reference Number from BIR AFS eSubmission as proof of upload.'
     errEl.style.display = 'block'
     return
   }
@@ -6723,9 +6853,13 @@ async function saveDat(recordId) {
     validation_email:      emailRcvd,
     validation_email_date: emailRcvd ? emailDate : null,
   }
-  if (eafsEl) {
-    updatePayload.eafs_2307_submitted = eafsEl.checked
-    updatePayload.eafs_trn = eafsTrn
+  if (eafsTrnEl) {
+    updatePayload.eafs_trn            = eafsTrn
+    updatePayload.afs_itr_uploaded    = !!afsItrEl?.checked
+    updatePayload.afs_afs_uploaded    = !!afsAfsEl?.checked
+    updatePayload.afs_1709_uploaded   = !!afs1709El?.checked
+    updatePayload.eafs_2307_submitted = !!eafsEl?.checked
+    updatePayload.afs_others_uploaded = !!afsOthersEl?.checked
   }
 
   const { error } = await supa.from('compliance_records').update(updatePayload).eq('id', recordId)
@@ -6767,7 +6901,7 @@ async function savePayment(recordId) {
 async function loadHistory() {
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,eafs_2307_submitted,eafs_trn,payment_status,amount_paid')
+    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,eafs_2307_submitted,eafs_trn,afs_itr_uploaded,afs_afs_uploaded,afs_1709_uploaded,afs_others_uploaded,payment_status,amount_paid')
     .eq('client_id', activeClientId)
     .not('filed_date', 'is', null)
     .order('filed_date', { ascending: false })
