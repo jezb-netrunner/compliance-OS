@@ -6644,7 +6644,9 @@ async function openDatForm(recordId, isEdit = false) {
   const tin         = cl.tin ? cl.tin.replace(/\D/g, '') : 'TIN'
   const periodMatch = String(r?.period ?? '').match(/(\d{4})/)
   const taxYear     = periodMatch ? periodMatch[1] : 'YYYY'
-  const filePrefix  = `${tin}-${taxYear}-12`
+  const fyStart     = cl.fiscal_start_month || 1
+  const fyEndMonth  = fyStart === 1 ? 12 : fyStart - 1
+  const filePrefix  = `${tin}-${taxYear}-${String(fyEndMonth).padStart(2, '0')}`
   const el = $(`form_${recordId}`)
   el.innerHTML = `
 <div class="inline-form">
