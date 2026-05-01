@@ -4134,6 +4134,9 @@ table.ct thead { background: var(--s2); }
  *     -- to SAWT via eSubmission — eAFS is a separate BIR portal.
  *     -- Only surfaces for annual ITRs (1700/1701/1701A/1702…); quarterly
  *     -- returns use SAWT only.
+ *   eafs_trn              text,
+ *     -- Transaction Reference Number / Confirmation Receipt issued by
+ *     -- BIR eAFS upon successful submission. Serves as proof of upload.
  *
  *   -- Step 3: Payment
  *   has_tax_due       boolean not null default false,
@@ -4160,7 +4163,8 @@ table.ct thead { background: var(--s2); }
  * --   add column if not exists validation_email      boolean not null default false,
  * --   add column if not exists validation_email_date date,
  * --   add column if not exists transaction_fee       numeric(12,2),
- * --   add column if not exists eafs_2307_submitted   boolean not null default false;
+ * --   add column if not exists eafs_2307_submitted   boolean not null default false,
+ * --   add column if not exists eafs_trn              text;
  *
  * alter table compliance_records enable row level security;
  *
@@ -6251,7 +6255,7 @@ function requiresEafsSubmission(r) {
 }
 
 function eafsStepDone(r) {
-  return !requiresEafsSubmission(r) || !!r.eafs_2307_submitted
+  return !requiresEafsSubmission(r) || (!!r.eafs_2307_submitted && !!r.eafs_trn)
 }
 
 function getCardStatus(r) {
@@ -6377,12 +6381,12 @@ function buildObligationCard(r) {
   if (stepDatDone) {
     const doneParts = []
     if (needsDat) doneParts.push(`DAT files saved · Validation email${r.validation_email_date ? ` ${r.validation_email_date}` : ''}`)
-    if (needsEafs) doneParts.push('eAFS 2307 submitted')
+    if (needsEafs) doneParts.push(`eAFS 2307 submitted${r.eafs_trn ? ` · TRN: ${esc(r.eafs_trn)}` : ''}`)
     stepDatDetail = doneParts.join(' · ') + editLink('openDatForm')
   } else if (needsDatStep) {
     const pending = []
     if (needsDat && !eSubDone) pending.push(`${datAttach.join(', ')} DAT + validation`)
-    if (needsEafs && !eafsDone) pending.push('eAFS 2307 scan')
+    if (needsEafs && !eafsDone) pending.push('eAFS — scanned 2307 + TRN')
     stepDatDetail = `Pending: ${pending.join(' + ')}${editLink('openDatForm')}`
   }
 
@@ -6554,7 +6558,7 @@ async function openTRRCForm(recordId, isEdit = false) {
 async function openDatForm(recordId, isEdit = false) {
   _closeAllInlineForms()
   const { data: r } = await supa.from('compliance_records')
-    .select('id,form,period,dat_files_saved,validation_email,validation_email_date,eafs_submitted,eafs_submission_date,eafs_reference')
+    .select('id,form,period,claims_cwt,dat_files_saved,validation_email,validation_email_date,eafs_2307_submitted,eafs_trn')
     .eq('id', recordId).single()
   const attachments = datAttachments(r)
   const attachLabel = attachments.length ? attachments.join(' + ') : 'DAT'
@@ -6579,10 +6583,15 @@ async function openDatForm(recordId, isEdit = false) {
   </div>
   ${needsEafs ? `
   <div style="border-top:1px solid var(--bd);margin:.6rem 0 .4rem"></div>
+  <div style="font-size:.78rem;font-weight:600;margin-bottom:.3rem">eAFS — Scanned 2307 Submission</div>
   <label class="check-inline">
     <input type="checkbox" id="df_eafs_${recordId}" ${r?.eafs_2307_submitted ? 'checked' : ''}>
-    Scanned 2307 certificates submitted via BIR eAFS
-  </label>` : ''}
+    Scanned copies of Form 2307 uploaded via BIR eAFS
+  </label>
+  <div class="fld" style="margin-top:.4rem">
+    <label>Transaction Reference Number / Confirmation Receipt</label>
+    <input type="text" id="df_eafs_trn_${recordId}" placeholder="eAFS TRN or confirmation number" value="${esc(r?.eafs_trn ?? '')}">
+  </div>` : ''}
   <div style="font-size:.72rem;color:var(--mu);margin-top:.35rem">
     eSubmission DAT attachments: Alphalist (1604-C/E/F), QAP (1601-EQ/FQ), SLSP (all VAT 2550Q per RR 1-2012), SAWT (returns claiming 2307 CWT per RR 2-2006). Retain both the DAT files and the BIR validation email.${needsEafs ? ' For annual ITRs, also upload scanned 2307 originals via the separate BIR eAFS portal.' : ''}
   </div>
@@ -6693,10 +6702,17 @@ async function saveDat(recordId) {
   const emailRcvd = $(`df_email_${recordId}`).checked
   const emailDate = $(`df_date_${recordId}`).value || null
   const eafsEl    = $(`df_eafs_${recordId}`)
+  const eafsTrnEl = $(`df_eafs_trn_${recordId}`)
+  const eafsTrn   = eafsTrnEl?.value.trim() || null
   const errEl     = $(`df_err_${recordId}`)
 
-  if (!datSaved && !emailRcvd && !(eafsEl?.checked)) {
-    errEl.textContent = 'Tick at least one item to record partial progress.'
+  if (!datSaved && !emailRcvd && !(eafsEl?.checked) && !eafsTrn) {
+    errEl.textContent = 'Tick at least one item or enter a TRN to record partial progress.'
+    errEl.style.display = 'block'
+    return
+  }
+  if (eafsEl?.checked && !eafsTrn) {
+    errEl.textContent = 'Enter the Transaction Reference Number from BIR eAFS as proof of submission.'
     errEl.style.display = 'block'
     return
   }
@@ -6707,7 +6723,10 @@ async function saveDat(recordId) {
     validation_email:      emailRcvd,
     validation_email_date: emailRcvd ? emailDate : null,
   }
-  if (eafsEl) updatePayload.eafs_2307_submitted = eafsEl.checked
+  if (eafsEl) {
+    updatePayload.eafs_2307_submitted = eafsEl.checked
+    updatePayload.eafs_trn = eafsTrn
+  }
 
   const { error } = await supa.from('compliance_records').update(updatePayload).eq('id', recordId)
 
@@ -6748,7 +6767,7 @@ async function savePayment(recordId) {
 async function loadHistory() {
   const { data: records, error } = await supa
     .from('compliance_records')
-    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,eafs_2307_submitted,payment_status,amount_paid')
+    .select('form,period,filed_date,trrc_saved,trrc_reference,claims_cwt,dat_files_saved,validation_email,eafs_2307_submitted,eafs_trn,payment_status,amount_paid')
     .eq('client_id', activeClientId)
     .not('filed_date', 'is', null)
     .order('filed_date', { ascending: false })
