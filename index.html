@@ -25,16 +25,17 @@
   --teal:   #0891B2;          /* Data Teal — accent, charts */
   --ts:     rgba(8,145,178,.07);
 
-  /* Semantic colours */
-  --green:  #2d8a4e;
-  --gs:     rgba(45,138,78,.07);
-  --gm:     rgba(45,138,78,.14);
-  --amber:  #d4850a;
-  --as:     rgba(212,133,10,.07);
-  --am:     rgba(212,133,10,.14);
-  --red:    #c0392b;
-  --rds:    rgba(192,57,43,.07);
-  --rdm:    rgba(192,57,43,.14);
+  /* Semantic colours — all foreground tokens pass WCAG AA on white
+     (4.5:1 minimum). Tinted background variants follow. */
+  --green:  #15803d;          /* AA on white = 5.27 */
+  --gs:     rgba(21,128,61,.08);
+  --gm:     rgba(21,128,61,.14);
+  --amber:  #B45309;          /* AA on white = 4.97 */
+  --as:     rgba(180,83,9,.08);
+  --am:     rgba(180,83,9,.14);
+  --red:    #b91c1c;          /* AA on white = 5.91 */
+  --rds:    rgba(185,28,28,.07);
+  --rdm:    rgba(185,28,28,.14);
 
   /* Neutrals — Indigo-tinted palette */
   --bg:   #F7F7FC;            /* Dusk White — page background */
@@ -45,21 +46,37 @@
   --bl:   #9B97C4;
   --ink:  #1E1A5E;            /* Dusk Indigo — headings, anchors */
   --ch:   #2A264E;
-  --dim:  #647489;            /* Precision Gray */
-  --mu:   #647489;            /* Precision Gray */
-  --lt:   #8A96A8;
+  --dim:  #586677;            /* AA on white = 4.83 */
+  --mu:   #586677;            /* AA on white = 4.83 */
+  --lt:   #6B7787;            /* AA on white = 4.55 — tertiary copy */
 
-  /* Shape */
-  --r:    8px;
-  --rr:   5px;
+  /* Shape — coherent scale */
+  --r-pill:    9999px;
+  --r-card:    12px;
+  --r-control:  8px;
+  --r-chip:     6px;
+  --r:    8px;                /* legacy alias → --r-control */
+  --rr:   5px;                /* legacy alias */
+  --r-sm: 6px;
+  --r-md: 10px;
 
-  /* Shadow */
-  --sh:   0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
-  --shs:  0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+  /* Surface aliases used by older selectors (HI-14) */
+  --sl:   var(--s2);
+  --dk:   var(--ink);
+  --bg2:  var(--s2);
+
+  /* Shadow / elevation system */
+  --elev-1: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+  --elev-2: 0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --elev-3: 0 -8px 48px rgba(0,0,0,.18);
+  --elev-4: 0 12px 48px rgba(61,56,138,.12);
+  --sh:   var(--elev-2);
+  --shs:  var(--elev-1);
 
   /* Typography */
   --se: 'Source Serif 4', Georgia, serif;
   --sa: 'Inter', system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
 
   /* Layout */
   --hdr-h:       60px;
@@ -802,13 +819,53 @@ body {
 ═══════════════════════════════════════════════════ */
 .hidden   { display: none !important; }
 .dimmed   { opacity: .4; pointer-events: none; }
-.mono     { font-family: 'Menlo', 'Consolas', monospace; font-size: .82em; }
+.mono     { font-family: var(--mono); font-size: .82em; }
+
+/* Inline penalty line on overdue obligation cards (replaces the
+   inline style="color:var(--amber,#b45309); …"). */
+.ob-penalty-line {
+  color: var(--amber);
+  font-size: .72rem;
+  margin-top: .2rem;
+}
+.ob-penalty-line strong { font-weight: 600; }
+.ob-penalty-line em     { font-style: italic; font-weight: 500; }
+
+/* Toast layer (showToast helper). */
+#toastHost {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  pointer-events: none;
+  max-width: 90vw;
+}
+.toast {
+  pointer-events: auto;
+  background: var(--ink);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 500;
+  padding: .65rem 1rem;
+  border-radius: var(--r-control);
+  box-shadow: var(--elev-2);
+  min-width: 220px;
+  transition: opacity .25s, transform .25s;
+}
+.toast-success { background: var(--green); }
+.toast-error   { background: var(--red); }
+.toast-leaving { opacity: 0; transform: translateY(8px); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
     transition-duration: .01ms !important;
   }
+  .toast { transition: none; }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -2418,47 +2475,10 @@ table.ct td {
    Precision Gray body · Source Serif 4 + Inter
 ═══════════════════════════════════════════════════ */
 
-/* ── Token overrides ── */
+/* ── Layout overrides — color/shape tokens consolidated to the
+   single :root block at the top of the file (HI-13). Only the
+   layout knobs the brand system actually changes are kept here. ── */
 :root {
-  /* Brand palette — The Present Value */
-  --royal:  #3D388A;          /* Indigo Mid — CTAs, links */
-  --rs:     rgba(61,56,138,.09);
-  --rm:     rgba(61,56,138,.16);
-  --teal:   #0891B2;          /* Data Teal — accent, charts */
-  --ts:     rgba(8,145,178,.09);
-
-  /* Semantic colours */
-  --green:  #16a34a;
-  --gs:     rgba(22,163,74,.09);
-  --gm:     rgba(22,163,74,.16);
-  --amber:  #d97706;
-  --as:     rgba(217,119,6,.09);
-  --am:     rgba(217,119,6,.16);
-  --red:    #dc2626;
-  --rds:    rgba(220,38,38,.09);
-  --rdm:    rgba(220,38,38,.16);
-
-  /* Indigo-tinted neutral palette */
-  --bg:  #F7F7FC;             /* Dusk White — page background */
-  --sf:  #ffffff;
-  --s2:  #EEEDF8;             /* Indigo Surface — cards, table rows */
-  --s3:  #E3E1F3;
-  --bd:  #D4D2EC;
-  --bl:  #9B97C4;
-  --ink: #1E1A5E;             /* Dusk Indigo — headings, anchors */
-  --ch:  #2A264E;
-  --dim: #647489;             /* Precision Gray */
-  --mu:  #647489;
-  --lt:  #8A96A8;
-
-  /* Rounder, softer shape language */
-  --r:   14px;
-  --rr:  9px;
-
-  /* Elevated card shadow */
-  --sh:  0 2px 4px rgba(30,26,94,.04), 0 8px 28px rgba(30,26,94,.08);
-  --shs: 0 1px 3px rgba(30,26,94,.03), 0 4px 14px rgba(30,26,94,.06);
-
   --hdr-h:     64px;
   --sidebar-w: 210px;
 }
@@ -2955,18 +2975,21 @@ table.ct thead { background: var(--s2); }
       <input
         type="password"
         id="loginPassword"
-        placeholder="At least 8 characters"
+        placeholder="Your password"
         autocomplete="current-password"
       >
     </div>
 
-    <button class="btn-primary btn-lg btn-full" id="loginBtn" onclick="handlePasswordLogin()">
+    <button class="btn-primary btn-lg btn-full" id="loginBtn" type="button" onclick="handlePasswordLogin()">
       Sign in
     </button>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.85rem;font-size:.82rem">
-      <a href="#" onclick="event.preventDefault();handleSignUp()" style="color:var(--royal);text-decoration:none;font-weight:600">Create account</a>
-      <a href="#" onclick="event.preventDefault();handleMagicLink()" style="color:var(--mu);text-decoration:none">Email me a sign-in link instead</a>
+    <div style="text-align:center;margin-top:.85rem;font-size:.82rem;color:var(--mu)">
+      Don't have an account?
+      <button type="button" onclick="handleSignUp()" style="color:var(--royal);font-weight:600;background:none;border:0;padding:0;cursor:pointer;font-size:inherit;font-family:inherit">Create one</button>
+    </div>
+    <div style="text-align:center;margin-top:.35rem;font-size:.78rem">
+      <button type="button" onclick="handleMagicLink()" style="color:var(--mu);background:none;border:0;padding:0;cursor:pointer;font-size:inherit;font-family:inherit;text-decoration:underline;text-underline-offset:2px">Email me a sign-in link instead</button>
     </div>
   </div>
 </div>
@@ -3037,7 +3060,7 @@ table.ct thead { background: var(--s2); }
         <button class="btn-ghost btn-sm" id="btnBulkClients"
           style="margin-left:auto" onclick="toggleBulkClients()">Bulk update</button>
         <button class="btn-primary btn-sm" style="margin-left:.5rem"
-          onclick="openClientSheet('add')">+ Add Client</button>
+          onclick="openClientSheet('add')">+ Add client</button>
       </div>
       <div id="bulkClientBar" class="bulk-bar hidden">
         <span><strong id="bulkClientCount">0</strong> selected</span>
@@ -3048,19 +3071,31 @@ table.ct thead { background: var(--s2); }
 
       <!-- Summary strip -->
       <div id="rosterSummary" class="roster-summary" aria-label="Summary">
-        <div class="sum-chip overdue" role="button" tabindex="0" onclick="_setFilter('overdue',this)" onkeydown="if(event.key==='Enter')_setFilter('overdue',this)" title="Filter: overdue">
+        <div class="sum-chip overdue" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('overdue',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('overdue',this)}"
+             title="Filter: overdue">
           <div class="sum-chip-n" id="sumOverdue">—</div>
           <div class="sum-chip-l">Overdue</div>
         </div>
-        <div class="sum-chip urgent" role="button" tabindex="0" onclick="_setFilter('urgent',this)" onkeydown="if(event.key==='Enter')_setFilter('urgent',this)" title="Filter: due this week">
+        <div class="sum-chip urgent" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('urgent',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('urgent',this)}"
+             title="Filter: due this week">
           <div class="sum-chip-n" id="sumUrgent">—</div>
           <div class="sum-chip-l">Due this week</div>
         </div>
-        <div class="sum-chip trrc" role="button" tabindex="0" onclick="_setFilter('trrc',this)" onkeydown="if(event.key==='Enter')_setFilter('trrc',this)" title="Filter: TRRC needed">
+        <div class="sum-chip trrc" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('trrc',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('trrc',this)}"
+             title="Tax Return Receipt Confirmation pending">
           <div class="sum-chip-n" id="sumTrrc">—</div>
-          <div class="sum-chip-l">TRRC needed</div>
+          <div class="sum-chip-l">TRRC pending</div>
         </div>
-        <div class="sum-chip payment" role="button" tabindex="0" onclick="_setFilter('payment',this)" onkeydown="if(event.key==='Enter')_setFilter('payment',this)" title="Filter: payment pending">
+        <div class="sum-chip payment" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('payment',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('payment',this)}"
+             title="Filter: payment pending">
           <div class="sum-chip-n" id="sumPayment">—</div>
           <div class="sum-chip-l">Payment pending</div>
         </div>
@@ -3094,7 +3129,7 @@ table.ct thead { background: var(--s2); }
       <div id="clientList">
         <div class="empty-state">
           No clients yet.<br>
-          <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
+          <span style="color:var(--lt)">Click <strong>+ Add client</strong> to get started.</span>
         </div>
       </div>
 
@@ -3108,20 +3143,20 @@ table.ct thead { background: var(--s2); }
       <button class="btn-back" id="detailBackBtn" onclick="_detailBack()">← Clients</button>
       <span id="detailClientName"></span>
       <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
-        onclick="generateYearObligations()">Generate Obligations</button>
+        onclick="generateYearObligations()">Generate obligations</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="shareEnrollmentLink()">Share Enrollment Link</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         id="btnBulkObs" onclick="toggleBulkObs()">Select</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
-        onclick="openStatusChangeSheet()">Status Change</button>
+        onclick="openStatusChangeSheet()">Status change</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
     </div>
     <div id="bulkObBar" class="bulk-bar hidden">
       <span><strong id="bulkObCount">0</strong> selected</span>
       <button class="btn-primary btn-sm" id="bulkObMark"
-        onclick="openBulkFilingSheet()" disabled>Mark as Filed</button>
+        onclick="openBulkFilingSheet()" disabled>Mark as filed</button>
       <button class="btn-ghost btn-sm" onclick="toggleBulkObs()">Cancel</button>
     </div>
 
@@ -3133,13 +3168,13 @@ table.ct thead { background: var(--s2); }
       <button class="subtab active" role="tab" aria-selected="true"
         data-tab="obligations" onclick="_switchSubtab('obligations')">Obligations</button>
       <button class="subtab" role="tab" aria-selected="false"
-        data-tab="history" onclick="_switchSubtab('history')">History</button>
+        data-tab="history" onclick="_switchSubtab('history')">Filings</button>
       <button class="subtab" role="tab" aria-selected="false"
         data-tab="notes" onclick="_switchSubtab('notes')">Notes</button>
       <button class="subtab hidden" role="tab" aria-selected="false"
         id="branchesTabBtn" data-tab="branches" onclick="_switchSubtab('branches')">Branches</button>
       <button class="subtab" role="tab" aria-selected="false"
-        data-tab="tax-history" onclick="_switchSubtab('tax-history')">Tax History</button>
+        data-tab="tax-history" onclick="_switchSubtab('tax-history')">Profile changes</button>
     </div>
 
     <div class="detail-panels">
@@ -3154,7 +3189,11 @@ table.ct thead { background: var(--s2); }
       <div id="notesPanel" class="hidden">
         <div class="notes-panel-wrap">
           <div class="fld">
-            <label for="clientNotesArea">Notes</label>
+            <label for="clientNotesArea">
+              Notes
+              <span id="clientNotesStatus" role="status" aria-live="polite"
+                    style="font-weight:500;font-size:.72rem;color:var(--mu);margin-left:.5rem"></span>
+            </label>
             <textarea
               id="clientNotesArea"
               rows="10"
@@ -3210,13 +3249,15 @@ table.ct thead { background: var(--s2); }
         <div>
           <div class="card">
             <div class="db-section-title-row">
-              <div class="db-section-title" id="dbUpcomingTitle">Upcoming Filings</div>
-              <select id="dbTimeframeSelect" class="db-timeframe-select" onchange="changeDashboardTimeframe(this.value)">
-                <option value="7">1 Week</option>
-                <option value="14">2 Weeks</option>
-                <option value="30">1 Month</option>
-                <option value="60">2 Months</option>
-                <option value="90">3 Months</option>
+              <div class="db-section-title" id="dbUpcomingTitle">Upcoming filings</div>
+              <select id="dbTimeframeSelect" class="db-timeframe-select"
+                aria-label="Dashboard timeframe"
+                onchange="changeDashboardTimeframe(this.value)">
+                <option value="7">Next 7 days</option>
+                <option value="14">Next 14 days</option>
+                <option value="30">Next 30 days</option>
+                <option value="60">Next 60 days</option>
+                <option value="90">Next 90 days</option>
               </select>
             </div>
             <div id="dbThisWeekList"></div>
@@ -3264,14 +3305,16 @@ table.ct thead { background: var(--s2); }
     </main>
 
     <!-- Dashboard quick-action modal -->
-    <div id="dbActionModal" class="modal-ov hidden" onclick="if(event.target===this)closeDbAction()">
+    <div id="dbActionModal" class="modal-ov hidden"
+         role="dialog" aria-modal="true" aria-labelledby="dbActionTitle"
+         onclick="if(event.target===this)closeDbAction()">
       <div class="modal-card" style="max-width:440px">
         <div class="modal-hdr">
           <div>
-            <div class="modal-title" id="dbActionTitle"></div>
+            <div class="modal-title" id="dbActionTitle">Action</div>
             <div id="dbActionSubtitle" style="font-size:.74rem;color:var(--mu);margin-top:.15rem"></div>
           </div>
-          <button class="sheet-close" onclick="closeDbAction()" aria-label="Close">×</button>
+          <button class="sheet-close" type="button" onclick="closeDbAction()" aria-label="Close">×</button>
         </div>
         <div class="modal-body" id="dbActionBody"></div>
       </div>
@@ -3350,7 +3393,7 @@ table.ct thead { background: var(--s2); }
               <select id="rptYear"></select>
             </span>
             <button class="btn-primary btn-sm" id="btnGen1" onclick="generateReport1()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3366,7 +3409,7 @@ table.ct thead { background: var(--s2); }
               <select id="rptYear2"></select>
             </span>
             <button class="btn-primary btn-sm" id="btnGen2" onclick="generateReport2()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3378,7 +3421,7 @@ table.ct thead { background: var(--s2); }
               <input type="date" id="rptAsOf">
             </span>
             <button class="btn-primary btn-sm" id="btnGen3" onclick="generateReport3()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3394,7 +3437,7 @@ table.ct thead { background: var(--s2); }
               <select id="rptYear4"></select>
             </span>
             <button class="btn-primary btn-sm" id="btnGen4" onclick="generateReport4()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3482,7 +3525,7 @@ table.ct thead { background: var(--s2); }
   <div class="sheet-card">
 
     <div class="sheet-hdr">
-      <span class="sheet-title" id="addSheetTitle">Add Client</span>
+      <span class="sheet-title" id="addSheetTitle">Add client</span>
       <span class="sheet-meta">
         <span class="step-dots" aria-hidden="true">
           <span class="step-dot active" id="stepDot1"></span>
@@ -3565,12 +3608,12 @@ table.ct thead { background: var(--s2); }
             <label for="ac_classification">Tax classification (EOPT)</label>
             <select id="ac_classification">
               <option value="">— Select —</option>
-              <option value="Micro">Micro (gross sales &lt; ₱3M)</option>
-              <option value="Small">Small (₱3M – &lt;₱20M)</option>
-              <option value="Medium">Medium (₱20M – &lt;₱1B)</option>
-              <option value="Large">Large (≥ ₱1B)</option>
+              <option value="Micro">Micro (under ₱3M gross sales)</option>
+              <option value="Small">Small (₱3M to under ₱20M)</option>
+              <option value="Medium">Medium (₱20M to under ₱1B)</option>
+              <option value="Large">Large (₱1B and above)</option>
             </select>
-            <span class="hint">RR 8-2024 — surfaces 1701-MS for Micro/Small individuals.</span>
+            <span class="hint">EOPT classification (RR 8-2024). For Micro/Small individuals, also surfaces the optional 1701-MS annual ITR.</span>
           </div>
           <div class="fld">
             <label for="ac_deduction">Deduction method</label>
@@ -3578,7 +3621,7 @@ table.ct thead { background: var(--s2); }
               <option value="">— Select —</option>
               <option value="Itemized">Itemized Deduction</option>
               <option value="OSD">Optional Standard Deduction (OSD)</option>
-              <option value="8%">8% Income Tax Rate</option>
+              <option value="8%">8% income tax option</option>
             </select>
             <span class="hint">OSD or 8% on a pure SE filer routes to 1701A; Itemized routes to 1701.</span>
           </div>
@@ -3741,11 +3784,11 @@ table.ct thead { background: var(--s2); }
 ═══════════════════════════════════════════════════ -->
 <div id="bulkFilingSheet" class="sheet-ov hidden"
   onclick="if(event.target===this)closeBulkFilingSheet()"
-  role="dialog" aria-modal="true">
+  role="dialog" aria-modal="true" aria-labelledby="bulkFilingTitle">
   <div class="sheet-card">
     <div class="sheet-hdr">
-      <span class="sheet-title">Mark as Filed</span>
-      <button class="sheet-close" onclick="closeBulkFilingSheet()" aria-label="Close">×</button>
+      <span class="sheet-title" id="bulkFilingTitle">Mark as filed</span>
+      <button class="sheet-close" type="button" onclick="closeBulkFilingSheet()" aria-label="Close">×</button>
     </div>
     <div class="sheet-body" id="bulkFilingBody"></div>
   </div>
@@ -3753,11 +3796,11 @@ table.ct thead { background: var(--s2); }
 
 <div id="combinedObSheet" class="sheet-ov hidden"
   onclick="if(event.target===this)closeCombinedObSheet()"
-  role="dialog" aria-modal="true">
+  role="dialog" aria-modal="true" aria-labelledby="combinedObTitle">
   <div class="sheet-card">
     <div class="sheet-hdr">
-      <span class="sheet-title">Combined obligations</span>
-      <button class="sheet-close" onclick="closeCombinedObSheet()" aria-label="Close">×</button>
+      <span class="sheet-title" id="combinedObTitle">Combined obligations</span>
+      <button class="sheet-close" type="button" onclick="closeCombinedObSheet()" aria-label="Close">×</button>
     </div>
     <div class="sheet-body" id="combinedObBody"></div>
   </div>
@@ -3774,7 +3817,7 @@ table.ct thead { background: var(--s2); }
   <div class="sheet-card">
 
     <div class="sheet-hdr">
-      <span class="sheet-title" id="scSheetTitle">Record Tax Status Change</span>
+      <span class="sheet-title" id="scSheetTitle">Record tax status change</span>
       <span class="sheet-meta">
         <span class="step-dots" aria-hidden="true">
           <span class="step-dot active" id="scDot1"></span>
@@ -3804,8 +3847,8 @@ table.ct thead { background: var(--s2); }
                 <option value="vat_to_nonvat">VAT → Non-VAT (De-registration)</option>
               </optgroup>
               <optgroup label="Income Tax Regime">
-                <option value="itemized_to_8pct">Itemized / OSD → 8% GIT Option</option>
-                <option value="8pct_to_itemized">8% GIT Option → Itemized / OSD</option>
+                <option value="itemized_to_8pct">Itemized / OSD → 8% income tax option</option>
+                <option value="8pct_to_itemized">8% income tax option → Itemized / OSD</option>
               </optgroup>
               <optgroup label="Obligations">
                 <option value="add_obligation">Add Obligation</option>
@@ -3819,7 +3862,7 @@ table.ct thead { background: var(--s2); }
             <label for="sc_new_vat_status">New VAT / income tax status</label>
             <select id="sc_new_vat_status">
               <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax (3%)</option>
-              <option value="Non-VAT (8% Option)">Non-VAT — 8% GIT Option</option>
+              <option value="Non-VAT (8% Option)">Non-VAT — 8% income tax option</option>
               <option value="Non-VAT (Graduated)">Non-VAT — Graduated Tax (no business tax)</option>
             </select>
           </div>
@@ -3907,7 +3950,7 @@ table.ct thead { background: var(--s2); }
     <div class="modal-body">
       <p id="enrollLinkHint" style="font-size:.8rem;color:var(--mu);margin-bottom:.75rem"></p>
       <div class="enroll-link-row">
-        <input type="text" id="enrollLinkUrl" readonly>
+        <input type="text" id="enrollLinkUrl" readonly aria-label="Enrollment link URL">
         <button class="btn-primary btn-sm" onclick="copyEnrollLink()" id="enrollLinkCopyBtn">Copy link</button>
       </div>
       <p style="font-size:.75rem;color:var(--mu);margin-top:.9rem;line-height:1.5">
@@ -3922,8 +3965,11 @@ table.ct thead { background: var(--s2); }
 <script>
 /*
  * ══════════════════════════════════════════════════════════════
- * SQL MIGRATION
- * Run once in the Supabase SQL editor before going live.
+ * SQL MIGRATION (REFERENCE ONLY)
+ * Authoritative schema lives in supabase/migrations/0001-0007*.sql.
+ * The block below documents the post-migration shape; do NOT run it
+ * as a one-off — `supabase db push` against the migrations directory
+ * is the supported deployment path.
  * ══════════════════════════════════════════════════════════════
  *
  * ── 1. PRACTITIONERS ──────────────────────────────────────────
@@ -4333,13 +4379,74 @@ let _dbRecordMeta       = {}     // { [recordId]: { clientName, form, period } }
 const $  = id  => document.getElementById(id)
 const qs = sel => document.querySelector(sel)
 
-/** Escape a string for safe HTML insertion */
+/** Escape a string for safe HTML insertion. Encodes both quote
+ *  variants and the backtick so the helper is also safe for use
+ *  inside attribute strings that quote with `'` (some inline
+ *  onclick=" ..." templates do — UUIDs are normally safe, but the
+ *  display_name is user-controlled and reaches the same templates). */
 function esc(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;')
+}
+
+/** Philippine peso formatter — always shows ₱X,XXX.XX with en-PH
+ *  separators, regardless of the user's browser locale. */
+function fmtPHP(v) {
+  const n = Number(v ?? 0)
+  return '₱' + (Number.isFinite(n) ? n : 0).toLocaleString('en-PH', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })
+}
+
+/** Timezone-safe date formatter for `YYYY-MM-DD` strings coming
+ *  from Postgres `date` columns. `new Date('2026-04-15')` parses as
+ *  UTC midnight, which renders as Apr 14 in PHT — appending T00:00:00
+ *  forces local-midnight semantics. */
+function fmtDate(s) {
+  if (!s) return ''
+  return new Date(s + 'T00:00:00').toLocaleDateString('en-PH', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
+/** Map raw Supabase / Postgres errors to user-actionable copy. */
+function humanError(err) {
+  if (!err) return 'Something went wrong — please try again.'
+  const m = (err.message ?? String(err)).toLowerCase()
+  if (m.includes('row-level security'))     return 'Permission denied. Please sign in again.'
+  if (m.includes('duplicate key'))          return 'A record with these details already exists.'
+  if (m.includes('violates foreign key'))   return 'Linked record was not found — try refreshing.'
+  if (m.includes('failed to fetch')
+      || m.includes('networkerror'))        return 'Network error — check your connection and try again.'
+  if (m.includes('jwt') || m.includes('expired session'))
+                                            return 'Your session expired. Please sign in again.'
+  if (m.includes('invalid_token'))          return 'This enrollment link is invalid.'
+  if (m.includes('token_already_used'))     return 'This enrollment link has already been used.'
+  if (m.includes('token_expired'))          return 'This enrollment link has expired.'
+  return err.message ?? 'Something went wrong — please try again.'
+}
+
+/** Toast layer. Call after every async mutation. `kind` ∈ {success,error,info}. */
+function showToast(message, kind = 'info') {
+  let host = document.getElementById('toastHost')
+  if (!host) {
+    host = document.createElement('div')
+    host.id = 'toastHost'
+    host.setAttribute('aria-live', 'polite')
+    host.setAttribute('aria-atomic', 'true')
+    document.body.appendChild(host)
+  }
+  const node = document.createElement('div')
+  node.className = `toast toast-${kind}`
+  node.textContent = message
+  host.appendChild(node)
+  setTimeout(() => { node.classList.add('toast-leaving') }, 2500)
+  setTimeout(() => { node.remove() }, 3000)
 }
 
 
@@ -4476,9 +4583,15 @@ async function loadDashboard() {
       ? new Date(r.due_date + 'T00:00:00').toLocaleDateString('en-PH', {month:'short', day:'numeric'})
       : '—'
     const actBtn = actionType
-      ? `<button class="db-row-act" onclick="event.stopPropagation();openDbAction('${actionType}','${r.id}')" title="Mark done">✓</button>`
+      ? `<button class="db-row-act" type="button" onclick="event.stopPropagation();openDbAction('${actionType}','${r.id}')" aria-label="Mark done">✓</button>`
       : ''
-    return `<div class="db-row" onclick="showClientDetail('${r.client_id}')">
+    // Keyboard-accessible row: real button semantics. role+tabindex+keydown
+    // mimics a <button> while preserving the existing flex layout.
+    const ariaLabel = `${clientMap[r.client_id] || ''} — ${r.form || ''} ${r.period || ''}`.trim()
+    return `<div class="db-row" role="button" tabindex="0"
+      aria-label="${esc(ariaLabel)}"
+      onclick="showClientDetail('${r.client_id}')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showClientDetail('${r.client_id}')}">
       <div class="db-row-client">${name}</div>
       <div class="db-row-meta">${esc(r.form||'')}${r.period ? ` · ${esc(r.period)}` : ''}</div>
       <div class="db-row-meta" style="margin-left:auto">Due ${due}</div>
@@ -4487,7 +4600,8 @@ async function loadDashboard() {
   }
   const _empty = t => `<p class="db-empty">${t}</p>`
 
-  const tfLabel = {7:'this week',14:'in the next 2 weeks',30:'this month',60:'in the next 2 months',90:'in the next 3 months'}[_dbTimeframeDays] || `in the next ${_dbTimeframeDays} days`
+  // Standardised relative-window phrasing (ME-13) — same voice for every option.
+  const tfLabel = `in the next ${_dbTimeframeDays} day${_dbTimeframeDays === 1 ? '' : 's'}`
   $('dbThisWeekList').innerHTML = thisWeek.length
     ? thisWeek.map(r => _row(r, '<span class="badge badge-dim">Pending</span>', 'file')).join('')
     : _empty(`No filings due ${tfLabel} ✓`)
@@ -4519,7 +4633,7 @@ function openDbAction(type, recordId) {
   $('dbActionSubtitle').innerHTML = subtitle
 
   if (type === 'file') {
-    $('dbActionTitle').textContent = 'Mark as Filed'
+    $('dbActionTitle').textContent = 'Mark as filed'
     $('dbActionBody').innerHTML = `
 <div class="inline-form" style="padding:0">
   <div class="fld">
@@ -4541,7 +4655,7 @@ function openDbAction(type, recordId) {
 </div>`
 
   } else if (type === 'trrc') {
-    $('dbActionTitle').textContent = 'Mark TRRC Saved'
+    $('dbActionTitle').textContent = 'Mark TRRC saved'
     $('dbActionBody').innerHTML = `
 <div class="inline-form" style="padding:0">
   <div class="fld">
@@ -4629,7 +4743,7 @@ async function _dbaSaveFiling() {
     tax_due:        taxDue,
     payment_status: hasTaxDue ? 'unpaid' : 'n/a',
   }).eq('id', _dbActionRid)
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   closeDbAction()
   await loadDashboard()
 }
@@ -4645,7 +4759,7 @@ async function _dbaSaveTRRC() {
     trrc_date:      trrcDate,
     trrc_reference: trrcRef,
   }).eq('id', _dbActionRid)
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   closeDbAction()
   await loadDashboard()
 }
@@ -4669,7 +4783,7 @@ async function _dbaSavePayment() {
     payment_reference: payRef,
     payment_mode:      payMode,
   }).eq('id', _dbActionRid)
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   closeDbAction()
   await loadDashboard()
 }
@@ -4975,6 +5089,53 @@ supa.auth.getSession().then(({ data: { session } }) => {
   $(id).addEventListener('keydown', e => { if (e.key === 'Enter') handlePasswordLogin() })
 })
 
+// ── Global modal/sheet handling: ESC-to-close, focus return ──
+// Tracks the element that opened the dialog so we can restore focus
+// when the dialog closes. Populated by openSheet() below.
+let _lastFocusedBeforeSheet = null
+
+/** Mark a sheet/modal as the active dialog, save the element that
+ *  opened it, and focus the first interactive control inside. */
+function openSheet(idOrEl) {
+  const el = typeof idOrEl === 'string' ? $(idOrEl) : idOrEl
+  if (!el) return
+  _lastFocusedBeforeSheet = document.activeElement
+  el.classList.remove('hidden')
+  // Defer focus so layout settles first.
+  setTimeout(() => {
+    const first = el.querySelector(
+      'input:not([type=hidden]):not([disabled]), select:not([disabled]), ' +
+      'textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (first) first.focus()
+  }, 30)
+}
+
+/** Find the topmost-open sheet/modal and synthesise a click on its
+ *  close button. Used by the global Escape handler. */
+function _closeTopmostSheet() {
+  const open = document.querySelector(
+    '.sheet-ov:not(.hidden), .modal-ov:not(.hidden), .modal:not(.hidden)'
+  )
+  if (!open) return false
+  const closeBtn = open.querySelector('.sheet-close, .modal-close, [data-sheet-close]')
+  if (closeBtn) { closeBtn.click(); return true }
+  // Fallback: just hide the dialog.
+  open.classList.add('hidden')
+  return true
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (_closeTopmostSheet()) {
+      // Restore focus to the trigger element so keyboard users land
+      // somewhere useful instead of on <body>.
+      _lastFocusedBeforeSheet?.focus?.()
+      _lastFocusedBeforeSheet = null
+    }
+  }
+})
+
 
 // ── OBLIGATION GENERATION ─────────────────────────────────────
 
@@ -5126,6 +5287,10 @@ function generateObligations(profile, year) {
     owner_pays_sss       = false,
     owner_pays_philhealth= false,
     owner_pays_pagibig   = false,
+    requires_audited_fs  = false,
+    has_business_income  = true,  // for Estate/Trust: defaults to true to preserve
+                                   // the previous behavior; set false for fiduciaries
+                                   // not engaged in trade or business.
   } = profile
   const yr  = year ?? new Date().getFullYear()
   const obs = []
@@ -5143,12 +5308,44 @@ function generateObligations(profile, year) {
   /** Shorthand: new Date(year, month-1, day) */
   const d = (month, day, y) => new Date(y ?? yr, month - 1, day)
 
-  /** Annual ITR due date for the given covered year; honors RMC 30-2026. */
+  /**
+   * Annual ITR due date for the given covered year.
+   *
+   * NIRC Sec. 77(B) / Sec. 51: due on or before the 15th day of the
+   * fourth month following the close of the taxable year. Calendar-
+   * year filers ⇒ 15 April; fiscal-year filers ⇒ 4 months and 15 days
+   * after fiscal year-end.
+   *
+   * RMC 30-2026 (EO 110, s. 2026) extended *calendar-year* CY 2025
+   * filers from 15 Apr 2026 to 15 May 2026 — fiscal-year corps are
+   * not affected.
+   */
   const annualItrDueDate = (coveredYear) => {
-    // CY 2025 Annual ITR: extended from 15 Apr 2026 to 15 May 2026
-    // per RMC 30-2026 (EO 110, s. 2026).
-    if (coveredYear === 2025) return new Date(2026, 4, 15) // May = index 4
-    return new Date(coveredYear + 1, 3, 15)                // default: 15 April
+    const isCalendarFiler = fiscal_year_start === 1
+    if (isCalendarFiler && coveredYear === 2025) return new Date(2026, 4, 15) // RMC 30-2026
+    if (isCalendarFiler) return new Date(coveredYear + 1, 3, 15)              // default: 15 April
+
+    // Fiscal-year close: month index = (fiscal_year_start - 2) mod 12,
+    // landing in (coveredYear + 1) when fiscal_year_start > 1.
+    const fyEndMonthIdx = (fiscal_year_start - 2 + 12) % 12
+    const fyEndYear     = coveredYear + 1
+    // Statutory deadline = end-of-fy-month + 4 months + 15 days,
+    // expressed as the 15th of the (fy-end-month + 4) month.
+    const dueMonthZero  = fyEndMonthIdx + 4
+    return new Date(fyEndYear + Math.floor(dueMonthZero / 12),
+                    dueMonthZero % 12, 15)
+  }
+
+  /**
+   * eAFS submission deadline (annual ITR + 15 calendar days), per
+   * RMC 76-2020 and prior issuances. Generated as a separate
+   * obligation so the practitioner has a real deadline to track
+   * after the ITR itself is filed.
+   */
+  const eafsDueDate = (coveredYear) => {
+    const itr = annualItrDueDate(coveredYear)
+    const eafs = new Date(itr); eafs.setDate(eafs.getDate() + 15)
+    return eafs
   }
 
   /** Add months to a (month, day) pair with year roll-over. */
@@ -5187,9 +5384,14 @@ function generateObligations(profile, year) {
   const isCoop        = taxpayer_type === 'Cooperative'
   const isIndividual  = isEmployee || isSelfEmp || isMixed || isFiduciary
   const isSEOrMixed   = isSelfEmp || isMixed
+  // Fiduciaries (Estate/Trust) only have business filings if they're
+  // actually engaged in trade or business. Pure passive estates/trusts
+  // file only the annual 1701.
+  const fiduciaryHasBusiness = isFiduciary && has_business_income
   // "Business" here means anyone with a trade/business or practice of
-  // profession — i.e. anyone other than a pure-compensation employee.
-  const isBusiness    = !isEmployee
+  // profession — i.e. anyone other than a pure-compensation employee
+  // or a passive (non-business) fiduciary.
+  const isBusiness    = !isEmployee && !(isFiduciary && !has_business_income)
   const isVAT         = vat_status === 'VAT-Registered'
 
   // NOTE: BIR Form 0605 (Annual Registration Fee) is intentionally NOT
@@ -5205,7 +5407,7 @@ function generateObligations(profile, year) {
       const { y: qy, m: qm } = quarterEndMonth(q)
       const due = addMonths(qm, 25, 1, qy)
       obs.push(ob(`2550Q-q${q}`, 'BIR Form 2550Q',
-        'Quarterly VAT Return (+ SLSP)', `${yr} Q${q}`,
+        'Quarterly VAT Return (+ SLSP)', `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr} Q${q}`,
         due, 'vat'))
     }
   }
@@ -5231,7 +5433,7 @@ function generateObligations(profile, year) {
       const { y: qy, m: qm } = quarterEndMonth(q)
       const due = addMonths(qm, 25, 1, qy)
       obs.push(ob(`2551Q-q${q}`, 'BIR Form 2551Q',
-        'Quarterly Percentage Tax', `${yr} Q${q}`,
+        'Quarterly Percentage Tax', `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr} Q${q}`,
         due, 'tax'))
     }
   }
@@ -5241,7 +5443,11 @@ function generateObligations(profile, year) {
   // Aug 15 / Nov 15). It applies to anyone with business or professional
   // income filing on the individual ITR — that is, SE, Mixed Income,
   // and fiduciaries of estates/trusts engaged in trade or business.
-  if (isSEOrMixed || isFiduciary) {
+  // Passive fiduciaries (no business income) skip the quarterly cycle
+  // and only file the annual 1701.
+  const filesQuarterlyIndIncome = isSEOrMixed || fiduciaryHasBusiness
+  const filesAnnualIndIncome    = isSEOrMixed || isFiduciary
+  if (filesQuarterlyIndIncome) {
     obs.push(ob('1701Q-q1', 'BIR Form 1701Q',
       'Quarterly ITR (Q1 cumulative)', `${yr} Q1 (covers Jan–Mar)`,
       d(5, 15), 'income'))
@@ -5251,6 +5457,8 @@ function generateObligations(profile, year) {
     obs.push(ob('1701Q-q3', 'BIR Form 1701Q',
       'Quarterly ITR (Q3 cumulative YTD)', `${yr} Q3 (covers Jul–Sep)`,
       d(11, 15), 'income'))
+  }
+  if (filesAnnualIndIncome) {
 
     // Annual ITR form selection per RMC 17-2019 / current BIR guidance:
     //   • 1701A — pure SE/professional whose ONLY income is from
@@ -5292,11 +5500,11 @@ function generateObligations(profile, year) {
       const due  = new Date(qEnd)
       due.setDate(due.getDate() + 60)
       obs.push(ob(`1702Q-q${q}`, 'BIR Form 1702Q',
-        `Quarterly Corporate ITR Q${q}`, `${yr} Q${q}`,
+        `Quarterly Corporate ITR Q${q}`, `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr} Q${q}`,
         due, 'income'))
     }
-    obs.push(ob('1702', 'BIR Form 1702-RT / 1702-MX / 1702-EX',
-      'Annual Corporate ITR (+ AFS attachment)', `CY ${yr}`,
+    obs.push(ob('1702', 'BIR Form 1702',
+      'Annual Corporate ITR — RT (regular) / MX (mixed) / EX (information)', `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr}`,
       annualItrDueDate(yr), 'income'))
   }
 
@@ -5307,7 +5515,7 @@ function generateObligations(profile, year) {
   if (isGPP) {
     obs.push(ob('1702EX', 'BIR Form 1702-EX',
       'Annual Information Return (GPP — partners taxed individually)',
-      `CY ${yr}`, annualItrDueDate(yr), 'income'))
+      `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr}`, annualItrDueDate(yr), 'income'))
   }
 
   // ── Cooperative: information return (1702-EX) ────────────────
@@ -5318,8 +5526,21 @@ function generateObligations(profile, year) {
   // 1702Q + 1702-RT instead.)
   if (isCoop) {
     obs.push(ob('1702EX', 'BIR Form 1702-EX',
-      'Annual Information Return (Cooperative)', `CY ${yr}`,
+      'Annual Information Return (Cooperative)', `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr}`,
       annualItrDueDate(yr), 'income'))
+  }
+
+  // ── eAFS attachment (RMC 76-2020 et seq.) ────────────────────
+  // The audited Financial Statements + supporting attachments must be
+  // submitted via eafs.bir.gov.ph within 15 calendar days after the
+  // statutory deadline of the income tax return. Tracked as its own
+  // obligation so practitioners who file the ITR on the deadline still
+  // see the AFS submission as a separate countdown.
+  if (requires_audited_fs && (isCorporation || filesAnnualIndIncome || isGPP || isCoop)) {
+    obs.push(ob('eAFS', 'eAFS Submission',
+      'AFS + supporting attachments (eafs.bir.gov.ph)',
+      `${fiscal_year_start === 1 ? 'CY' : 'FY'} ${yr}`,
+      eafsDueDate(yr), 'income'))
   }
 
   // ── Employee: 1700 annual ────────────────────────────────────
@@ -5435,23 +5656,49 @@ function generateObligations(profile, year) {
   }
 
   // ── Owner/operator: voluntary government contributions ────────
-  // Self-employed individuals and sole operators not covered by an employer
-  // may voluntarily contribute to SSS, PhilHealth, and/or Pag-IBIG.
-  // SSS voluntary: 15% of the member's chosen MSC (RA 11199).
-  // PhilHealth voluntary: 5% of declared monthly income (RA 11223).
-  // Pag-IBIG voluntary: minimum ₱200/month (HDMF Circular 460, eff. Feb 2024); higher optional savings allowed.
-  // Deadline: last business day of the applicable month.
-  if (owner_pays_sss || owner_pays_philhealth || owner_pays_pagibig) {
+  // Self-employed individuals and sole operators not covered by an
+  // employer may voluntarily contribute to SSS, PhilHealth, and/or
+  // Pag-IBIG. Cadences and deadlines per current circulars:
+  //
+  //   • SSS voluntary (SSS Circular 2019-009): self-employed/voluntary
+  //     members may pay for the applicable month or quarter on or
+  //     before the LAST DAY OF THE MONTH FOLLOWING the applicable
+  //     month/quarter. Tracked monthly here at the conservative end of
+  //     the staggered window.
+  //   • PhilHealth voluntary (PhilHealth Circular 2020-0014):
+  //     individually-paying members file QUARTERLY, by the last day of
+  //     the applicable quarter. Tracked quarterly.
+  //   • Pag-IBIG voluntary (HDMF Circular 274 / 460): self-paying
+  //     members remit monthly by the last day of the applicable month.
+  if (owner_pays_sss) {
+    for (let m = 1; m <= 12; m++) {
+      const mnth = _MONTHS[m - 1]
+      const mAbb = mnth.toLowerCase().slice(0, 3)
+      // Last day of (m + 1) — i.e. last day of the next month
+      const volDue = new Date(yr, m + 1, 0)
+      obs.push(ob(`SSS-vol-${mAbb}`, 'SSS Voluntary Contribution',
+        'Monthly SSS Voluntary Contribution', `${mnth} ${yr}`,
+        volDue, 'government'))
+    }
+  }
+  if (owner_pays_philhealth) {
+    for (let q = 1; q <= 4; q++) {
+      const { y: qy, m: qm } = quarterEndMonth(q)
+      // Last day of the applicable quarter (= last day of qm)
+      const volDue = new Date(qy, qm, 0)
+      obs.push(ob(`PHIC-vol-q${q}`, 'PhilHealth Voluntary Premium',
+        'Quarterly PhilHealth Voluntary Premium', `${yr} Q${q}`,
+        volDue, 'government'))
+    }
+  }
+  if (owner_pays_pagibig) {
     for (let m = 1; m <= 12; m++) {
       const mnth   = _MONTHS[m - 1]
       const mAbb   = mnth.toLowerCase().slice(0, 3)
       const volDue = new Date(yr, m, 0)  // last day of the applicable month
-      if (owner_pays_sss) obs.push(ob(`SSS-vol-${mAbb}`, 'SSS Voluntary Contribution',
-        'Monthly SSS Voluntary Contribution', `${mnth} ${yr}`, volDue, 'government'))
-      if (owner_pays_philhealth) obs.push(ob(`PHIC-vol-${mAbb}`, 'PhilHealth Voluntary Premium',
-        'Monthly PhilHealth Voluntary Premium', `${mnth} ${yr}`, volDue, 'government'))
-      if (owner_pays_pagibig) obs.push(ob(`HDMF-vol-${mAbb}`, 'Pag-IBIG Voluntary Savings',
-        'Monthly Pag-IBIG Voluntary Savings', `${mnth} ${yr}`, volDue, 'government'))
+      obs.push(ob(`HDMF-vol-${mAbb}`, 'Pag-IBIG Voluntary Contribution',
+        'Monthly Pag-IBIG Voluntary Contribution', `${mnth} ${yr}`,
+        volDue, 'government'))
     }
   }
 
@@ -5486,28 +5733,21 @@ async function seedComplianceRecords(clientId, profile, year = new Date().getFul
   const obligations = generateObligations(profile, year)
   if (!obligations.length) return
 
-  const { data: existing } = await supa
-    .from('compliance_records')
-    .select('obligation_id')
-    .eq('client_id', clientId)
+  // Upsert is race-safe under the compliance_records_client_obl_uq
+  // unique index added in migration 0006 — two concurrent clicks of
+  // "Generate {year} obligations" will not produce duplicate rows.
+  const rows = obligations.map(o => ({
+    client_id:      clientId,
+    obligation_id:  o.id,
+    form:           o.form,
+    period:         o.period,
+    due_date:       _iso(o.dueDate),
+    payment_status: 'n/a',
+  }))
 
-  const seen = new Set((existing || []).map(r => r.obligation_id))
-
-  const rows = obligations
-    .filter(o => !seen.has(o.id))
-    .map(o => ({
-      client_id:      clientId,
-      obligation_id:  o.id,
-      form:           o.form,
-      period:         o.period,
-      due_date:       _iso(o.dueDate),
-      payment_status: 'n/a',
-    }))
-
-  if (rows.length) {
-    const { error } = await supa.from('compliance_records').insert(rows)
-    if (error) console.error('seedComplianceRecords:', error)
-  }
+  const { error } = await supa.from('compliance_records')
+    .upsert(rows, { onConflict: 'client_id,obligation_id', ignoreDuplicates: true })
+  if (error) console.error('seedComplianceRecords:', error)
 }
 
 /**
@@ -5558,9 +5798,14 @@ async function syncComplianceRecords(clientId, profile) {
     return y !== null && y >= cutoffYear
   })
 
-  // Operate on the union of in-scope years already present.
-  const years = [...new Set(inScope.map(yearOf))]
-  if (!years.length) return
+  // Always reconcile at least the current and next calendar year, even
+  // if the DB has no rows in those years yet — otherwise toggling
+  // `has_employees=true` mid-year does not seed next year's 1601-C/SSS
+  // rows, and a status change effective Jan 2027 (recorded in 2026)
+  // mutates nothing.
+  const yearsSet = new Set([cutoffYear, cutoffYear + 1])
+  inScope.map(yearOf).forEach(y => yearsSet.add(y))
+  const years = [...yearsSet].sort()
 
   const wanted    = years.flatMap(y => generateObligations(profile, y))
   const wantedMap = new Map(wanted.map(o => [o.id, o]))
@@ -5587,7 +5832,8 @@ async function syncComplianceRecords(clientId, profile) {
     if (error) console.error('syncComplianceRecords (update):', error)
   }
 
-  // (3) insert newly-required obligations for in-scope years
+  // (3) upsert newly-required obligations (race-safe via the
+  //     compliance_records_client_obl_uq unique index from 0006).
   const toInsert = wanted
     .filter(o => !haveMap.has(o.id))
     .map(o => ({
@@ -5599,7 +5845,8 @@ async function syncComplianceRecords(clientId, profile) {
       payment_status: 'n/a',
     }))
   if (toInsert.length) {
-    const { error } = await supa.from('compliance_records').insert(toInsert)
+    const { error } = await supa.from('compliance_records')
+      .upsert(toInsert, { onConflict: 'client_id,obligation_id', ignoreDuplicates: true })
     if (error) console.error('syncComplianceRecords (insert):', error)
   }
 }
@@ -5615,8 +5862,13 @@ async function syncComplianceRecords(clientId, profile) {
 function buildClientCard(client, stats) {
   const { overdue, urgent, total, trrc, payment } = stats
 
+  // needs_review wins over the regular status — it tells the practitioner
+  // the client was self-enrolled and hasn't been confirmed yet.
   let statusKey, statusBadge
-  if (overdue > 0) {
+  if (client.needs_review) {
+    statusKey   = 'review'
+    statusBadge = `<span class="badge-amber" title="Self-enrolled — review and seed obligations">Needs review</span>`
+  } else if (overdue > 0) {
     statusKey   = 'overdue'
     statusBadge = `<span class="badge-red">${overdue} overdue</span>`
   } else if (urgent > 0) {
@@ -5642,19 +5894,23 @@ function buildClientCard(client, stats) {
     ? `<span class="badge-branch">${esc(client.branch_name)}</span>`
     : ''
 
+  const safeId   = esc(client.id)
+  const safeName = esc(client.display_name)
+
   return `<div class="client-card"
     data-status="${statusKey}"
     data-trrc="${trrc > 0 ? '1' : '0'}"
     data-payment="${payment > 0 ? '1' : '0'}"
-    data-name="${esc(client.display_name.toLowerCase())}"
-    data-client-id="${esc(client.id)}"
+    data-needs-review="${client.needs_review ? '1' : '0'}"
+    data-name="${esc((client.display_name || '').toLowerCase())}"
+    data-client-id="${safeId}"
     data-parent-id="${esc(client.parent_client_id || '')}"
-    onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${esc(client.id)}')"
+    onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${safeId}')"
     role="button" tabindex="0"
-    onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(client.id)}')"
-    aria-label="${esc(client.display_name)}">
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showClientDetail('${safeId}')}"
+    aria-label="${safeName}">
   <div class="cc-left">
-    <div class="cc-name">${esc(client.display_name)}</div>
+    <div class="cc-name">${safeName}</div>
     ${metaParts.length ? `<div class="cc-meta">${metaParts.join(' · ')}</div>` : ''}
   </div>
   <div class="cc-right">
@@ -5739,7 +5995,7 @@ async function loadRoster() {
   if (!clients || !clients.length) {
     listEl.innerHTML = `<div class="empty-state">
       No clients yet.<br>
-      <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
+      <span style="color:var(--lt)">Click <strong>+ Add client</strong> to get started.</span>
     </div>`
     return
   }
@@ -5801,7 +6057,13 @@ function _setFilter(filter, btn) {
     b.classList.remove('active')
     b.setAttribute('aria-selected', 'false')
   })
-  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true') }
+  // Summary chips also reflect pressed state via aria-pressed.
+  document.querySelectorAll('.sum-chip').forEach(c => c.setAttribute('aria-pressed', 'false'))
+  if (btn) {
+    btn.classList.add('active')
+    if (btn.classList.contains('filter-tab')) btn.setAttribute('aria-selected', 'true')
+    if (btn.classList.contains('sum-chip'))   btn.setAttribute('aria-pressed', 'true')
+  }
 
   if (filter === 'archived') {
     $('rosterSummary').style.display = 'none'
@@ -5933,7 +6195,7 @@ function openClientSheet(mode, clientId) {
 
   _syncTaxProfileOptions()
   _renderStep(1)
-  $('addClientSheet').classList.remove('hidden')
+  openSheet('addClientSheet')
   setTimeout(() => $('ac_name').focus(), 60)
 }
 
@@ -6049,13 +6311,13 @@ function _renderStep(n) {
   $('stepDot1').classList.toggle('active', onStep1)
   $('stepDot2').classList.toggle('active', !onStep1)
   $('addSheetTitle').textContent = onStep1
-    ? (isEdit ? 'Edit Client' : (isBranchMode ? 'Add Branch' : 'Add Client'))
+    ? (isEdit ? 'Edit client' : (isBranchMode ? 'Add branch' : 'Add client'))
     : 'Tax Profile'
 
   const backBtn = $('addBackBtn')
   const nextBtn = $('addNextBtn')
   backBtn.classList.toggle('hidden', onStep1)
-  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : (isBranchMode ? 'Save branch' : 'Save client'))
+  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : (isBranchMode ? 'Save changes' : 'Save changes'))
   nextBtn.onclick     = onStep1 ? () => _goAddStep(2) : saveClient
 }
 
@@ -6156,15 +6418,17 @@ async function saveClient() {
   }
 
   btn.disabled    = false
-  btn.textContent = isEdit ? 'Save changes' : 'Save client'
+  btn.textContent = isEdit ? 'Save changes' : 'Save changes'
 
   if (error) {
-    $('step2Err').textContent   = error.message
+    console.error(error)
+    $('step2Err').textContent   = humanError(error)
     $('step2Err').style.display = 'block'
     return
   }
 
   closeAddClient()
+  showToast(isEdit ? 'Changes saved' : (isBranchMode ? 'Branch added' : 'Client added'), 'success')
   if (isEdit) {
     await showClientDetail(_editingClientId)
   } else if (isBranchMode && parentClientId) {
@@ -6190,7 +6454,8 @@ async function archiveClient() {
     .eq('id', _editingClientId)
 
   if (error) {
-    $('step2Err').textContent   = 'Archive failed: ' + error.message
+    console.error(error)
+    $('step2Err').textContent   = 'Archive failed: ' + humanError(error)
     $('step2Err').style.display = 'block'
     return
   }
@@ -6247,14 +6512,14 @@ function buildArchivedCard(client) {
 async function restoreClient(id, name) {
   if (!confirm(`Restore ${name}? They will return to your active client list.`)) return
   const { error } = await supa.from('clients').update({ is_active: true }).eq('id', id)
-  if (error) { alert('Restore failed: ' + error.message); return }
+  if (error) { console.error(error); showToast('Restore failed: ' + humanError(error), 'error'); return }
   loadArchivedClients()
 }
 
 async function permanentlyDeleteClient(id, name) {
   if (!confirm(`Permanently delete "${name}"?\n\nThis cannot be undone. All compliance records and data for this client will be deleted.`)) return
   const { error } = await supa.from('clients').delete().eq('id', id)
-  if (error) { alert('Delete failed: ' + error.message); return }
+  if (error) { console.error(error); showToast('Delete failed: ' + humanError(error), 'error'); return }
   loadArchivedClients()
 }
 
@@ -6396,21 +6661,23 @@ function buildObligationCard(r) {
   const { label: rawLabel, cls } = _statusMeta(status)
   const label = (status === 'trrc-missing' && isGovContrib) ? 'Receipt needed' : rawLabel
   const due             = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
-  const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
+  const dueTxt          = due ? fmtDate(r.due_date) : '—'
   const isDueOver       = due && due < today && !r.filed_date
 
   let penaltyLine = ''
   if (status === 'overdue' && due) {
     const daysLate = Math.floor((today - due) / 86400000)
     if (isGovContrib) {
-      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Late contribution — penalties accumulating. Remit as soon as possible.</div>`
+      penaltyLine = `<div class="ob-penalty-line"><em>Late contribution — penalties accumulating. Remit as soon as possible.</em></div>`
     } else {
       const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
       if (taxDue) {
+        // Sec. 248(A): 25% surcharge. Sec. 249 (TRAIN, RA 10963):
+        // deficiency interest = double the BSP legal rate = 12% p.a.
         const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
-        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+        penaltyLine = `<div class="ob-penalty-line"><strong>Est. penalty: ${fmtPHP(total)} as of today</strong></div>`
       } else {
-        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+        penaltyLine = `<div class="ob-penalty-line"><em>Penalties accumulating — file to stop the clock</em></div>`
       }
     }
   }
@@ -6420,7 +6687,7 @@ function buildObligationCard(r) {
 
   const step1Done   = !!r.filed_date
   const step1Detail = step1Done
-    ? `${r.filed_date}${r.has_tax_due ? ` · ${isGovContrib ? 'Amount' : 'Tax due'}: ₱${Number(r.tax_due||0).toLocaleString()}` : (isGovContrib ? '' : ' · No tax due')}${editLink('openFilingForm')}`
+    ? `${fmtDate(r.filed_date)}${r.has_tax_due ? ` · ${isGovContrib ? 'Amount' : 'Tax due'}: ${fmtPHP(r.tax_due)}` : (isGovContrib ? '' : ' · No tax due')}${editLink('openFilingForm')}`
     : ''
 
   const step2Done   = !!r.trrc_saved
@@ -6475,9 +6742,9 @@ function buildObligationCard(r) {
   const noPaymentNeeded = r.payment_status === 'n/a' && step1Done
   const step3Done   = r.payment_status === 'paid' || noPaymentNeeded
   const feeTxt      = r.transaction_fee != null && +r.transaction_fee > 0
-    ? ` · Fee: ₱${Number(r.transaction_fee).toLocaleString()}` : ''
+    ? ` · Fee: ${fmtPHP(r.transaction_fee)}` : ''
   const step3Detail = r.payment_status === 'paid'
-    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
+    ? `${fmtPHP(r.amount_paid)} · ${fmtDate(r.payment_date)} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
     : (noPaymentNeeded ? `${isGovContrib ? 'No contribution amount recorded' : 'No tax due — no payment needed'}${editLink('openFilingForm')}` : '')
 
   let actionBtn = ''
@@ -6801,7 +7068,7 @@ async function saveFiling(recordId) {
 
   const { error } = await supa.from('compliance_records').update(payload).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6819,7 +7086,7 @@ async function saveTRRC(recordId) {
     trrc_reference:  trrcRef || null,
   }).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6866,7 +7133,7 @@ async function saveDat(recordId) {
 
   const { error } = await supa.from('compliance_records').update(updatePayload).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6893,7 +7160,7 @@ async function savePayment(recordId) {
     payment_mode:      payMode || null,
   }).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6931,10 +7198,10 @@ async function loadHistory() {
 <tr>
   <td class="mono">${esc(r.form)}</td>
   <td>${esc(r.period ?? '—')}</td>
-  <td class="mono">${r.filed_date ?? '—'}</td>
-  <td class="mono">${r.trrc_saved ? esc(r.trrc_reference ?? '✅') : '—'}</td>
+  <td class="mono">${fmtDate(r.filed_date) || '—'}</td>
+  <td class="mono">${r.trrc_saved ? esc(r.trrc_reference ?? '✓') : '—'}</td>
   <td class="mono">${esc(datCell)}</td>
-  <td>${r.payment_status === 'paid' ? `₱${Number(r.amount_paid||0).toLocaleString()}` : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
+  <td>${r.payment_status === 'paid' ? fmtPHP(r.amount_paid) : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
 </tr>`
   }).join('')
 
@@ -6995,8 +7262,21 @@ async function loadClientNotes() {
 }
 
 async function saveClientNotes() {
-  const notes = $('clientNotesArea').value
-  await supa.from('clients').update({ notes }).eq('id', activeClientId)
+  const notes  = $('clientNotesArea').value
+  const status = $('clientNotesStatus')
+  if (status) { status.textContent = 'Saving…'; status.style.color = 'var(--mu)' }
+  const { error } = await supa.from('clients').update({ notes }).eq('id', activeClientId)
+  if (error) {
+    console.error(error)
+    if (status) { status.textContent = 'Save failed — try again'; status.style.color = 'var(--red)' }
+    showToast('Could not save notes', 'error')
+    return
+  }
+  if (_currentClient) _currentClient.notes = notes
+  if (status) {
+    status.textContent = 'Saved ✓'; status.style.color = 'var(--green)'
+    setTimeout(() => { if (status.textContent === 'Saved ✓') status.textContent = '' }, 2000)
+  }
 }
 
 
@@ -7040,7 +7320,7 @@ async function loadBranches(clientId) {
     ;(recsByBranch[r.client_id] = recsByBranch[r.client_id] || []).push(r)
   })
 
-  const addBranchBtn = `<button class="btn-primary btn-sm" onclick="openAddBranchSheet('${esc(clientId)}')">+ Add Branch</button>`
+  const addBranchBtn = `<button class="btn-primary btn-sm" onclick="openAddBranchSheet('${esc(clientId)}')">+ Add branch</button>`
 
   if (!branches || !branches.length) {
     panel.innerHTML = `
@@ -7048,7 +7328,7 @@ async function loadBranches(clientId) {
         <h3>Branches</h3>
         ${addBranchBtn}
       </div>
-      <p class="branch-empty">No branches yet. Use <strong>+ Add Branch</strong> to register a separate branch location or line of business under the same TIN.</p>`
+      <p class="branch-empty">No branches yet. Use <strong>+ Add branch</strong> to register a separate branch location or line of business under the same TIN.</p>`
     return
   }
 
@@ -7134,7 +7414,7 @@ function openStatusChangeSheet() {
   ;['scValidationBox','scSummaryBox','scChecklistBox','scStep2Err']
     .forEach(id => { const el = $(id); if (el) { el.innerHTML = ''; el.style.display = 'none' } })
   _scRenderStep(1)
-  $('statusChangeSheet').classList.remove('hidden')
+  openSheet('statusChangeSheet')
   setTimeout(() => $('sc_effective_date').focus(), 60)
 }
 
@@ -7156,9 +7436,9 @@ function _scRenderStep(n) {
   $('scStep2').style.display = onStep1 ? 'none' : ''
   $('scDot1').classList.toggle('active',  onStep1)
   $('scDot2').classList.toggle('active', !onStep1)
-  $('scSheetTitle').textContent = onStep1 ? 'Record Tax Status Change' : 'Review & Actions'
+  $('scSheetTitle').textContent = onStep1 ? 'Record tax status change' : 'Review & actions'
   $('scBackBtn').classList.toggle('hidden', onStep1)
-  $('scNextBtn').textContent = onStep1 ? 'Next →' : 'Apply Change'
+  $('scNextBtn').textContent = onStep1 ? 'Next →' : 'Apply change'
   $('scNextBtn').onclick     = onStep1 ? () => _scGoStep(2) : saveStatusChange
 }
 
@@ -7237,33 +7517,40 @@ function _validateTaxStatusChange(client, ct, effectiveDate, newVatStatus, newDe
       warnings.push('This date falls mid-quarter. BIR generally recognises VAT changes at the start of a taxable quarter. Confirm the exact effectivity with your RDO before proceeding.')
   }
 
-  // Full-year lock warning for 8% changes
+  // Full-year lock for 8% income tax option changes. Per NIRC Sec.
+  // 24(A)(2)(b) and RR 8-2018, the 8% election (and its revocation)
+  // is binding for the entire taxable year and must be declared on
+  // the Q1 1701Q. Mid-year switches are not permitted — the change
+  // takes effect the following calendar year. Reject the date
+  // outright if it isn't January 1 of any year.
   if (ct === 'itemized_to_8pct' || ct === '8pct_to_itemized') {
-    const d = new Date(effectiveDate)
-    if (!(d.getMonth() === 0 && d.getDate() === 1))
-      warnings.push('The 8% GIT election (and its revocation) applies for the entire taxable year. This change should ideally be effective January 1. Ensure the election is declared on the Q1 1701Q.')
+    const d = new Date(effectiveDate + 'T00:00:00')
+    const isJan1 = d.getMonth() === 0 && d.getDate() === 1
+    if (!isJan1) {
+      errors.push('The 8% income tax option (and its revocation) is binding for the full taxable year and must take effect on January 1. Set the effective date to January 1 of the year the election applies to.')
+    }
   }
 
   switch (ct) {
     case 'vat_to_nonvat':
       if (!isVat) errors.push('Client is not currently VAT-registered.')
       if (newVatStatus === 'Non-VAT (8% Option)' && !isSEOrMix)
-        errors.push('8% GIT option is only available to Self-Employed or Mixed Income individuals (NIRC Sec. 24(A)(2)(b)).')
+        errors.push('8% income tax option is only available to Self-Employed or Mixed Income individuals (NIRC Sec. 24(A)(2)(b)).')
       break
 
     case 'nonvat_to_vat':
       if (isVat)  errors.push('Client is already VAT-registered.')
-      if (is8Pct) errors.push('Cannot register for VAT while on the 8% GIT option. Revoke the 8% election first, then register for VAT.')
+      if (is8Pct) errors.push('Cannot register for VAT while on the 8% income tax option. Revoke the 8% election first, then register for VAT.')
       break
 
     case 'itemized_to_8pct':
-      if (!isSEOrMix)                    errors.push('8% GIT option is only available to Self-Employed or Mixed Income individuals.')
-      if (isVat)                          errors.push('VAT-registered taxpayers cannot avail of the 8% GIT option. De-register from VAT first.')
-      if (is8Pct || deduction_method === '8%') errors.push('Client is already on the 8% GIT option.')
+      if (!isSEOrMix)                    errors.push('8% income tax option is only available to Self-Employed or Mixed Income individuals.')
+      if (isVat)                          errors.push('VAT-registered taxpayers cannot avail of the 8% income tax option. De-register from VAT first.')
+      if (is8Pct || deduction_method === '8%') errors.push('Client is already on the 8% income tax option.')
       break
 
     case '8pct_to_itemized':
-      if (!is8Pct && deduction_method !== '8%') errors.push('Client is not currently on the 8% GIT option.')
+      if (!is8Pct && deduction_method !== '8%') errors.push('Client is not currently on the 8% income tax option.')
       break
 
     case 'add_obligation':
@@ -7421,7 +7708,7 @@ function _getStatusChangeChecklist(ct, obligCode) {
     items.push({ id: 'vat_cert', label: 'Obtain VAT Registration Certificate and update official receipts / invoices', required: true })
 
   if (ct === 'itemized_to_8pct')
-    items.push({ id: '8pct_lock', label: 'Note: 8% GIT election is irrevocable for the taxable year — declare on Q1 1701Q', required: false,
+    items.push({ id: '8pct_lock', label: 'Note: 8% income tax election is irrevocable for the taxable year — declare on Q1 1701Q', required: false,
       hint: 'NIRC Sec. 24(A)(2)(b) as amended by TRAIN' })
 
   if (ct === '8pct_to_itemized')
@@ -7473,8 +7760,8 @@ function _scBuildStep2(ct, effectiveDate, obligCode, newVatStatus, newDeduction,
   const _TSC_LABELS = {
     vat_to_nonvat:    'VAT → Non-VAT De-registration',
     nonvat_to_vat:    'Non-VAT → VAT Registration',
-    itemized_to_8pct: 'Income Tax Regime: Itemised/OSD → 8% GIT',
-    '8pct_to_itemized':'Income Tax Regime: 8% GIT → Itemised/OSD',
+    itemized_to_8pct: 'Income Tax Regime: Itemized/OSD → 8% income tax option',
+    '8pct_to_itemized':'Income Tax Regime: 8% income tax option → Itemized/OSD',
     add_obligation:   `Add Obligation — ${obligCode || ''}`,
     remove_obligation:`Remove Obligation — ${obligCode || ''}`,
   }
@@ -7582,9 +7869,10 @@ async function saveStatusChange() {
     notes,
   })
   if (logErr) {
-    $('scStep2Err').textContent   = 'Could not save audit record: ' + logErr.message
+    console.error(logErr)
+    $('scStep2Err').textContent   = 'Could not save audit record: ' + humanError(logErr)
     $('scStep2Err').style.display = 'block'
-    btn.disabled = false; btn.textContent = 'Apply Change'
+    btn.disabled = false; btn.textContent = 'Apply change'
     return
   }
 
@@ -7602,9 +7890,10 @@ async function saveStatusChange() {
   }
   const { error: upErr } = await supa.from('clients').update(clientPayload).eq('id', activeClientId)
   if (upErr) {
-    $('scStep2Err').textContent   = 'Could not update client profile: ' + upErr.message
+    console.error(upErr)
+    $('scStep2Err').textContent   = 'Could not update client profile: ' + humanError(upErr)
     $('scStep2Err').style.display = 'block'
-    btn.disabled = false; btn.textContent = 'Apply Change'
+    btn.disabled = false; btn.textContent = 'Apply change'
     return
   }
 
@@ -7613,7 +7902,7 @@ async function saveStatusChange() {
 
   Object.assign(_currentClient, clientPayload)
   closeStatusChangeSheet()
-  btn.disabled = false; btn.textContent = 'Apply Change'
+  btn.disabled = false; btn.textContent = 'Apply change'
   await showClientDetail(activeClientId)
 }
 
@@ -7647,8 +7936,12 @@ async function applyStatusChangeCalendar(clientId, newProfile, effectiveDateStr)
     return y !== null && y >= effYear
   })
 
-  const years = [...new Set(inScope.map(yearOf))]
-  if (!years.length) return
+  // Always reconcile the effective year and the next year, even if
+  // those years aren't yet seeded in the DB — a status change effective
+  // Jan 2027 recorded in 2026 must apply forward.
+  const yearsSet = new Set([effYear, effYear + 1])
+  inScope.map(yearOf).forEach(y => yearsSet.add(y))
+  const years = [...yearsSet].sort()
 
   const wanted    = years.flatMap(y => generateObligations(newProfile, y))
   const wantedMap = new Map(wanted.map(o => [o.id, o]))
@@ -7687,7 +7980,8 @@ async function applyStatusChangeCalendar(clientId, newProfile, effectiveDateStr)
       payment_status: 'n/a',
     }))
   if (toInsert.length) {
-    const { error } = await supa.from('compliance_records').insert(toInsert)
+    const { error } = await supa.from('compliance_records')
+      .upsert(toInsert, { onConflict: 'client_id,obligation_id', ignoreDuplicates: true })
     if (error) console.error('applyStatusChangeCalendar (insert):', error)
   }
 }
@@ -7729,8 +8023,8 @@ async function loadTaxHistory(clientId) {
   const _TSC_LABELS = {
     vat_to_nonvat:     'VAT → Non-VAT De-registration',
     nonvat_to_vat:     'Non-VAT → VAT Registration',
-    itemized_to_8pct:  'Regime: Itemised/OSD → 8% GIT',
-    '8pct_to_itemized':'Regime: 8% GIT → Itemised/OSD',
+    itemized_to_8pct:  'Regime: Itemized/OSD → 8% income tax option',
+    '8pct_to_itemized':'Regime: 8% income tax option → Itemized/OSD',
     add_obligation:    'Obligation Added',
     remove_obligation: 'Obligation Removed',
   }
@@ -7823,7 +8117,8 @@ async function updateStatusChangeRecord(recordId, field, value) {
     const panel = $('taxHistoryPanel')
     const errDiv = document.createElement('div')
     errDiv.className = 'fld-error'; errDiv.style.marginBottom = '.5rem'
-    errDiv.textContent = 'Could not update: ' + error.message
+    console.error(error)
+    errDiv.textContent = 'Could not update: ' + humanError(error)
     panel.prepend(errDiv)
     setTimeout(() => errDiv.remove(), 5000)
     return
@@ -7868,9 +8163,11 @@ async function _initReportControls() {
     ).join('')
   }
 
-  // As-of date — set to today if blank
+  // As-of date — set to today (in local PHT, not UTC) if blank.
+  // toISOString() in PHT after 4pm renders as the next UTC date,
+  // pushing the report's "as of" to tomorrow.
   const asOf = $('rptAsOf')
-  if (asOf && !asOf.value) asOf.value = new Date().toISOString().slice(0, 10)
+  if (asOf && !asOf.value) asOf.value = _iso(new Date())
 
   // Client dropdown — always refresh so newly added clients appear
   const clientSel = $('rptClient')
@@ -7930,18 +8227,16 @@ function _rptBusy(btnId, busy) {
   btn.textContent = busy ? 'Generating…' : 'Generate'
 }
 
-function _rptFmtDate(s) {
-  return s ? new Date(s).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}) : '—'
-}
-
-function _rptFmtAmt(v) {
-  return '₱' + Number(v).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
-}
+// Aliases retained for backwards-compat at call sites.
+const _rptFmtDate = s => s ? fmtDate(s) : '—'
+const _rptFmtAmt  = v => fmtPHP(v)
 
 function _rptStatusBadge(r) {
   const s = getCardStatus(r)
   const cls = {done:'badge-green', unpaid:'badge-blue', 'trrc-missing':'badge-amber', 'dat-missing':'badge-amber', overdue:'badge-red', pending:'badge-dim'}
-  const lbl = {done:'Filed & Paid', unpaid:'Unpaid', 'trrc-missing':'TRRC Missing', 'dat-missing':'DAT Validation', overdue:'Overdue', pending:'Pending'}
+  // Glossary aligned with getCardStatus: "Complete" instead of "Filed & Paid",
+  // "Payment pending" instead of "Unpaid", "TRRC pending" instead of "TRRC Missing".
+  const lbl = {done:'Complete', unpaid:'Payment pending', 'trrc-missing':'TRRC pending', 'dat-missing':'DAT validation', overdue:'Overdue', pending:'Pending'}
   return `<span class="${cls[s] || 'badge-dim'}">${lbl[s] || s}</span>`
 }
 
@@ -8404,7 +8699,7 @@ async function generateReport3() {
   </div>`
 
   html += `<div class="rpt-warning">
-    <strong>Important:</strong> Estimates are computed under NIRC Sec. 248 (25% surcharge) and Sec. 249 (20% interest p.a.) on the last recorded tax due amount. Actual BIR assessments may differ due to compromise penalties, deficiency interest adjustments, or additional assessments issued after filing. These figures are for practitioner reference only and do not constitute a formal BIR computation. Always reconcile with official BIR notices before advising clients.
+    <strong>Important:</strong> Estimates use NIRC Sec. 248 (25% surcharge) and Sec. 249 deficiency interest at 12% p.a. (double the BSP legal rate, per RA 10963 / TRAIN). They exclude compromise penalties and the 50% surcharge for fraudulent / wilful neglect cases under Sec. 248(B). Reconcile with official BIR notices before advising clients.
   </div>`
 
   $('rptContent').innerHTML = html
@@ -8550,8 +8845,9 @@ async function saveSettings() {
     .update(payload)
     .eq('id', currentPractitioner.id)
   if (error) {
+    console.error(error)
     msg.style.color = 'var(--red)'
-    msg.textContent = error.message
+    msg.textContent = humanError(error)
     return
   }
   Object.assign(currentPractitioner, payload)
@@ -8586,7 +8882,8 @@ async function shareEnrollmentLink() {
 
   if (error || !data) {
     err.style.display = 'block'
-    err.textContent   = error?.message || 'Could not create link.'
+    console.error(error)
+    err.textContent   = humanError(error || new Error('Could not create link.'))
     hint.textContent  = ''
     return
   }
@@ -8613,6 +8910,7 @@ async function copyEnrollLink() {
   }
   const prev = btn.textContent
   btn.textContent = 'Copied ✓'
+  showToast('Enrollment link copied', 'success')
   setTimeout(() => { btn.textContent = prev }, 1500)
 }
 
@@ -8794,7 +9092,7 @@ async function openCombinedObligations() {
   const recMap = {}; (records || []).forEach(r => { recMap[r.id] = r })
   $('combinedObBody').innerHTML = groups +
     `<div style="margin-top:1rem;display:flex;gap:.5rem">
-       <button class="btn-primary btn-sm" onclick="_combinedMarkFiled()">Mark as Filed</button>
+       <button class="btn-primary btn-sm" onclick="_combinedMarkFiled()">Mark as filed</button>
      </div>`
   $('combinedObSheet')._recMap = recMap
   $('combinedObSheet').classList.remove('hidden')

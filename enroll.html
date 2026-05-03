@@ -12,20 +12,25 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
 <style>
+/* Tokens are intentionally aligned with index.html so the enrollment
+   page renders in the same brand palette as the practitioner app. */
 :root {
-  --royal:#4169e1; --rs:rgba(65,105,225,.07); --rm:rgba(65,105,225,.14);
-  --navy:#1a2f7a;
-  --green:#2d8a4e; --red:#c0392b;
-  --bg:#f9f9fa; --sf:#fff; --s2:#f0f1f3; --s3:#e8e9ec; --bd:#e0e2e6;
-  --ink:#111; --ch:#333; --mu:#707070; --lt:#9a9a9a; --dim:#9a9a9a;
-  --r:8px; --rr:5px;
+  --royal:#3D388A;             /* Indigo Mid */
+  --rs:rgba(61,56,138,.07);
+  --rm:rgba(61,56,138,.14);
+  --navy:#1E1A5E;              /* Dusk Indigo */
+  --green:#15803d;             /* AA on white */
+  --red:#b91c1c;
+  --bg:#F7F7FC; --sf:#fff; --s2:#EEEDF8; --s3:#E3E1F3; --bd:#D4D2EC;
+  --ink:#1E1A5E; --ch:#2A264E; --mu:#586677; --lt:#6B7787; --dim:#586677;
+  --r:8px; --rr:6px;
   --sh:0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
   --shs:0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
   --se:'Source Serif 4',Georgia,serif;
   --sa:'Inter',system-ui,sans-serif;
-  --bl:#2563eb; --gs:#16a34a; --gm:rgba(22,163,74,.12);
-  --as:#d97706; --am:rgba(217,119,6,.12);
-  --rdm:rgba(192,57,43,.08);
+  --bl:#9B97C4; --gs:#15803d; --gm:rgba(21,128,61,.12);
+  --as:#B45309; --am:rgba(180,83,9,.12);
+  --rdm:rgba(185,28,28,.08);
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 body {
@@ -168,7 +173,7 @@ h2 {
 
   <!-- Step 1 -->
   <div id="step1">
-    <div class="step-label">Step 1 of 2 — Identity</div>
+    <div class="step-label">Step 1 of 2 — Your details</div>
     <div class="fg">
       <div class="fld span2">
         <label for="f_name">Client name <span class="req">*</span></label>
@@ -180,22 +185,22 @@ h2 {
       </div>
       <div class="fld">
         <label for="f_rdo">RDO code</label>
-        <input type="text" id="f_rdo" placeholder="e.g. 040">
+        <input type="text" id="f_rdo" placeholder="e.g. 044" inputmode="numeric" maxlength="3">
       </div>
       <div class="fld span2">
         <label for="f_industry">Line of Business</label>
-        <input type="text" id="f_industry" placeholder="e.g. Computer Programming Activities" autocomplete="off">
+        <input type="text" id="f_industry" placeholder="e.g. IT consulting, online retail, freelance design" autocomplete="off">
       </div>
     </div>
-    <div class="err" id="err1"></div>
+    <div class="err" id="err1" role="alert" aria-live="polite"></div>
     <div class="footer-row">
-      <button class="btn btn-primary" id="btnNext">Next →</button>
+      <button class="btn btn-primary" type="button" id="btnNext">Next →</button>
     </div>
   </div>
 
   <!-- Step 2 -->
   <div id="step2" class="hidden">
-    <div class="step-label">Step 2 of 2 — Tax profile</div>
+    <div class="step-label">Step 2 of 2 — Your tax profile</div>
     <div class="fg">
       <div class="fld">
         <label for="f_type">Taxpayer type</label>
@@ -228,20 +233,20 @@ h2 {
       <div class="fld">
         <label for="f_classification">Tax classification (EOPT)</label>
         <select id="f_classification">
-          <option value="">— Select —</option>
-          <option value="Micro">Micro (gross sales &lt; ₱3M)</option>
-          <option value="Small">Small (₱3M – &lt;₱20M)</option>
-          <option value="Medium">Medium (₱20M – &lt;₱1B)</option>
-          <option value="Large">Large (≥ ₱1B)</option>
+          <option value="">Select…</option>
+          <option value="Micro">Micro (under ₱3M gross sales)</option>
+          <option value="Small">Small (₱3M to under ₱20M)</option>
+          <option value="Medium">Medium (₱20M to under ₱1B)</option>
+          <option value="Large">Large (₱1B and above)</option>
         </select>
       </div>
       <div class="fld">
         <label for="f_deduction">Deduction method</label>
         <select id="f_deduction">
-          <option value="">— Select —</option>
-          <option value="Itemized">Itemized Deduction</option>
+          <option value="">Select…</option>
+          <option value="Itemized">Itemized deduction</option>
           <option value="OSD">Optional Standard Deduction (OSD)</option>
-          <option value="8%">8% Income Tax Rate</option>
+          <option value="8%">8% income tax option</option>
         </select>
       </div>
       <div class="fld span2">
@@ -256,18 +261,18 @@ h2 {
         </select>
       </div>
     </div>
-    <div class="err" id="err2"></div>
+    <div class="err" id="err2" role="alert" aria-live="polite"></div>
     <div class="footer-row">
-      <button class="btn btn-ghost" id="btnBack">← Back</button>
-      <button class="btn btn-primary" id="btnSubmit">Submit</button>
+      <button class="btn btn-ghost" type="button" id="btnBack">← Back</button>
+      <button class="btn btn-primary" type="button" id="btnSubmit">Submit</button>
     </div>
   </div>
 </template>
 
 <template id="successTpl">
   <div class="success" style="text-align:center;padding:1rem 0">
-    <h2>Thank you — your information has been submitted.</h2>
-    <p>Your accountant will review and confirm your enrollment.</p>
+    <h2>Thanks — we've sent your details to your accountant.</h2>
+    <p>They'll review and confirm your enrollment within a business day.</p>
   </div>
 </template>
 
@@ -289,21 +294,23 @@ async function init() {
     renderInvalid()
     return
   }
-  const { data, error } = await supa
-    .from('enrollment_tokens')
-    .select('practitioner_id, client_name_hint, used, expires_at')
-    .eq('token', token)
-    .maybeSingle()
-
-  if (error) {
-    renderNetworkError(error.message)
+  let res, body
+  try {
+    res = await fetch(`${SUPA_URL}/functions/v1/claim-enrollment-token`, {
+      method:  'POST',
+      headers: { 'content-type': 'application/json', apikey: SUPA_KEY },
+      body:    JSON.stringify({ token, mode: 'validate' }),
+    })
+    body = await res.json().catch(() => ({}))
+  } catch (e) {
+    renderNetworkError(e?.message)
     return
   }
-  if (!data || data.used || new Date(data.expires_at) <= new Date()) {
+  if (!res.ok || !body?.ok) {
     renderInvalid()
     return
   }
-  renderForm(data)
+  renderForm({ client_name_hint: body.client_name_hint })
 }
 
 function renderInvalid() {
@@ -388,7 +395,22 @@ function renderForm(tok) {
   _syncVatOptions()
 }
 
-async function submit(tok) {
+// Friendly error map for the Edge Function's structured error codes.
+function _humanError(code, fallback) {
+  return ({
+    invalid_token:        'This enrollment link is invalid.',
+    token_already_used:   'This enrollment link has already been used.',
+    token_expired:        'This enrollment link has expired.',
+    invalid_taxpayer_type:'Please select a taxpayer type.',
+    invalid_vat_status:   'Please select a VAT status.',
+    missing_display_name: 'Please enter your name.',
+    insert_failed:        'Could not save your details. Please try again or contact your accountant.',
+    lookup_failed:        'Could not reach the server. Please check your connection and try again.',
+    network:              'Network error — check your connection and try again.',
+  })[code] ?? fallback ?? 'Something went wrong. Please try again.'
+}
+
+async function submit(/* tok */) {
   const btn = $('btnSubmit')
   const err = $('err2')
   err.style.display = 'none'
@@ -402,41 +424,42 @@ async function submit(tok) {
     return
   }
 
-  const taxpayer_type      = $('f_type').value
-  const vat_status         = $('f_vat').value
-  const tax_classification = $('f_classification').value || null
-  const deduction_method   = $('f_deduction').value      || null
-  const fiscal_start_month = parseInt($('f_fiscal').value, 10)
-
-  const payload = {
-    practitioner_id:    tok.practitioner_id,
+  const profile = {
     display_name:       name,
     tin:                $('f_tin').value.trim() || null,
     rdo_code:           $('f_rdo').value.trim() || null,
-    industry:           $('f_industry').value   || null,
-    taxpayer_type,
-    vat_status,
-    tax_classification,
-    deduction_method,
-    regime:             vat_status,
-    fiscal_start_month,
-    is_active:          true,
+    industry:           $('f_industry').value.trim() || null,
+    taxpayer_type:      $('f_type').value,
+    vat_status:         $('f_vat').value,
+    tax_classification: $('f_classification').value || null,
+    deduction_method:   $('f_deduction').value      || null,
+    fiscal_start_month: parseInt($('f_fiscal').value, 10) || 1,
   }
 
-  const { error: insErr } = await supa.from('clients').insert(payload)
-  if (insErr) {
-    err.textContent = insErr.message
+  // Submit through the Edge Function. Public RLS no longer permits a
+  // direct insert, and the function does the token-validate + client-
+  // insert + token-mark-used dance atomically with the service role.
+  let res, body
+  try {
+    res = await fetch(`${SUPA_URL}/functions/v1/claim-enrollment-token`, {
+      method:  'POST',
+      headers: { 'content-type': 'application/json', apikey: SUPA_KEY },
+      body:    JSON.stringify({ token, profile }),
+    })
+    body = await res.json().catch(() => ({}))
+  } catch (e) {
+    err.textContent = _humanError('network')
     err.style.display = 'block'
-    btn.disabled = false
-    btn.textContent = 'Submit'
+    btn.disabled = false; btn.textContent = 'Submit'
     return
   }
 
-  const { error: updErr } = await supa
-    .from('enrollment_tokens')
-    .update({ used: true })
-    .eq('token', token)
-  if (updErr) console.warn('token update failed:', updErr.message)
+  if (!res.ok) {
+    err.textContent = _humanError(body?.error)
+    err.style.display = 'block'
+    btn.disabled = false; btn.textContent = 'Submit'
+    return
+  }
 
   $('card').replaceChildren($('successTpl').content.cloneNode(true))
 }
