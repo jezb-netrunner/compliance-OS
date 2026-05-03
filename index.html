@@ -12,6 +12,25 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
+<!--
+  Canonical obligation-generation engine. The same code is also
+  inlined further down (see ── OBLIGATION GENERATION ── section)
+  for environments that don't load ES modules; src/engine/__tests__
+  /parity.test.js fails CI when the two drift. Once index.html is
+  served through a real bundler, the inline copy goes away.
+-->
+<script type="module">
+  import * as engine from './src/engine/obligations.js'
+  // Promote engine exports to globals so the existing non-module
+  // inline script keeps resolving generateObligations, _iso, etc.
+  // at call time. Calls that happen during the module-load window
+  // hit the inline copy; calls afterwards hit the module — both
+  // produce identical output (parity test guarantees).
+  for (const [name, value] of Object.entries(engine)) {
+    window[name] = value
+  }
+</script>
+
 <style>
 /* ═══════════════════════════════════════════════════
    DESIGN TOKENS
