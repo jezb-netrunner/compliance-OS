@@ -3114,7 +3114,7 @@ table.ct thead { background: var(--s2); }
           id="rosterSearch"
           placeholder="Search clients…"
           aria-label="Search clients"
-          oninput="_applyRosterFilter()"
+          oninput="_onRosterSearchChange()"
         >
         <div class="filter-tabs" role="tablist" aria-label="Filter clients">
           <button class="filter-tab active" role="tab" aria-selected="true"
@@ -5994,97 +5994,101 @@ function buildClientCard(client, stats) {
 // ── LOAD ROSTER ───────────────────────────────────────────────
 
 let _rosterFilter = 'all'
+const _ROSTER_PAGE_SIZE = 50
+let _rosterPage  = 0
+let _rosterQuery = ''
+let _rosterHasMore = false
 
-async function loadRoster() {
+/**
+ * Fetch one page of the roster via the roster_card_stats RPC plus
+ * a separate roster_summary_totals RPC for the aggregate chip
+ * counts. Pagination + ILIKE search now happen in Postgres, so
+ * 10,000-client tenants don't hit URL-length / row-count limits.
+ *
+ * `append=true` adds to the existing list (load-more); `false`
+ * replaces it (initial render or filter/search change).
+ */
+async function loadRoster(append = false) {
   if (!currentPractitioner) return
 
-  const today = _iso(new Date())
-  const week  = _iso(new Date(Date.now() + 7 * 86400000))
+  if (!append) _rosterPage = 0
 
-  const { data: clients, error } = await supa
-    .from('clients')
-    .select('*')
-    .eq('practitioner_id', currentPractitioner.id)
-    .eq('is_active', true)
-    .order('display_name')
+  // Map UI filter slug to RPC parameter. 'archived' is handled by a
+  // separate path; the others map 1:1.
+  const rpcFilter = (_rosterFilter === 'archived') ? 'all' : _rosterFilter
 
-  if (error) { console.error('loadRoster:', error); return }
+  const [{ data: rows, error: rErr }, { data: totals, error: tErr }] = await Promise.all([
+    supa.rpc('roster_card_stats', {
+      p_query:  _rosterQuery,
+      p_filter: rpcFilter,
+      p_offset: _rosterPage * _ROSTER_PAGE_SIZE,
+      p_limit:  _ROSTER_PAGE_SIZE,
+    }),
+    append ? Promise.resolve({ data: null, error: null })
+           : supa.rpc('roster_summary_totals', { p_query: _rosterQuery }),
+  ])
 
-  // Fetch all compliance records for every client in one round-trip
-  const clientIds = (clients || []).map(c => c.id)
-  const { data: allRecs } = clientIds.length
-    ? await supa
-        .from('compliance_records')
-        .select('client_id,due_date,filed_date,trrc_saved,has_tax_due,payment_status')
-        .in('client_id', clientIds)
-    : { data: [] }
+  if (rErr) { console.error('loadRoster (rows):', rErr); return }
+  if (tErr) console.error('loadRoster (totals):', tErr)
 
-  const recsByClient = {}
-  ;(allRecs || []).forEach(x => {
-    (recsByClient[x.client_id] = recsByClient[x.client_id] || []).push(x)
-  })
+  _rosterHasMore = (rows ?? []).length === _ROSTER_PAGE_SIZE
 
-  // Aggregate counts for summary strip — derived from a single
-  // recordStatus() call per record so roster, dashboard, and detail
-  // stay in lockstep.
-  let sumOverdue = 0, sumUrgent = 0, sumTrrc = 0, sumPayment = 0
-  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0)
+  // Update summary strip + nav badge from the totals RPC
+  if (totals && totals.length) {
+    const t = totals[0]
+    $('sumOverdue').textContent = t.overdue_count
+    $('sumUrgent').textContent  = t.urgent_count
+    $('sumTrrc').textContent    = t.trrc_count
+    $('sumPayment').textContent = t.payment_count
+    const nb = $('navBadgeClients')
+    if (nb) nb.textContent = t.total_clients
+  }
 
-  const cards = (clients || []).map(client => {
-    const r = recsByClient[client.id] || []
-    let cOverdue = 0, cUrgent = 0, cTrrc = 0, cPayment = 0
-    r.forEach(x => {
-      const s = recordStatus(x, { today: todayDate, weekAheadDays: 7 })
-      if (s.isOverdue)      { cOverdue++;  sumOverdue++  }
-      if (s.isUrgent)       { cUrgent++;   sumUrgent++   }
-      if (s.needsTrrc)      { cTrrc++;     sumTrrc++     }
-      if (s.paymentPending) { cPayment++;  sumPayment++  }
-    })
-
-    const stats = {
-      total: r.length, overdue: cOverdue, urgent: cUrgent,
-      trrc:  cTrrc,    payment: cPayment,
+  // Map the RPC's flat shape onto the legacy { client, stats } shape
+  // buildClientCard expects.
+  const cards = (rows || []).map(row => buildClientCard(
+    {
+      id: row.id, display_name: row.display_name, tin: row.tin,
+      rdo_code: row.rdo_code, taxpayer_type: row.taxpayer_type,
+      vat_status: row.vat_status, parent_client_id: row.parent_client_id,
+      branch_name: row.branch_name, needs_review: row.needs_review,
+    },
+    {
+      total:   row.total_records, overdue: row.overdue_count,
+      urgent:  row.urgent_count,  trrc:    row.trrc_count,
+      payment: row.payment_count,
     }
-    return buildClientCard(client, stats)
-  })
+  ))
 
-  // Update summary strip
-  $('sumOverdue').textContent  = sumOverdue
-  $('sumUrgent').textContent   = sumUrgent
-  $('sumTrrc').textContent     = sumTrrc
-  $('sumPayment').textContent  = sumPayment
-
-  // Update nav badge
-  const nb = $('navBadgeClients')
-  if (nb) nb.textContent = (clients || []).length
-
-  // Render client list — group branches under their parent
   const listEl = $('clientList')
-  if (!clients || !clients.length) {
-    listEl.innerHTML = `<div class="empty-state">
-      No clients yet.<br>
-      <span style="color:var(--lt)">Click <strong>+ Add client</strong> to get started.</span>
-    </div>`
+  if (!append && (!rows || !rows.length)) {
+    listEl.innerHTML = _rosterQuery
+      ? `<div class="empty-state">
+          No clients match "${esc(_rosterQuery)}".<br>
+          <button class="btn-ghost btn-sm" type="button" style="margin-top:.6rem"
+            onclick="document.getElementById('rosterSearch').value='';_onRosterSearchChange()">Clear search</button>
+        </div>`
+      : `<div class="empty-state">
+          No clients yet.<br>
+          <span style="color:var(--lt)">Click <strong>+ Add client</strong> to get started.</span>
+        </div>`
     return
   }
 
-  // Separate top-level clients from branches. Self-enrolled clients
-  // pending review float to the top so the practitioner can confirm
-  // them before anything else.
-  const clientMap = {}
-  ;(clients || []).forEach(c => { clientMap[c.id] = c })
-
-  const topLevel  = (clients || [])
-    .filter(c => !c.parent_client_id)
-    .sort((a, b) => Number(!!b.needs_review) - Number(!!a.needs_review))
-  const branchMap = {}   // parentId → [client, ...]
-  ;(clients || []).filter(c => !!c.parent_client_id).forEach(c => {
-    ;(branchMap[c.parent_client_id] = branchMap[c.parent_client_id] || []).push(c)
+  // Group branches under parents — server already sorts needs_review
+  // first, then by display_name, but branches within the page need
+  // re-attachment to their parents.
+  const branchMap = {}
+  const topLevel  = []
+  ;(rows || []).forEach(row => {
+    if (row.parent_client_id) {
+      ;(branchMap[row.parent_client_id] = branchMap[row.parent_client_id] || []).push(row)
+    } else {
+      topLevel.push(row)
+    }
   })
-
-  // Build card HTML with branch grouping
   const cardMapById = {}
-  ;(clients || []).forEach((client, i) => { cardMapById[client.id] = cards[i] })
+  ;(rows || []).forEach((row, i) => { cardMapById[row.id] = cards[i] })
 
   const grouped = topLevel.map(client => {
     const branches = branchMap[client.id] || []
@@ -6110,8 +6114,37 @@ async function loadRoster() {
     </div>`
   })
 
-  listEl.innerHTML = grouped.join('')
+  // "Load more" tail row appears when the page filled exactly.
+  const loadMoreHtml = _rosterHasMore
+    ? `<button class="btn-ghost btn-sm btn-full" type="button"
+        style="margin-top:.6rem"
+        onclick="_loadRosterNextPage()">Load more clients</button>`
+    : ''
+
+  if (append) {
+    // Replace any prior "Load more" with the new page + tail.
+    document.querySelectorAll('#clientList .roster-load-more').forEach(el => el.remove())
+    listEl.insertAdjacentHTML('beforeend', grouped.join('') + (loadMoreHtml ? `<div class="roster-load-more">${loadMoreHtml}</div>` : ''))
+  } else {
+    listEl.innerHTML = grouped.join('') + (loadMoreHtml ? `<div class="roster-load-more">${loadMoreHtml}</div>` : '')
+  }
   _applyRosterFilter()
+}
+
+function _loadRosterNextPage() {
+  _rosterPage++
+  loadRoster(true)
+}
+
+/** Debounced search-input handler — re-queries the RPC on each change. */
+let _rosterSearchTimer = null
+function _onRosterSearchChange() {
+  const v = ($('rosterSearch')?.value || '').trim()
+  clearTimeout(_rosterSearchTimer)
+  _rosterSearchTimer = setTimeout(() => {
+    _rosterQuery = v
+    loadRoster(false)
+  }, 250)
 }
 
 function _toggleBranchGroup(btn) {
@@ -6142,52 +6175,24 @@ function _setFilter(filter, btn) {
     loadArchivedClients()
   } else {
     $('rosterSummary').style.display = ''
-    if (wasArchived) loadRoster()
-    else _applyRosterFilter()
+    // Filter is now applied in SQL — refetch the first page so the
+    // result is consistent across pagination boundaries.
+    loadRoster(false)
   }
 }
 
+/**
+ * Filter + search are now applied server-side via roster_card_stats
+ * for the active roster (HI-11). The archived list is still fetched
+ * in full because it's small; this helper handles hide-on-search
+ * for the archived path only.
+ */
 function _applyRosterFilter() {
+  if (_rosterFilter !== 'archived') return
   const q = ($('rosterSearch')?.value || '').toLowerCase()
-
-  if (_rosterFilter === 'archived') {
-    document.querySelectorAll('.archived-client-card').forEach(card => {
-      const name = card.dataset.name || ''
-      card.classList.toggle('hidden', !!(q && !name.includes(q)))
-    })
-    return
-  }
-
-  document.querySelectorAll('.client-card').forEach(card => {
-    const status = card.dataset.status
-    const name   = card.dataset.name || ''
-    const meta   = (card.querySelector('.cc-meta')?.textContent || '').toLowerCase()
-
-    const matchFilter =
-      _rosterFilter === 'overdue'  ? status === 'overdue'     :
-      _rosterFilter === 'urgent'   ? status === 'urgent'      :
-      _rosterFilter === 'trrc'     ? card.dataset.trrc === '1'    :
-      _rosterFilter === 'payment'  ? card.dataset.payment === '1' :
-      _rosterFilter === 'active'   ? true                     : true
-
-    const matchSearch = !q || name.includes(q) || meta.includes(q)
-    card.classList.toggle('hidden', !(matchFilter && matchSearch))
-  })
-
-  // Show/hide entire branch groups based on whether any card inside is visible
-  document.querySelectorAll('.branch-group').forEach(group => {
-    const anyVisible = [...group.querySelectorAll('.client-card')]
-      .some(c => !c.classList.contains('hidden'))
-    group.classList.toggle('hidden', !anyVisible)
-    // If search is active and a branch card matches, expand the children
-    if (q) {
-      const children = group.querySelector('.branch-children')
-      if (children) {
-        const branchVisible = [...children.querySelectorAll('.client-card')]
-          .some(c => !c.classList.contains('hidden'))
-        if (branchVisible) children.classList.remove('collapsed')
-      }
-    }
+  document.querySelectorAll('.archived-client-card').forEach(card => {
+    const name = card.dataset.name || ''
+    card.classList.toggle('hidden', !!(q && !name.includes(q)))
   })
 }
 
