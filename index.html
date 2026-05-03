@@ -1056,6 +1056,10 @@ body {
 .client-card[data-status="overdue"]  { border-left-color: var(--red);   }
 .client-card[data-status="urgent"]   { border-left-color: var(--amber); }
 .client-card[data-status="on-track"] { border-left-color: var(--green); }
+.client-card[data-status="review"]   {
+  border-left-color: var(--royal);
+  background: var(--rs);
+}
 
 .cc-left { min-width: 0; flex: 1; }
 
@@ -2728,6 +2732,7 @@ body { background: var(--bg); }
 .client-card[data-status="overdue"]  { border-left-color: var(--red);   }
 .client-card[data-status="urgent"]   { border-left-color: var(--amber); }
 .client-card[data-status="on-track"] { border-left-color: var(--green); }
+.client-card[data-status="review"]   { border-left-color: var(--royal); background: var(--rs); }
 
 .cc-name { color: var(--ink); }
 .cc-meta { color: var(--mu);  }
@@ -3142,16 +3147,22 @@ table.ct thead { background: var(--s2); }
     <div class="detail-back-bar">
       <button class="btn-back" id="detailBackBtn" onclick="_detailBack()">← Clients</button>
       <span id="detailClientName"></span>
-      <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
+      <button class="btn-primary btn-sm hidden" id="btnConfirmEnrollment" style="margin-left:auto"
+        onclick="confirmEnrollment()">Confirm enrollment</button>
+      <button class="btn-ghost btn-sm" id="btnGenerateYear"
         onclick="generateYearObligations()">Generate obligations</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
-        onclick="shareEnrollmentLink()">Share Enrollment Link</button>
+        onclick="shareEnrollmentLink()">Share enrollment link</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         id="btnBulkObs" onclick="toggleBulkObs()">Select</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openStatusChangeSheet()">Status change</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
+    </div>
+    <div id="reviewBanner" class="hidden" style="background:var(--rs);border-bottom:1px solid var(--rm);padding:.55rem 1.25rem;font-size:.82rem;color:var(--ink)">
+      <strong>Self-enrolled — not yet confirmed.</strong>
+      Review the details below, then click <strong>Confirm enrollment</strong> to seed the compliance calendar.
     </div>
     <div id="bulkObBar" class="bulk-bar hidden">
       <span><strong id="bulkObCount">0</strong> selected</span>
@@ -4862,8 +4873,60 @@ async function showClientDetail(clientId) {
   ].filter(Boolean).join(' · ')
   $('detailMetaStrip').textContent = metaParts
 
+  // Surface the "Confirm enrollment" CTA + banner for self-enrolled clients.
+  const confirmBtn = $('btnConfirmEnrollment')
+  const banner     = $('reviewBanner')
+  if (client.needs_review) {
+    confirmBtn?.classList.remove('hidden')
+    banner?.classList.remove('hidden')
+  } else {
+    confirmBtn?.classList.add('hidden')
+    banner?.classList.add('hidden')
+  }
+
   await _updateGenerateYearBtn(clientId)
   await loadObligations(clientId)
+}
+
+/** Mark a self-enrolled client as reviewed and seed their compliance
+ *  calendar for the current year. The "Generate {year} obligations"
+ *  button remains for back-fills and additional years. */
+async function confirmEnrollment() {
+  if (!_currentClient || !activeClientId) return
+  const btn = $('btnConfirmEnrollment')
+  if (btn) { btn.disabled = true; btn.textContent = 'Confirming…' }
+
+  // 1. Clear the flag.
+  const { error: upErr } = await supa
+    .from('clients').update({ needs_review: false }).eq('id', activeClientId)
+  if (upErr) {
+    console.error(upErr)
+    showToast(humanError(upErr), 'error')
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm enrollment' }
+    return
+  }
+  _currentClient.needs_review = false
+
+  // 2. Seed obligations for the current year — practitioner can still
+  //    use "Generate obligations" to back-fill or add future years.
+  await seedComplianceRecords(activeClientId, {
+    taxpayer_type:        _currentClient.taxpayer_type,
+    vat_status:           _currentClient.vat_status,
+    tax_classification:   _currentClient.tax_classification,
+    deduction_method:     _currentClient.deduction_method,
+    has_employees:        _currentClient.has_employees,
+    withholds_expanded:   _currentClient.withholds_expanded,
+    withholds_final:      _currentClient.withholds_final,
+    fiscal_year_start:    _currentClient.fiscal_start_month || 1,
+    owner_pays_sss:       _currentClient.owner_pays_sss,
+    owner_pays_philhealth:_currentClient.owner_pays_philhealth,
+    owner_pays_pagibig:   _currentClient.owner_pays_pagibig,
+    requires_audited_fs:  _currentClient.requires_audited_fs,
+  })
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm enrollment' }
+  showToast('Enrollment confirmed — calendar seeded', 'success')
+  await showClientDetail(activeClientId)
 }
 
 /** Back navigation from client detail — branches go to their parent, others go to roster. */
@@ -6000,11 +6063,15 @@ async function loadRoster() {
     return
   }
 
-  // Separate top-level clients from branches
+  // Separate top-level clients from branches. Self-enrolled clients
+  // pending review float to the top so the practitioner can confirm
+  // them before anything else.
   const clientMap = {}
   ;(clients || []).forEach(c => { clientMap[c.id] = c })
 
-  const topLevel  = (clients || []).filter(c => !c.parent_client_id)
+  const topLevel  = (clients || [])
+    .filter(c => !c.parent_client_id)
+    .sort((a, b) => Number(!!b.needs_review) - Number(!!a.needs_review))
   const branchMap = {}   // parentId → [client, ...]
   ;(clients || []).filter(c => !!c.parent_client_id).forEach(c => {
     ;(branchMap[c.parent_client_id] = branchMap[c.parent_client_id] || []).push(c)
