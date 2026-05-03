@@ -83,6 +83,11 @@ Deno.serve(async (req) => {
     const nameOf: Record<string, string> = {}
     for (const c of clients ?? []) nameOf[c.id] = c.display_name
 
+    // Mirrors index.html's recordStatus() predicates: due-soon
+    // (unfiled, due in [today, today+7]) and overdue (unfiled, past
+    // due). Kept inline because edge fns can't share JS modules
+    // across runtimes; reconcile here whenever the in-app helper
+    // changes.
     const [{ data: dueRows }, { data: overdueRows }] = await Promise.all([
       supa.from('compliance_records')
         .select('client_id, form, due_date')

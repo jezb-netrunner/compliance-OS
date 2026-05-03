@@ -4564,6 +4564,11 @@ async function loadDashboard() {
   const thisWeek = [], overdue = [], trrcNeeded = [], paymentPending = []
   let totalYear = 0, filed = 0, pending = 0, overdueCount = 0
 
+  // Reuse the single recordStatus() helper — the dashboard's "this
+  // week" horizon is the configurable timeframe rather than a fixed
+  // 7-day window.
+  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0)
+
   ;(records || []).forEach(r => {
     const due = r.due_date || ''
     if (due >= yearStart && due <= yearEnd) {
@@ -4572,10 +4577,11 @@ async function loadDashboard() {
       else if (due < todayStr) { overdueCount++; pending++ }
       else                     { pending++ }
     }
-    if (!r.filed_date && due >= todayStr && due <= inNStr) thisWeek.push(r)
-    if (!r.filed_date && due && due < todayStr)            overdue.push(r)
-    if (r.filed_date && !r.trrc_saved)                     trrcNeeded.push(r)
-    if (r.filed_date && r.has_tax_due && r.payment_status !== 'paid') paymentPending.push(r)
+    const s = recordStatus(r, { today: todayDate, weekAheadDays: _dbTimeframeDays })
+    if (s.isUrgent)       thisWeek.push(r)
+    if (s.isOverdue)      overdue.push(r)
+    if (s.needsTrrc)      trrcNeeded.push(r)
+    if (s.paymentPending) paymentPending.push(r)
   })
 
   thisWeek.sort((a,b) => a.due_date.localeCompare(b.due_date))
@@ -6018,28 +6024,27 @@ async function loadRoster() {
     (recsByClient[x.client_id] = recsByClient[x.client_id] || []).push(x)
   })
 
-  // Aggregate counts for summary strip
+  // Aggregate counts for summary strip — derived from a single
+  // recordStatus() call per record so roster, dashboard, and detail
+  // stay in lockstep.
   let sumOverdue = 0, sumUrgent = 0, sumTrrc = 0, sumPayment = 0
+  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0)
 
   const cards = (clients || []).map(client => {
     const r = recsByClient[client.id] || []
-
-    const stats = {
-      total:   r.length,
-      overdue: r.filter(x => !x.filed_date && x.due_date < today).length,
-      urgent:  r.filter(x => !x.filed_date && x.due_date >= today && x.due_date <= week).length,
-      trrc:    r.filter(x => x.filed_date && !x.trrc_saved).length,
-      payment: r.filter(x => x.filed_date && x.has_tax_due && x.payment_status !== 'paid').length,
-    }
-
-    // Accumulate summary-strip totals
+    let cOverdue = 0, cUrgent = 0, cTrrc = 0, cPayment = 0
     r.forEach(x => {
-      if (!x.filed_date && x.due_date < today)                           sumOverdue++
-      if (!x.filed_date && x.due_date >= today && x.due_date <= week)   sumUrgent++
-      if (x.filed_date  && !x.trrc_saved)                               sumTrrc++
-      if (x.filed_date  && x.has_tax_due && x.payment_status !== 'paid') sumPayment++
+      const s = recordStatus(x, { today: todayDate, weekAheadDays: 7 })
+      if (s.isOverdue)      { cOverdue++;  sumOverdue++  }
+      if (s.isUrgent)       { cUrgent++;   sumUrgent++   }
+      if (s.needsTrrc)      { cTrrc++;     sumTrrc++     }
+      if (s.paymentPending) { cPayment++;  sumPayment++  }
     })
 
+    const stats = {
+      total: r.length, overdue: cOverdue, urgent: cUrgent,
+      trrc:  cTrrc,    payment: cPayment,
+    }
     return buildClientCard(client, stats)
   })
 
@@ -6652,22 +6657,71 @@ function eafsStepDone(r) {
   return true
 }
 
-function getCardStatus(r) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const due   = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
-  // Payment is closed either by an actual payment ('paid') OR by the
-  // taxpayer recording the filing with no tax due ('n/a' after a
-  // filed_date is set).  Both cases should mark the obligation as
-  // 'done' rather than leaving it stuck on "Payment pending".
-  if (r.payment_status === 'paid') return 'done'
-  if (r.filed_date && r.trrc_saved && datStepDone(r) && eafsStepDone(r)
-      && r.payment_status === 'n/a') return 'done'
-  if (r.filed_date && r.trrc_saved && (!datStepDone(r) || !eafsStepDone(r))) return 'dat-missing'
-  if (r.filed_date && r.trrc_saved) return 'unpaid'
-  if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
-  if (!r.filed_date && due && due < today) return 'overdue'
-  return 'pending'
+/**
+ * Single source of truth for derived compliance-record state. Used by
+ * the roster, dashboard, client-detail, and reports — replaces four
+ * slightly-divergent inline implementations.
+ *
+ * Returns:
+ *   status         — 'done' | 'overdue' | 'unpaid' | 'trrc-missing'
+ *                  | 'dat-missing' | 'pending'   (for badges)
+ *   isFiled        — filed_date is set
+ *   isOverdue      — unfiled and past the due date
+ *   isUrgent       — unfiled and due within `weekAheadDays` (default 7)
+ *   isPaid         — payment_status === 'paid'
+ *   needsTrrc      — filed but no TRRC saved (gov-contrib gets the
+ *                    same flag — caller may relabel as "Receipt needed")
+ *   paymentPending — filed, has tax due, not yet paid (and not 'n/a')
+ *   complete       — every required step is done
+ *   daysLate       — integer days past due (0 if not overdue)
+ *
+ * Caller passes `opts.today` to override "now" for testing or dashboard
+ * recomputation; `opts.weekAheadDays` to override the urgency horizon.
+ */
+function recordStatus(r, opts = {}) {
+  const today = opts.today instanceof Date
+    ? new Date(opts.today)
+    : (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t })()
+  if (!(opts.today instanceof Date)) today.setHours(0, 0, 0, 0)
+  const due = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
+
+  const isFiled         = !!r.filed_date
+  const isPaid          = r.payment_status === 'paid'
+  const isOverdue       = !isFiled && !!due && due < today
+  const needsTrrc       = isFiled && !r.trrc_saved
+  const datDone         = typeof datStepDone  === 'function' ? datStepDone(r)  : true
+  const eafsDone        = typeof eafsStepDone === 'function' ? eafsStepDone(r) : true
+  const noPaymentNeeded = r.payment_status === 'n/a' && isFiled
+  const paymentPending  = isFiled && r.has_tax_due
+                          && r.payment_status !== 'paid'
+                          && r.payment_status !== 'n/a'
+  const complete        = isPaid
+                          || (isFiled && r.trrc_saved && datDone && eafsDone && noPaymentNeeded)
+
+  let status
+  if (complete)                                                 status = 'done'
+  else if (isFiled && r.trrc_saved && (!datDone || !eafsDone))  status = 'dat-missing'
+  else if (isFiled && r.trrc_saved)                              status = 'unpaid'
+  else if (isFiled && !r.trrc_saved)                              status = 'trrc-missing'
+  else if (isOverdue)                                            status = 'overdue'
+  else                                                            status = 'pending'
+
+  const weekAheadDays = opts.weekAheadDays ?? 7
+  const horizon       = new Date(today.getTime() + weekAheadDays * 86_400_000)
+  const isUrgent      = !isFiled && !!due && due >= today && due <= horizon
+
+  const daysLate = (isOverdue && due)
+    ? Math.floor((today - due) / 86_400_000)
+    : 0
+
+  return {
+    status, isFiled, isOverdue, isUrgent, isPaid,
+    needsTrrc, paymentPending, complete, daysLate,
+  }
 }
+
+/** Back-compat: existing callers used getCardStatus(r) → string. */
+function getCardStatus(r) { return recordStatus(r).status }
 
 function _statusMeta(status) {
   return ({
