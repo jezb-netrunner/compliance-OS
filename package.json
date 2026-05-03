@@ -1,0 +1,17 @@
+{
+  "name": "compliance-os",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Philippine BIR compliance tracking for CPAs and bookkeepers",
+  "scripts": {
+    "test":      "vitest run",
+    "test:watch":"vitest",
+    "lint":      "eslint 'src/**/*.js'",
+    "check":     "npm run lint && npm test"
+  },
+  "devDependencies": {
+    "eslint":  "^9.18.0",
+    "vitest":  "^2.1.8"
+  }
+}
