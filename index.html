@@ -21,14 +21,40 @@
   handlers) runs.
 -->
 <script type="module">
-  import * as engine from './src/engine/obligations.js'
-  import * as ui     from './src/ui/render.js'
+  import * as engine        from './src/engine/obligations.js'
+  import * as ui            from './src/ui/render.js'
+  import { createStore }    from './src/state/store.js'
+
   for (const [name, value] of Object.entries(engine)) {
     window[name] = value
   }
-  // The inline app script reaches the lit-html facade through this
-  // single global; views convert one at a time via uiRender.render().
   window.uiRender = ui
+
+  // Tiny app store. Migrate one slice at a time off the top-level
+  // mutable globals; for now it carries practitioner identity (so
+  // the five DOM IDs that were poked manually after saveSettings
+  // can subscribe instead) and the active client id.
+  window.appStore = createStore({
+    practitioner:   null,
+    activeClientId: null,
+  })
+
+  // When the practitioner row changes, sync every header / sidebar
+  // / settings surface that displays it. Replaces the manual
+  // five-DOM-ID poke at the bottom of saveSettings.
+  window.appStore.subscribe(
+    (s) => s.practitioner,
+    (p) => {
+      const display = p ? (p.firm_name || p.name || p.email || '') : ''
+      const email   = p?.email ?? ''
+      for (const id of ['sidebarPractName','dbSidebarName','rptSidebarName','stSidebarName','hdrUser']) {
+        const el = document.getElementById(id)
+        if (el) el.textContent = id === 'hdrUser' ? email : display
+      }
+      const sidebarEmail = document.getElementById('sidebarPractEmail')
+      if (sidebarEmail) sidebarEmail.textContent = email
+    },
+  )
 </script>
 
 <style>
@@ -5223,24 +5249,15 @@ async function _onSessionChange(session) {
   if (!session) {
     currentPractitioner = null
     activeClientId      = null
+    appStore.update({ practitioner: null, activeClientId: null })
     showLoginView()
     return
   }
 
   currentPractitioner = await getCurrentPractitioner()
-
-  // Populate header user indicator
-  const hdrUser = $('hdrUser')
-  if (hdrUser && currentPractitioner) {
-    hdrUser.textContent =
-      currentPractitioner.firm_name ||
-      currentPractitioner.name      ||
-      currentPractitioner.email     || ''
-  }
-
-  // Populate sidebar identity (desktop)
-  const sp = $('sidebarPractName');  if (sp) sp.textContent  = currentPractitioner?.firm_name || currentPractitioner?.name  || ''
-  const se = $('sidebarPractEmail'); if (se) se.textContent  = currentPractitioner?.email || ''
+  // Push to the store; the subscribe() at the top of <head> updates
+  // every header / sidebar / settings DOM surface in one place.
+  appStore.update({ practitioner: currentPractitioner })
 
   // Only navigate to the roster on the *initial* sign-in.
   // If the user is already inside the app (any page other than login),
@@ -8532,11 +8549,14 @@ async function saveSettings() {
     return
   }
   Object.assign(currentPractitioner, payload)
-  const nEls = ['sidebarPractName', 'dbSidebarName', 'rptSidebarName', 'stSidebarName', 'hdrUser']
-  nEls.forEach(id => { const el = $(id); if (el) el.textContent = payload.firm_name || payload.name || '' })
+  // Push the new practitioner row to the store; its subscribe() at
+  // the top of <head> updates every DOM surface that displays the
+  // name / email in one place.
+  appStore.update({ practitioner: { ...currentPractitioner } })
   msg.style.color = 'var(--green)'
   msg.textContent = 'Saved ✓'
   setTimeout(() => { msg.textContent = '' }, 2000)
+  showToast('Settings saved', 'success')
 }
 
 // ── ENROLLMENT LINK ───────────────────────────────────────────
