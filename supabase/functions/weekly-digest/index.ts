@@ -7,22 +7,21 @@
 //   RESEND_API_KEY  — Resend API key (required)
 //   APP_URL         — absolute URL to the app, used in the email body
 //   DIGEST_FROM     — verified Resend From: address
+//   DIGEST_SECRET   — shared secret; pg_cron must send it as
+//                     `Authorization: Bearer <secret>` (required)
 //
 // Auto-injected by the Edge runtime:
 //   SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY
-//
-// One-time DB migration:
-//   alter table practitioners
-//     add column if not exists email_reminders boolean not null default true;
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const RESEND_KEY   = Deno.env.get('RESEND_API_KEY')!
-const APP_URL      = Deno.env.get('APP_URL')     ?? 'https://app.present-value.ph'
-const FROM_ADDR    = Deno.env.get('DIGEST_FROM') ?? 'The Present Value <digest@present-value.ph>'
+const SUPABASE_URL   = Deno.env.get('SUPABASE_URL')!
+const SERVICE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const RESEND_KEY     = Deno.env.get('RESEND_API_KEY')!
+const APP_URL        = Deno.env.get('APP_URL')       ?? 'https://app.present-value.ph'
+const FROM_ADDR      = Deno.env.get('DIGEST_FROM')   ?? 'The Present Value <digest@present-value.ph>'
+const DIGEST_SECRET  = Deno.env.get('DIGEST_SECRET') ?? ''
 
 const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
 
@@ -43,14 +42,25 @@ async function sendEmail(to: string, subject: string, text: string) {
   return res.ok
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  // Require shared-secret auth so the function can't be triggered by
+  // arbitrary HTTP callers (cost / abuse vector for Resend).
+  if (!DIGEST_SECRET) {
+    console.error('DIGEST_SECRET is not configured')
+    return new Response('not configured', { status: 500 })
+  }
+  const auth = req.headers.get('authorization') ?? ''
+  if (auth !== `Bearer ${DIGEST_SECRET}`) {
+    return new Response('forbidden', { status: 403 })
+  }
+
   const today    = new Date(); today.setUTCHours(0, 0, 0, 0)
   const todayStr = iso(today)
   const in7Str   = iso(new Date(today.getTime() + 7 * 86_400_000))
 
   const { data: practitioners, error: pErr } = await supa
     .from('practitioners')
-    .select('id, email, email_reminders')
+    .select('id, name, email, email_reminders')
     .eq('email_reminders', true)
 
   if (pErr) {
@@ -73,6 +83,11 @@ Deno.serve(async () => {
     const nameOf: Record<string, string> = {}
     for (const c of clients ?? []) nameOf[c.id] = c.display_name
 
+    // Mirrors index.html's recordStatus() predicates: due-soon
+    // (unfiled, due in [today, today+7]) and overdue (unfiled, past
+    // due). Kept inline because edge fns can't share JS modules
+    // across runtimes; reconcile here whenever the in-app helper
+    // changes.
     const [{ data: dueRows }, { data: overdueRows }] = await Promise.all([
       supa.from('compliance_records')
         .select('client_id, form, due_date')
@@ -89,8 +104,8 @@ Deno.serve(async () => {
         .order('due_date'),
     ])
 
-    const due     = dueRows     ?? []
-    const overdue = overdueRows ?? []
+    const due     = (dueRows     ?? []).filter(r => r.due_date)
+    const overdue = (overdueRows ?? []).filter(r => r.due_date)
     if (!due.length && !overdue.length) continue
 
     const dueLines = due.map(r =>
@@ -98,16 +113,19 @@ Deno.serve(async () => {
     ).join('\n')
 
     const overdueLines = overdue.map(r => {
-      const days = Math.max(0, Math.floor((today.getTime() - new Date(r.due_date).getTime()) / 86_400_000))
-      return `· ${nameOf[r.client_id] ?? '—'} — ${r.form ?? '—'} — ${days} days late`
+      const days = Math.max(0, Math.floor((today.getTime() - new Date(r.due_date + 'T00:00:00').getTime()) / 86_400_000))
+      return `· ${nameOf[r.client_id] ?? '—'} — ${r.form ?? '—'} — ${days} day${days === 1 ? '' : 's'} late`
     }).join('\n')
 
-    const sections: string[] = []
+    const greeting = p.name ? `Hi ${p.name.split(' ')[0]},` : 'Hi,'
+    const sections: string[] = [greeting, '']
     if (due.length)     sections.push(`DUE THIS WEEK (${due.length}):\n${dueLines}`)
     if (overdue.length) sections.push(`OVERDUE (${overdue.length}):\n${overdueLines}`)
     sections.push(`Log in to update filing status: ${APP_URL}`)
+    sections.push('')
+    sections.push('Manage email reminders in Settings.')
 
-    const subject = `Your compliance digest — ${due.length} deadlines this week`
+    const subject = `Compliance digest — ${due.length} due, ${overdue.length} overdue`
     const ok = await sendEmail(p.email, subject, sections.join('\n\n'))
     if (ok) sent++
   }

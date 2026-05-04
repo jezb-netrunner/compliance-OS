@@ -12,58 +12,192 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
+<!--
+  Canonical obligation-generation engine. Vite bundles this when
+  building dist/; the relative path also works for the unbundled
+  source served as-is. The non-module inline script further down
+  resolves generateObligations / _iso / _PH_HOLIDAYS / etc. via
+  window, set here before any callsite (all inside async event
+  handlers) runs.
+-->
+<script type="module">
+  import * as engine        from './src/engine/obligations.js'
+  import * as ui            from './src/ui/render.js'
+  import { createStore }    from './src/state/store.js'
+
+  for (const [name, value] of Object.entries(engine)) {
+    window[name] = value
+  }
+  window.uiRender = ui
+
+  // Tiny app store. Migrate one slice at a time off the top-level
+  // mutable globals; for now it carries practitioner identity (so
+  // the five DOM IDs that were poked manually after saveSettings
+  // can subscribe instead) and the active client id.
+  window.appStore = createStore({
+    practitioner:   null,
+    activeClientId: null,
+  })
+
+  // When the practitioner row changes, sync every header / sidebar
+  // / settings surface that displays it. Replaces the manual
+  // five-DOM-ID poke at the bottom of saveSettings.
+  window.appStore.subscribe(
+    (s) => s.practitioner,
+    (p) => {
+      const display = p ? (p.firm_name || p.name || p.email || '') : ''
+      const email   = p?.email ?? ''
+      for (const id of ['sidebarPractName','dbSidebarName','rptSidebarName','stSidebarName','hdrUser']) {
+        const el = document.getElementById(id)
+        if (el) el.textContent = id === 'hdrUser' ? email : display
+      }
+      const sidebarEmail = document.getElementById('sidebarPractEmail')
+      if (sidebarEmail) sidebarEmail.textContent = email
+    },
+  )
+</script>
+
 <style>
 /* ═══════════════════════════════════════════════════
    DESIGN TOKENS
 ═══════════════════════════════════════════════════ */
+/*
+ * Design tokens. Two layers:
+ *   1. Self-documenting names (--color-*, --space-*, --radius-*) —
+ *      preferred for new code.
+ *   2. Short legacy aliases (--mu, --rs, --bd …) kept verbatim so
+ *      thousands of existing references keep working. New CSS should
+ *      use the long names; over time, mechanical sweeps can replace
+ *      the short ones in batches without behaviour changes.
+ *
+ * Cross-walk:
+ *   --color-brand        ↔ --royal       Indigo Mid (#3D388A) — CTAs, links
+ *   --color-brand-tint   ↔ --rs          7% royal tint
+ *   --color-brand-tint-2 ↔ --rm          14% royal tint
+ *   --color-brand-soft   ↔ --bl          #9B97C4 borders
+ *   --color-success      ↔ --green
+ *   --color-success-tint ↔ --gs / --gm
+ *   --color-warning      ↔ --amber
+ *   --color-warning-tint ↔ --as / --am
+ *   --color-danger       ↔ --red
+ *   --color-danger-tint  ↔ --rds / --rdm
+ *   --color-bg           ↔ --bg          page background
+ *   --color-surface      ↔ --sf          white card surface
+ *   --color-surface-2    ↔ --s2          tinted surface
+ *   --color-surface-3    ↔ --s3
+ *   --color-border       ↔ --bd
+ *   --color-text         ↔ --ch          body
+ *   --color-text-strong  ↔ --ink         headings, anchors
+ *   --color-text-muted   ↔ --mu / --dim
+ *   --color-text-subtle  ↔ --lt          tertiary, placeholders
+ */
 :root {
-  /* Brand — The Present Value */
-  --royal:  #3D388A;          /* Indigo Mid — CTAs, links, interactive */
-  --rs:     rgba(61,56,138,.07);
-  --rm:     rgba(61,56,138,.14);
-  --navy:   #1E1A5E;          /* Dusk Indigo */
-  --teal:   #0891B2;          /* Data Teal — accent, charts */
-  --ts:     rgba(8,145,178,.07);
+  /* ── Brand & semantic colours ─────────────────────────────────── */
+  --color-brand:         #3D388A;
+  --color-brand-tint:    rgba(61,56,138,.07);
+  --color-brand-tint-2:  rgba(61,56,138,.14);
+  --color-brand-soft:    #9B97C4;
+  --color-brand-dark:    #1E1A5E;
+  --color-accent:        #0891B2;
+  --color-accent-tint:   rgba(8,145,178,.07);
 
-  /* Semantic colours */
-  --green:  #2d8a4e;
-  --gs:     rgba(45,138,78,.07);
-  --gm:     rgba(45,138,78,.14);
-  --amber:  #d4850a;
-  --as:     rgba(212,133,10,.07);
-  --am:     rgba(212,133,10,.14);
-  --red:    #c0392b;
-  --rds:    rgba(192,57,43,.07);
-  --rdm:    rgba(192,57,43,.14);
+  --color-success:       #15803d;
+  --color-success-tint:  rgba(21,128,61,.08);
+  --color-success-tint-2:rgba(21,128,61,.14);
+  --color-warning:       #B45309;
+  --color-warning-tint:  rgba(180,83,9,.08);
+  --color-warning-tint-2:rgba(180,83,9,.14);
+  --color-danger:        #b91c1c;
+  --color-danger-tint:   rgba(185,28,28,.07);
+  --color-danger-tint-2: rgba(185,28,28,.14);
 
-  /* Neutrals — Indigo-tinted palette */
-  --bg:   #F7F7FC;            /* Dusk White — page background */
-  --sf:   #fff;
-  --s2:   #EEEDF8;            /* Indigo Surface — card fills, table rows */
-  --s3:   #E3E1F3;
-  --bd:   #D4D2EC;
-  --bl:   #9B97C4;
-  --ink:  #1E1A5E;            /* Dusk Indigo — headings, anchors */
-  --ch:   #2A264E;
-  --dim:  #647489;            /* Precision Gray */
-  --mu:   #647489;            /* Precision Gray */
-  --lt:   #8A96A8;
+  /* ── Neutrals ─────────────────────────────────────────────────── */
+  --color-bg:            #F7F7FC;
+  --color-surface:       #fff;
+  --color-surface-2:     #EEEDF8;
+  --color-surface-3:     #E3E1F3;
+  --color-border:        #D4D2EC;
+  --color-text-strong:   #1E1A5E;
+  --color-text:          #2A264E;
+  --color-text-muted:    #586677;          /* AA on white = 4.83 */
+  --color-text-subtle:   #6B7787;          /* AA on white = 4.55 */
 
-  /* Shape */
-  --r:    8px;
-  --rr:   5px;
+  /* ── Shape ────────────────────────────────────────────────────── */
+  --radius-pill:    9999px;
+  --radius-card:    12px;
+  --radius-control:  8px;
+  --radius-chip:     6px;
+  --radius-sm:       6px;
+  --radius-md:      10px;
 
-  /* Shadow */
-  --sh:   0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
-  --shs:  0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+  /* ── Elevation ────────────────────────────────────────────────── */
+  --elev-1: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+  --elev-2: 0 1px 3px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --elev-3: 0 -8px 48px rgba(0,0,0,.18);
+  --elev-4: 0 12px 48px rgba(61,56,138,.12);
 
-  /* Typography */
-  --se: 'Source Serif 4', Georgia, serif;
-  --sa: 'Inter', system-ui, sans-serif;
+  /* ── Typography ───────────────────────────────────────────────── */
+  --font-serif: 'Source Serif 4', Georgia, serif;
+  --font-sans:  'Inter', system-ui, sans-serif;
+  --font-mono:  ui-monospace, SFMono-Regular, 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
 
-  /* Layout */
+  /* Type scale — explicit ladder so a future audit doesn't find 30
+     distinct font-size values. Selectors should reach for the named
+     step instead of inlining `font-size: 0.82rem` etc. */
+  --fs-h1:    1.5rem;     /* page H1 */
+  --fs-h2:    1.25rem;    /* section title */
+  --fs-h3:    1.0rem;     /* card title */
+  --fs-body:  0.875rem;   /* body text */
+  --fs-meta:  0.78rem;    /* meta lines, sublabels */
+  --fs-micro: 0.7rem;     /* badges, eyebrow labels */
+
+  /* ── Layout ───────────────────────────────────────────────────── */
   --hdr-h:       60px;
   --sidebar-w:   240px;
+
+  /* ── Legacy aliases (keep working until a sweep replaces refs) ── */
+  --royal:  var(--color-brand);
+  --rs:     var(--color-brand-tint);
+  --rm:     var(--color-brand-tint-2);
+  --navy:   var(--color-brand-dark);
+  --teal:   var(--color-accent);
+  --ts:     var(--color-accent-tint);
+  --green:  var(--color-success);
+  --gs:     var(--color-success-tint);
+  --gm:     var(--color-success-tint-2);
+  --amber:  var(--color-warning);
+  --as:     var(--color-warning-tint);
+  --am:     var(--color-warning-tint-2);
+  --red:    var(--color-danger);
+  --rds:    var(--color-danger-tint);
+  --rdm:    var(--color-danger-tint-2);
+  --bg:     var(--color-bg);
+  --sf:     var(--color-surface);
+  --s2:     var(--color-surface-2);
+  --s3:     var(--color-surface-3);
+  --bd:     var(--color-border);
+  --bl:     var(--color-brand-soft);
+  --ink:    var(--color-text-strong);
+  --ch:     var(--color-text);
+  --dim:    var(--color-text-muted);
+  --mu:     var(--color-text-muted);
+  --lt:     var(--color-text-subtle);
+  --r:      var(--radius-control);
+  --rr:     var(--radius-chip);
+  --r-sm:   var(--radius-sm);
+  --r-md:   var(--radius-md);
+  --r-pill: var(--radius-pill);
+  --r-card: var(--radius-card);
+  --r-control: var(--radius-control);
+  --r-chip: var(--radius-chip);
+  --sl:     var(--color-surface-2);
+  --dk:     var(--color-text-strong);
+  --bg2:    var(--color-surface-2);
+  --sh:     var(--elev-2);
+  --shs:    var(--elev-1);
+  --se:     var(--font-serif);
+  --sa:     var(--font-sans);
+  --mono:   var(--font-mono);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -802,13 +936,53 @@ body {
 ═══════════════════════════════════════════════════ */
 .hidden   { display: none !important; }
 .dimmed   { opacity: .4; pointer-events: none; }
-.mono     { font-family: 'Menlo', 'Consolas', monospace; font-size: .82em; }
+.mono     { font-family: var(--mono); font-size: .82em; }
+
+/* Inline penalty line on overdue obligation cards (replaces the
+   inline style="color:var(--amber,#b45309); …"). */
+.ob-penalty-line {
+  color: var(--amber);
+  font-size: .72rem;
+  margin-top: .2rem;
+}
+.ob-penalty-line strong { font-weight: 600; }
+.ob-penalty-line em     { font-style: italic; font-weight: 500; }
+
+/* Toast layer (showToast helper). */
+#toastHost {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  pointer-events: none;
+  max-width: 90vw;
+}
+.toast {
+  pointer-events: auto;
+  background: var(--ink);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 500;
+  padding: .65rem 1rem;
+  border-radius: var(--r-control);
+  box-shadow: var(--elev-2);
+  min-width: 220px;
+  transition: opacity .25s, transform .25s;
+}
+.toast-success { background: var(--green); }
+.toast-error   { background: var(--red); }
+.toast-leaving { opacity: 0; transform: translateY(8px); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
     transition-duration: .01ms !important;
   }
+  .toast { transition: none; }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -999,6 +1173,10 @@ body {
 .client-card[data-status="overdue"]  { border-left-color: var(--red);   }
 .client-card[data-status="urgent"]   { border-left-color: var(--amber); }
 .client-card[data-status="on-track"] { border-left-color: var(--green); }
+.client-card[data-status="review"]   {
+  border-left-color: var(--royal);
+  background: var(--rs);
+}
 
 .cc-left { min-width: 0; flex: 1; }
 
@@ -2418,47 +2596,10 @@ table.ct td {
    Precision Gray body · Source Serif 4 + Inter
 ═══════════════════════════════════════════════════ */
 
-/* ── Token overrides ── */
+/* ── Layout overrides — color/shape tokens consolidated to the
+   single :root block at the top of the file (HI-13). Only the
+   layout knobs the brand system actually changes are kept here. ── */
 :root {
-  /* Brand palette — The Present Value */
-  --royal:  #3D388A;          /* Indigo Mid — CTAs, links */
-  --rs:     rgba(61,56,138,.09);
-  --rm:     rgba(61,56,138,.16);
-  --teal:   #0891B2;          /* Data Teal — accent, charts */
-  --ts:     rgba(8,145,178,.09);
-
-  /* Semantic colours */
-  --green:  #16a34a;
-  --gs:     rgba(22,163,74,.09);
-  --gm:     rgba(22,163,74,.16);
-  --amber:  #d97706;
-  --as:     rgba(217,119,6,.09);
-  --am:     rgba(217,119,6,.16);
-  --red:    #dc2626;
-  --rds:    rgba(220,38,38,.09);
-  --rdm:    rgba(220,38,38,.16);
-
-  /* Indigo-tinted neutral palette */
-  --bg:  #F7F7FC;             /* Dusk White — page background */
-  --sf:  #ffffff;
-  --s2:  #EEEDF8;             /* Indigo Surface — cards, table rows */
-  --s3:  #E3E1F3;
-  --bd:  #D4D2EC;
-  --bl:  #9B97C4;
-  --ink: #1E1A5E;             /* Dusk Indigo — headings, anchors */
-  --ch:  #2A264E;
-  --dim: #647489;             /* Precision Gray */
-  --mu:  #647489;
-  --lt:  #8A96A8;
-
-  /* Rounder, softer shape language */
-  --r:   14px;
-  --rr:  9px;
-
-  /* Elevated card shadow */
-  --sh:  0 2px 4px rgba(30,26,94,.04), 0 8px 28px rgba(30,26,94,.08);
-  --shs: 0 1px 3px rgba(30,26,94,.03), 0 4px 14px rgba(30,26,94,.06);
-
   --hdr-h:     64px;
   --sidebar-w: 210px;
 }
@@ -2708,6 +2849,7 @@ body { background: var(--bg); }
 .client-card[data-status="overdue"]  { border-left-color: var(--red);   }
 .client-card[data-status="urgent"]   { border-left-color: var(--amber); }
 .client-card[data-status="on-track"] { border-left-color: var(--green); }
+.client-card[data-status="review"]   { border-left-color: var(--royal); background: var(--rs); }
 
 .cc-name { color: var(--ink); }
 .cc-meta { color: var(--mu);  }
@@ -2939,34 +3081,50 @@ table.ct thead { background: var(--s2); }
 
     <div id="loginMsg" class="login-msg" role="alert" aria-live="polite"></div>
 
-    <div class="fld">
-      <label for="loginEmail">Email address</label>
-      <input
-        type="email"
-        id="loginEmail"
-        placeholder="you@yourfirm.com"
-        autocomplete="email"
-        inputmode="email"
-      >
+    <!--
+      Wrapped in a real <form> so password managers detect the
+      email/password pair, autofill works, and Enter submits the
+      form without the JS-side Enter listener that was wired in
+      pre-chunk-11. The button's type="submit" handles Enter; the
+      event handler calls preventDefault() inside handlePasswordLogin.
+    -->
+    <form id="loginForm" onsubmit="event.preventDefault();handlePasswordLogin()">
+      <div class="fld">
+        <label for="loginEmail">Email address</label>
+        <input
+          type="email"
+          id="loginEmail"
+          name="email"
+          placeholder="you@yourfirm.com"
+          autocomplete="email"
+          inputmode="email"
+          required
+        >
+      </div>
+
+      <div class="fld" style="margin-top:.85rem">
+        <label for="loginPassword">Password</label>
+        <input
+          type="password"
+          id="loginPassword"
+          name="password"
+          placeholder="Your password"
+          autocomplete="current-password"
+          required
+        >
+      </div>
+
+      <button class="btn-primary btn-lg btn-full" id="loginBtn" type="submit" style="margin-top:.85rem">
+        Sign in
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:.85rem;font-size:.82rem;color:var(--mu)">
+      Don't have an account?
+      <button type="button" onclick="handleSignUp()" style="color:var(--royal);font-weight:600;background:none;border:0;padding:0;cursor:pointer;font-size:inherit;font-family:inherit">Create one</button>
     </div>
-
-    <div class="fld">
-      <label for="loginPassword">Password</label>
-      <input
-        type="password"
-        id="loginPassword"
-        placeholder="At least 8 characters"
-        autocomplete="current-password"
-      >
-    </div>
-
-    <button class="btn-primary btn-lg btn-full" id="loginBtn" onclick="handlePasswordLogin()">
-      Sign in
-    </button>
-
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.85rem;font-size:.82rem">
-      <a href="#" onclick="event.preventDefault();handleSignUp()" style="color:var(--royal);text-decoration:none;font-weight:600">Create account</a>
-      <a href="#" onclick="event.preventDefault();handleMagicLink()" style="color:var(--mu);text-decoration:none">Email me a sign-in link instead</a>
+    <div style="text-align:center;margin-top:.35rem;font-size:.78rem">
+      <button type="button" onclick="handleMagicLink()" style="color:var(--mu);background:none;border:0;padding:0;cursor:pointer;font-size:inherit;font-family:inherit;text-decoration:underline;text-underline-offset:2px">Email me a sign-in link instead</button>
     </div>
   </div>
 </div>
@@ -3037,7 +3195,7 @@ table.ct thead { background: var(--s2); }
         <button class="btn-ghost btn-sm" id="btnBulkClients"
           style="margin-left:auto" onclick="toggleBulkClients()">Bulk update</button>
         <button class="btn-primary btn-sm" style="margin-left:.5rem"
-          onclick="openClientSheet('add')">+ Add Client</button>
+          onclick="openClientSheet('add')">+ Add client</button>
       </div>
       <div id="bulkClientBar" class="bulk-bar hidden">
         <span><strong id="bulkClientCount">0</strong> selected</span>
@@ -3048,19 +3206,31 @@ table.ct thead { background: var(--s2); }
 
       <!-- Summary strip -->
       <div id="rosterSummary" class="roster-summary" aria-label="Summary">
-        <div class="sum-chip overdue" role="button" tabindex="0" onclick="_setFilter('overdue',this)" onkeydown="if(event.key==='Enter')_setFilter('overdue',this)" title="Filter: overdue">
+        <div class="sum-chip overdue" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('overdue',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('overdue',this)}"
+             title="Filter: overdue">
           <div class="sum-chip-n" id="sumOverdue">—</div>
           <div class="sum-chip-l">Overdue</div>
         </div>
-        <div class="sum-chip urgent" role="button" tabindex="0" onclick="_setFilter('urgent',this)" onkeydown="if(event.key==='Enter')_setFilter('urgent',this)" title="Filter: due this week">
+        <div class="sum-chip urgent" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('urgent',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('urgent',this)}"
+             title="Filter: due this week">
           <div class="sum-chip-n" id="sumUrgent">—</div>
           <div class="sum-chip-l">Due this week</div>
         </div>
-        <div class="sum-chip trrc" role="button" tabindex="0" onclick="_setFilter('trrc',this)" onkeydown="if(event.key==='Enter')_setFilter('trrc',this)" title="Filter: TRRC needed">
+        <div class="sum-chip trrc" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('trrc',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('trrc',this)}"
+             title="Tax Return Receipt Confirmation pending">
           <div class="sum-chip-n" id="sumTrrc">—</div>
-          <div class="sum-chip-l">TRRC needed</div>
+          <div class="sum-chip-l">TRRC pending</div>
         </div>
-        <div class="sum-chip payment" role="button" tabindex="0" onclick="_setFilter('payment',this)" onkeydown="if(event.key==='Enter')_setFilter('payment',this)" title="Filter: payment pending">
+        <div class="sum-chip payment" role="button" tabindex="0" aria-pressed="false"
+             onclick="_setFilter('payment',this)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_setFilter('payment',this)}"
+             title="Filter: payment pending">
           <div class="sum-chip-n" id="sumPayment">—</div>
           <div class="sum-chip-l">Payment pending</div>
         </div>
@@ -3074,7 +3244,7 @@ table.ct thead { background: var(--s2); }
           id="rosterSearch"
           placeholder="Search clients…"
           aria-label="Search clients"
-          oninput="_applyRosterFilter()"
+          oninput="_onRosterSearchChange()"
         >
         <div class="filter-tabs" role="tablist" aria-label="Filter clients">
           <button class="filter-tab active" role="tab" aria-selected="true"
@@ -3094,7 +3264,7 @@ table.ct thead { background: var(--s2); }
       <div id="clientList">
         <div class="empty-state">
           No clients yet.<br>
-          <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
+          <span style="color:var(--lt)">Click <strong>+ Add client</strong> to get started.</span>
         </div>
       </div>
 
@@ -3107,21 +3277,27 @@ table.ct thead { background: var(--s2); }
     <div class="detail-back-bar">
       <button class="btn-back" id="detailBackBtn" onclick="_detailBack()">← Clients</button>
       <span id="detailClientName"></span>
-      <button class="btn-ghost btn-sm" id="btnGenerateYear" style="margin-left:auto"
-        onclick="generateYearObligations()">Generate Obligations</button>
+      <button class="btn-primary btn-sm hidden" id="btnConfirmEnrollment" style="margin-left:auto"
+        onclick="confirmEnrollment()">Confirm enrollment</button>
+      <button class="btn-ghost btn-sm" id="btnGenerateYear"
+        onclick="generateYearObligations()">Generate obligations</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
-        onclick="shareEnrollmentLink()">Share Enrollment Link</button>
+        onclick="shareEnrollmentLink()">Share enrollment link</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         id="btnBulkObs" onclick="toggleBulkObs()">Select</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
-        onclick="openStatusChangeSheet()">Status Change</button>
+        onclick="openStatusChangeSheet()">Status change</button>
       <button class="btn-ghost btn-sm" style="margin-left:.5rem"
         onclick="openClientSheet('edit', activeClientId)">Edit</button>
+    </div>
+    <div id="reviewBanner" class="hidden" style="background:var(--rs);border-bottom:1px solid var(--rm);padding:.55rem 1.25rem;font-size:.82rem;color:var(--ink)">
+      <strong>Self-enrolled — not yet confirmed.</strong>
+      Review the details below, then click <strong>Confirm enrollment</strong> to seed the compliance calendar.
     </div>
     <div id="bulkObBar" class="bulk-bar hidden">
       <span><strong id="bulkObCount">0</strong> selected</span>
       <button class="btn-primary btn-sm" id="bulkObMark"
-        onclick="openBulkFilingSheet()" disabled>Mark as Filed</button>
+        onclick="openBulkFilingSheet()" disabled>Mark as filed</button>
       <button class="btn-ghost btn-sm" onclick="toggleBulkObs()">Cancel</button>
     </div>
 
@@ -3133,13 +3309,13 @@ table.ct thead { background: var(--s2); }
       <button class="subtab active" role="tab" aria-selected="true"
         data-tab="obligations" onclick="_switchSubtab('obligations')">Obligations</button>
       <button class="subtab" role="tab" aria-selected="false"
-        data-tab="history" onclick="_switchSubtab('history')">History</button>
+        data-tab="history" onclick="_switchSubtab('history')">Filings</button>
       <button class="subtab" role="tab" aria-selected="false"
         data-tab="notes" onclick="_switchSubtab('notes')">Notes</button>
       <button class="subtab hidden" role="tab" aria-selected="false"
         id="branchesTabBtn" data-tab="branches" onclick="_switchSubtab('branches')">Branches</button>
       <button class="subtab" role="tab" aria-selected="false"
-        data-tab="tax-history" onclick="_switchSubtab('tax-history')">Tax History</button>
+        data-tab="tax-history" onclick="_switchSubtab('tax-history')">Profile changes</button>
     </div>
 
     <div class="detail-panels">
@@ -3154,7 +3330,11 @@ table.ct thead { background: var(--s2); }
       <div id="notesPanel" class="hidden">
         <div class="notes-panel-wrap">
           <div class="fld">
-            <label for="clientNotesArea">Notes</label>
+            <label for="clientNotesArea">
+              Notes
+              <span id="clientNotesStatus" role="status" aria-live="polite"
+                    style="font-weight:500;font-size:.72rem;color:var(--mu);margin-left:.5rem"></span>
+            </label>
             <textarea
               id="clientNotesArea"
               rows="10"
@@ -3210,13 +3390,15 @@ table.ct thead { background: var(--s2); }
         <div>
           <div class="card">
             <div class="db-section-title-row">
-              <div class="db-section-title" id="dbUpcomingTitle">Upcoming Filings</div>
-              <select id="dbTimeframeSelect" class="db-timeframe-select" onchange="changeDashboardTimeframe(this.value)">
-                <option value="7">1 Week</option>
-                <option value="14">2 Weeks</option>
-                <option value="30">1 Month</option>
-                <option value="60">2 Months</option>
-                <option value="90">3 Months</option>
+              <div class="db-section-title" id="dbUpcomingTitle">Upcoming filings</div>
+              <select id="dbTimeframeSelect" class="db-timeframe-select"
+                aria-label="Dashboard timeframe"
+                onchange="changeDashboardTimeframe(this.value)">
+                <option value="7">Next 7 days</option>
+                <option value="14">Next 14 days</option>
+                <option value="30">Next 30 days</option>
+                <option value="60">Next 60 days</option>
+                <option value="90">Next 90 days</option>
               </select>
             </div>
             <div id="dbThisWeekList"></div>
@@ -3264,14 +3446,16 @@ table.ct thead { background: var(--s2); }
     </main>
 
     <!-- Dashboard quick-action modal -->
-    <div id="dbActionModal" class="modal-ov hidden" onclick="if(event.target===this)closeDbAction()">
+    <div id="dbActionModal" class="modal-ov hidden"
+         role="dialog" aria-modal="true" aria-labelledby="dbActionTitle"
+         onclick="if(event.target===this)closeDbAction()">
       <div class="modal-card" style="max-width:440px">
         <div class="modal-hdr">
           <div>
-            <div class="modal-title" id="dbActionTitle"></div>
+            <div class="modal-title" id="dbActionTitle">Action</div>
             <div id="dbActionSubtitle" style="font-size:.74rem;color:var(--mu);margin-top:.15rem"></div>
           </div>
-          <button class="sheet-close" onclick="closeDbAction()" aria-label="Close">×</button>
+          <button class="sheet-close" type="button" onclick="closeDbAction()" aria-label="Close">×</button>
         </div>
         <div class="modal-body" id="dbActionBody"></div>
       </div>
@@ -3350,7 +3534,7 @@ table.ct thead { background: var(--s2); }
               <select id="rptYear"></select>
             </span>
             <button class="btn-primary btn-sm" id="btnGen1" onclick="generateReport1()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3366,7 +3550,7 @@ table.ct thead { background: var(--s2); }
               <select id="rptYear2"></select>
             </span>
             <button class="btn-primary btn-sm" id="btnGen2" onclick="generateReport2()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3378,7 +3562,7 @@ table.ct thead { background: var(--s2); }
               <input type="date" id="rptAsOf">
             </span>
             <button class="btn-primary btn-sm" id="btnGen3" onclick="generateReport3()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3394,7 +3578,7 @@ table.ct thead { background: var(--s2); }
               <select id="rptYear4"></select>
             </span>
             <button class="btn-primary btn-sm" id="btnGen4" onclick="generateReport4()">Generate</button>
-            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export to Excel</button>
+            <button class="btn-ghost btn-sm" style="margin-left:auto" onclick="exportCurrentReportToCsv()">Export CSV</button>
             <button class="btn-ghost btn-sm print-btn" onclick="window.print()">Print</button>
           </div>
 
@@ -3482,7 +3666,7 @@ table.ct thead { background: var(--s2); }
   <div class="sheet-card">
 
     <div class="sheet-hdr">
-      <span class="sheet-title" id="addSheetTitle">Add Client</span>
+      <span class="sheet-title" id="addSheetTitle">Add client</span>
       <span class="sheet-meta">
         <span class="step-dots" aria-hidden="true">
           <span class="step-dot active" id="stepDot1"></span>
@@ -3565,12 +3749,12 @@ table.ct thead { background: var(--s2); }
             <label for="ac_classification">Tax classification (EOPT)</label>
             <select id="ac_classification">
               <option value="">— Select —</option>
-              <option value="Micro">Micro (gross sales &lt; ₱3M)</option>
-              <option value="Small">Small (₱3M – &lt;₱20M)</option>
-              <option value="Medium">Medium (₱20M – &lt;₱1B)</option>
-              <option value="Large">Large (≥ ₱1B)</option>
+              <option value="Micro">Micro (under ₱3M gross sales)</option>
+              <option value="Small">Small (₱3M to under ₱20M)</option>
+              <option value="Medium">Medium (₱20M to under ₱1B)</option>
+              <option value="Large">Large (₱1B and above)</option>
             </select>
-            <span class="hint">RR 8-2024 — surfaces 1701-MS for Micro/Small individuals.</span>
+            <span class="hint">EOPT classification (RR 8-2024). For Micro/Small individuals, also surfaces the optional 1701-MS annual ITR.</span>
           </div>
           <div class="fld">
             <label for="ac_deduction">Deduction method</label>
@@ -3578,7 +3762,7 @@ table.ct thead { background: var(--s2); }
               <option value="">— Select —</option>
               <option value="Itemized">Itemized Deduction</option>
               <option value="OSD">Optional Standard Deduction (OSD)</option>
-              <option value="8%">8% Income Tax Rate</option>
+              <option value="8%">8% income tax option</option>
             </select>
             <span class="hint">OSD or 8% on a pure SE filer routes to 1701A; Itemized routes to 1701.</span>
           </div>
@@ -3741,11 +3925,11 @@ table.ct thead { background: var(--s2); }
 ═══════════════════════════════════════════════════ -->
 <div id="bulkFilingSheet" class="sheet-ov hidden"
   onclick="if(event.target===this)closeBulkFilingSheet()"
-  role="dialog" aria-modal="true">
+  role="dialog" aria-modal="true" aria-labelledby="bulkFilingTitle">
   <div class="sheet-card">
     <div class="sheet-hdr">
-      <span class="sheet-title">Mark as Filed</span>
-      <button class="sheet-close" onclick="closeBulkFilingSheet()" aria-label="Close">×</button>
+      <span class="sheet-title" id="bulkFilingTitle">Mark as filed</span>
+      <button class="sheet-close" type="button" onclick="closeBulkFilingSheet()" aria-label="Close">×</button>
     </div>
     <div class="sheet-body" id="bulkFilingBody"></div>
   </div>
@@ -3753,11 +3937,11 @@ table.ct thead { background: var(--s2); }
 
 <div id="combinedObSheet" class="sheet-ov hidden"
   onclick="if(event.target===this)closeCombinedObSheet()"
-  role="dialog" aria-modal="true">
+  role="dialog" aria-modal="true" aria-labelledby="combinedObTitle">
   <div class="sheet-card">
     <div class="sheet-hdr">
-      <span class="sheet-title">Combined obligations</span>
-      <button class="sheet-close" onclick="closeCombinedObSheet()" aria-label="Close">×</button>
+      <span class="sheet-title" id="combinedObTitle">Combined obligations</span>
+      <button class="sheet-close" type="button" onclick="closeCombinedObSheet()" aria-label="Close">×</button>
     </div>
     <div class="sheet-body" id="combinedObBody"></div>
   </div>
@@ -3774,7 +3958,7 @@ table.ct thead { background: var(--s2); }
   <div class="sheet-card">
 
     <div class="sheet-hdr">
-      <span class="sheet-title" id="scSheetTitle">Record Tax Status Change</span>
+      <span class="sheet-title" id="scSheetTitle">Record tax status change</span>
       <span class="sheet-meta">
         <span class="step-dots" aria-hidden="true">
           <span class="step-dot active" id="scDot1"></span>
@@ -3804,8 +3988,8 @@ table.ct thead { background: var(--s2); }
                 <option value="vat_to_nonvat">VAT → Non-VAT (De-registration)</option>
               </optgroup>
               <optgroup label="Income Tax Regime">
-                <option value="itemized_to_8pct">Itemized / OSD → 8% GIT Option</option>
-                <option value="8pct_to_itemized">8% GIT Option → Itemized / OSD</option>
+                <option value="itemized_to_8pct">Itemized / OSD → 8% income tax option</option>
+                <option value="8pct_to_itemized">8% income tax option → Itemized / OSD</option>
               </optgroup>
               <optgroup label="Obligations">
                 <option value="add_obligation">Add Obligation</option>
@@ -3819,7 +4003,7 @@ table.ct thead { background: var(--s2); }
             <label for="sc_new_vat_status">New VAT / income tax status</label>
             <select id="sc_new_vat_status">
               <option value="Non-VAT (Percentage Tax)">Non-VAT — Percentage Tax (3%)</option>
-              <option value="Non-VAT (8% Option)">Non-VAT — 8% GIT Option</option>
+              <option value="Non-VAT (8% Option)">Non-VAT — 8% income tax option</option>
               <option value="Non-VAT (Graduated)">Non-VAT — Graduated Tax (no business tax)</option>
             </select>
           </div>
@@ -3907,7 +4091,7 @@ table.ct thead { background: var(--s2); }
     <div class="modal-body">
       <p id="enrollLinkHint" style="font-size:.8rem;color:var(--mu);margin-bottom:.75rem"></p>
       <div class="enroll-link-row">
-        <input type="text" id="enrollLinkUrl" readonly>
+        <input type="text" id="enrollLinkUrl" readonly aria-label="Enrollment link URL">
         <button class="btn-primary btn-sm" onclick="copyEnrollLink()" id="enrollLinkCopyBtn">Copy link</button>
       </div>
       <p style="font-size:.75rem;color:var(--mu);margin-top:.9rem;line-height:1.5">
@@ -3922,8 +4106,11 @@ table.ct thead { background: var(--s2); }
 <script>
 /*
  * ══════════════════════════════════════════════════════════════
- * SQL MIGRATION
- * Run once in the Supabase SQL editor before going live.
+ * SQL MIGRATION (REFERENCE ONLY)
+ * Authoritative schema lives in supabase/migrations/0001-0007*.sql.
+ * The block below documents the post-migration shape; do NOT run it
+ * as a one-off — `supabase db push` against the migrations directory
+ * is the supported deployment path.
  * ══════════════════════════════════════════════════════════════
  *
  * ── 1. PRACTITIONERS ──────────────────────────────────────────
@@ -4333,13 +4520,74 @@ let _dbRecordMeta       = {}     // { [recordId]: { clientName, form, period } }
 const $  = id  => document.getElementById(id)
 const qs = sel => document.querySelector(sel)
 
-/** Escape a string for safe HTML insertion */
+/** Escape a string for safe HTML insertion. Encodes both quote
+ *  variants and the backtick so the helper is also safe for use
+ *  inside attribute strings that quote with `'` (some inline
+ *  onclick=" ..." templates do — UUIDs are normally safe, but the
+ *  display_name is user-controlled and reaches the same templates). */
 function esc(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;')
+}
+
+/** Philippine peso formatter — always shows ₱X,XXX.XX with en-PH
+ *  separators, regardless of the user's browser locale. */
+function fmtPHP(v) {
+  const n = Number(v ?? 0)
+  return '₱' + (Number.isFinite(n) ? n : 0).toLocaleString('en-PH', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })
+}
+
+/** Timezone-safe date formatter for `YYYY-MM-DD` strings coming
+ *  from Postgres `date` columns. `new Date('2026-04-15')` parses as
+ *  UTC midnight, which renders as Apr 14 in PHT — appending T00:00:00
+ *  forces local-midnight semantics. */
+function fmtDate(s) {
+  if (!s) return ''
+  return new Date(s + 'T00:00:00').toLocaleDateString('en-PH', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
+/** Map raw Supabase / Postgres errors to user-actionable copy. */
+function humanError(err) {
+  if (!err) return 'Something went wrong — please try again.'
+  const m = (err.message ?? String(err)).toLowerCase()
+  if (m.includes('row-level security'))     return 'Permission denied. Please sign in again.'
+  if (m.includes('duplicate key'))          return 'A record with these details already exists.'
+  if (m.includes('violates foreign key'))   return 'Linked record was not found — try refreshing.'
+  if (m.includes('failed to fetch')
+      || m.includes('networkerror'))        return 'Network error — check your connection and try again.'
+  if (m.includes('jwt') || m.includes('expired session'))
+                                            return 'Your session expired. Please sign in again.'
+  if (m.includes('invalid_token'))          return 'This enrollment link is invalid.'
+  if (m.includes('token_already_used'))     return 'This enrollment link has already been used.'
+  if (m.includes('token_expired'))          return 'This enrollment link has expired.'
+  return err.message ?? 'Something went wrong — please try again.'
+}
+
+/** Toast layer. Call after every async mutation. `kind` ∈ {success,error,info}. */
+function showToast(message, kind = 'info') {
+  let host = document.getElementById('toastHost')
+  if (!host) {
+    host = document.createElement('div')
+    host.id = 'toastHost'
+    host.setAttribute('aria-live', 'polite')
+    host.setAttribute('aria-atomic', 'true')
+    document.body.appendChild(host)
+  }
+  const node = document.createElement('div')
+  node.className = `toast toast-${kind}`
+  node.textContent = message
+  host.appendChild(node)
+  setTimeout(() => { node.classList.add('toast-leaving') }, 2500)
+  setTimeout(() => { node.remove() }, 3000)
 }
 
 
@@ -4383,17 +4631,15 @@ function showDashboard() {
 }
 
 async function loadDashboard() {
-  const loading = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">Loading…</p>'
-  ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList']
-    .forEach(id => { $(id).innerHTML = loading })
+  const panelIds = ['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList']
+  panelIds.forEach(id => uiRender.render(uiRender.loadingLine(), $(id)))
   ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue']
     .forEach(id => { $(id).textContent = '—' })
 
   const practitioner = currentPractitioner
 
   if (!practitioner) {
-    const msg = '<p style="color:var(--red);font-size:.82rem">Not signed in.</p>'
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    panelIds.forEach(id => uiRender.render(uiRender.errorLine('Not signed in.'), $(id)))
     return
   }
 
@@ -4416,8 +4662,10 @@ async function loadDashboard() {
     .eq('is_active', true)
 
   if (cErr || !clients?.length) {
-    const msg = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">No active clients found.</p>'
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    panelIds.forEach(id => uiRender.render(
+      uiRender.emptyState('No active clients found.'),
+      $(id),
+    ))
     ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue'].forEach(id => { $(id).textContent = '0' })
     return
   }
@@ -4438,13 +4686,21 @@ async function loadDashboard() {
     .or(`due_date.gte.${yearStart},and(filed_date.is.null,due_date.lt.${todayStr}),and(filed_date.not.is.null,trrc_saved.is.false),and(filed_date.not.is.null,has_tax_due.is.true,payment_status.eq.unpaid)`)
 
   if (error) {
-    const msg = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    console.error(error)
+    panelIds.forEach(id => uiRender.render(
+      uiRender.errorLine(humanError(error)),
+      $(id),
+    ))
     return
   }
 
   const thisWeek = [], overdue = [], trrcNeeded = [], paymentPending = []
   let totalYear = 0, filed = 0, pending = 0, overdueCount = 0
+
+  // Reuse the single recordStatus() helper — the dashboard's "this
+  // week" horizon is the configurable timeframe rather than a fixed
+  // 7-day window.
+  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0)
 
   ;(records || []).forEach(r => {
     const due = r.due_date || ''
@@ -4454,10 +4710,11 @@ async function loadDashboard() {
       else if (due < todayStr) { overdueCount++; pending++ }
       else                     { pending++ }
     }
-    if (!r.filed_date && due >= todayStr && due <= inNStr) thisWeek.push(r)
-    if (!r.filed_date && due && due < todayStr)            overdue.push(r)
-    if (r.filed_date && !r.trrc_saved)                     trrcNeeded.push(r)
-    if (r.filed_date && r.has_tax_due && r.payment_status !== 'paid') paymentPending.push(r)
+    const s = recordStatus(r, { today: todayDate, weekAheadDays: _dbTimeframeDays })
+    if (s.isUrgent)       thisWeek.push(r)
+    if (s.isOverdue)      overdue.push(r)
+    if (s.needsTrrc)      trrcNeeded.push(r)
+    if (s.paymentPending) paymentPending.push(r)
   })
 
   thisWeek.sort((a,b) => a.due_date.localeCompare(b.due_date))
@@ -4468,38 +4725,52 @@ async function loadDashboard() {
   $('dbStatPending').textContent = pending
   $('dbStatOverdue').textContent = overdueCount
 
+  // _dbRecordMeta is still consulted by the quick-action modal
+  // (openDbAction reads it to render the modal subtitle), so we
+  // populate it here while preparing the lit-html row props.
   _dbRecordMeta = {}
-  const _row = (r, badge, actionType) => {
-    _dbRecordMeta[r.id] = { clientName: clientMap[r.client_id] || '—', form: r.form || '', period: r.period || '' }
-    const name = esc(clientMap[r.client_id] || '—')
-    const due  = r.due_date
-      ? new Date(r.due_date + 'T00:00:00').toLocaleDateString('en-PH', {month:'short', day:'numeric'})
-      : '—'
-    const actBtn = actionType
-      ? `<button class="db-row-act" onclick="event.stopPropagation();openDbAction('${actionType}','${r.id}')" title="Mark done">✓</button>`
-      : ''
-    return `<div class="db-row" onclick="showClientDetail('${r.client_id}')">
-      <div class="db-row-client">${name}</div>
-      <div class="db-row-meta">${esc(r.form||'')}${r.period ? ` · ${esc(r.period)}` : ''}</div>
-      <div class="db-row-meta" style="margin-left:auto">Due ${due}</div>
-      ${badge}${actBtn}
-    </div>`
+  for (const r of [...thisWeek, ...overdue, ...trrcNeeded, ...paymentPending]) {
+    _dbRecordMeta[r.id] = {
+      clientName: clientMap[r.client_id] || '—',
+      form:       r.form   || '',
+      period:     r.period || '',
+    }
   }
-  const _empty = t => `<p class="db-empty">${t}</p>`
 
-  const tfLabel = {7:'this week',14:'in the next 2 weeks',30:'this month',60:'in the next 2 months',90:'in the next 3 months'}[_dbTimeframeDays] || `in the next ${_dbTimeframeDays} days`
-  $('dbThisWeekList').innerHTML = thisWeek.length
-    ? thisWeek.map(r => _row(r, '<span class="badge badge-dim">Pending</span>', 'file')).join('')
-    : _empty(`No filings due ${tfLabel} ✓`)
-  $('dbOverdueList').innerHTML = overdue.length
-    ? overdue.map(r => _row(r, '<span class="badge badge-red">Overdue</span>', 'file')).join('')
-    : _empty('Nothing overdue ✓')
-  $('dbTrrcList').innerHTML = trrcNeeded.length
-    ? trrcNeeded.map(r => _row(r, '<span class="badge badge-blue">TRRC</span>', 'trrc')).join('')
-    : _empty('No TRRC pending ✓')
-  $('dbPaymentList').innerHTML = paymentPending.length
-    ? paymentPending.map(r => _row(r, '<span class="badge badge-amber">Unpaid</span>', 'pay')).join('')
-    : _empty('No payments pending ✓')
+  const resolveClientName = (r) => clientMap[r.client_id] || '—'
+  const tfLabel = `in the next ${_dbTimeframeDays} day${_dbTimeframeDays === 1 ? '' : 's'}`
+
+  uiRender.render(uiRender.dashboardList({
+    rows: thisWeek, badge: 'pending',
+    emptyText: `No filings due ${tfLabel} ✓`,
+    resolveClientName,
+    onAction: (r) => openDbAction('file', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbThisWeekList'))
+
+  uiRender.render(uiRender.dashboardList({
+    rows: overdue, badge: 'overdue',
+    emptyText: 'Nothing overdue ✓',
+    resolveClientName,
+    onAction: (r) => openDbAction('file', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbOverdueList'))
+
+  uiRender.render(uiRender.dashboardList({
+    rows: trrcNeeded, badge: 'trrc',
+    emptyText: 'No TRRC pending ✓',
+    resolveClientName,
+    onAction: (r) => openDbAction('trrc', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbTrrcList'))
+
+  uiRender.render(uiRender.dashboardList({
+    rows: paymentPending, badge: 'unpaid',
+    emptyText: 'No payments pending ✓',
+    resolveClientName,
+    onAction: (r) => openDbAction('pay', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbPaymentList'))
 }
 
 
@@ -4510,104 +4781,56 @@ function changeDashboardTimeframe(val) {
 }
 
 // ── DASHBOARD QUICK-ACTION MODAL ─────────────────────────────
+// The three forms (filing / TRRC / payment) are now lit-html
+// templates in src/ui/render.js. Click handlers are real function
+// refs instead of inline onclick="…", and select options are no
+// longer concatenated as strings (the chunk-9 audit flagged this
+// as fragile).
 function openDbAction(type, recordId) {
   _dbActionRid = recordId
-  const meta    = _dbRecordMeta[recordId] || {}
-  const today   = _iso(new Date())
-  const subtitle = `${esc(meta.form)}${meta.period ? ' · ' + esc(meta.period) : ''} — ${esc(meta.clientName)}`
+  const meta   = _dbRecordMeta[recordId] || {}
+  const today  = _iso(new Date())
 
-  $('dbActionSubtitle').innerHTML = subtitle
+  // Subtitle is plain text; no innerHTML.
+  $('dbActionSubtitle').textContent =
+    `${meta.form ?? ''}${meta.period ? ' · ' + meta.period : ''} — ${meta.clientName ?? ''}`
 
+  let template
   if (type === 'file') {
-    $('dbActionTitle').textContent = 'Mark as Filed'
-    $('dbActionBody').innerHTML = `
-<div class="inline-form" style="padding:0">
-  <div class="fld">
-    <label>Date filed <span class="req">*</span></label>
-    <input type="date" id="dba_date" value="${today}">
-  </div>
-  <label class="check-inline">
-    <input type="checkbox" id="dba_taxdue" onchange="_dbaToggleTaxDue()"> Has tax due?
-  </label>
-  <div class="fld hidden" id="dba_taxdue_wrap">
-    <label>Tax due amount (₱)</label>
-    <input type="number" id="dba_taxamt" min="0" step="0.01" placeholder="0.00">
-  </div>
-  <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none"></div>
-  <div class="inline-form-actions">
-    <button class="btn-primary btn-sm" onclick="_dbaSaveFiling()">Save</button>
-    <button class="btn-cancel-inline" onclick="closeDbAction()">Cancel</button>
-  </div>
-</div>`
-
+    $('dbActionTitle').textContent = 'Mark as filed'
+    template = uiRender.quickActionFiling({
+      today,
+      onSave:          _dbaSaveFiling,
+      onCancel:        closeDbAction,
+      onToggleTaxDue:  _dbaToggleTaxDue,
+    })
   } else if (type === 'trrc') {
-    $('dbActionTitle').textContent = 'Mark TRRC Saved'
-    $('dbActionBody').innerHTML = `
-<div class="inline-form" style="padding:0">
-  <div class="fld">
-    <label>TRRC date <span class="req">*</span></label>
-    <input type="date" id="dba_date" value="${today}">
-  </div>
-  <div class="fld">
-    <label>TRRC file name <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
-    <input type="text" id="dba_ref" placeholder="e.g. TRRC_2550Q_2026Q1.pdf">
-  </div>
-  <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none"></div>
-  <div class="inline-form-actions">
-    <button class="btn-primary btn-sm" onclick="_dbaSaveTRRC()">Save</button>
-    <button class="btn-cancel-inline" onclick="closeDbAction()">Cancel</button>
-  </div>
-</div>`
-
+    $('dbActionTitle').textContent = 'Mark TRRC saved'
+    template = uiRender.quickActionTRRC({
+      today, onSave: _dbaSaveTRRC, onCancel: closeDbAction,
+    })
   } else if (type === 'pay') {
-    $('dbActionTitle').textContent = 'Record Payment'
-    const modes = ['Online banking','Over-the-counter','GCash','Maya','MyEG PH','Check','Others']
-    $('dbActionBody').innerHTML = `
-<div class="inline-form" style="padding:0">
-  <div class="inline-form-row">
-    <div class="fld">
-      <label>Amount paid (₱) <span class="req">*</span></label>
-      <input type="number" id="dba_amt" min="0" step="0.01" placeholder="0.00">
-    </div>
-    <div class="fld">
-      <label>Payment date <span class="req">*</span></label>
-      <input type="date" id="dba_date" value="${today}">
-    </div>
-  </div>
-  <div class="inline-form-row">
-    <div class="fld">
-      <label>Reference / confirmation no.</label>
-      <input type="text" id="dba_ref" placeholder="e.g. LANDBANK-…">
-    </div>
-    <div class="fld">
-      <label>Payment mode</label>
-      <select id="dba_mode">
-        <option value="">— select —</option>
-        ${modes.map(m => `<option value="${m}">${m}</option>`).join('')}
-      </select>
-    </div>
-  </div>
-  <div class="fld">
-    <label>Transaction fee (₱) <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
-    <input type="number" id="dba_fee" min="0" step="0.01" placeholder="0.00">
-  </div>
-  <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none"></div>
-  <div class="inline-form-actions">
-    <button class="btn-primary btn-sm" onclick="_dbaSavePayment()">Save</button>
-    <button class="btn-cancel-inline" onclick="closeDbAction()">Cancel</button>
-  </div>
-</div>`
+    $('dbActionTitle').textContent = 'Record payment'
+    template = uiRender.quickActionPayment({
+      today, onSave: _dbaSavePayment, onCancel: closeDbAction,
+    })
+  } else {
+    return
   }
 
-  $('dbActionModal').classList.remove('hidden')
-  // Focus first input for keyboard users
-  setTimeout(() => { const f = $('dbActionBody').querySelector('input'); if (f) f.focus() }, 50)
+  uiRender.render(template, $('dbActionBody'))
+  openSheet('dbActionModal')
+  // openSheet handles initial focus + ESC to close + focus return.
 }
 
 function closeDbAction() {
   $('dbActionModal').classList.add('hidden')
-  $('dbActionBody').innerHTML = ''
+  uiRender.render(uiRender.html``, $('dbActionBody'))
   _dbActionRid = null
+  // Restore focus to the trigger element so keyboard users land
+  // somewhere useful (mirrors the global Escape handler's behaviour).
+  _lastFocusedBeforeSheet?.focus?.()
+  _lastFocusedBeforeSheet = null
 }
 
 function _dbaToggleTaxDue() {
@@ -4629,7 +4852,7 @@ async function _dbaSaveFiling() {
     tax_due:        taxDue,
     payment_status: hasTaxDue ? 'unpaid' : 'n/a',
   }).eq('id', _dbActionRid)
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   closeDbAction()
   await loadDashboard()
 }
@@ -4645,7 +4868,7 @@ async function _dbaSaveTRRC() {
     trrc_date:      trrcDate,
     trrc_reference: trrcRef,
   }).eq('id', _dbActionRid)
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   closeDbAction()
   await loadDashboard()
 }
@@ -4669,7 +4892,7 @@ async function _dbaSavePayment() {
     payment_reference: payRef,
     payment_mode:      payMode,
   }).eq('id', _dbActionRid)
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   closeDbAction()
   await loadDashboard()
 }
@@ -4682,13 +4905,13 @@ async function showClientDetail(clientId) {
   _showPage('clientView')
 
   _switchSubtab('obligations')
-  $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading…</p>'
+  uiRender.render(uiRender.loadingLine(), $('obligationsPanel'))
   $('detailClientName').textContent = ''
   $('detailMetaStrip').textContent  = ''
 
   const { data: client } = await supa.from('clients').select('*').eq('id', clientId).single()
   if (!client) {
-    $('obligationsPanel').innerHTML = '<p style="color:var(--red);font-size:.82rem">Could not load client.</p>'
+    uiRender.render(uiRender.errorLine('Could not load client.'), $('obligationsPanel'))
     return
   }
 
@@ -4748,8 +4971,60 @@ async function showClientDetail(clientId) {
   ].filter(Boolean).join(' · ')
   $('detailMetaStrip').textContent = metaParts
 
+  // Surface the "Confirm enrollment" CTA + banner for self-enrolled clients.
+  const confirmBtn = $('btnConfirmEnrollment')
+  const banner     = $('reviewBanner')
+  if (client.needs_review) {
+    confirmBtn?.classList.remove('hidden')
+    banner?.classList.remove('hidden')
+  } else {
+    confirmBtn?.classList.add('hidden')
+    banner?.classList.add('hidden')
+  }
+
   await _updateGenerateYearBtn(clientId)
   await loadObligations(clientId)
+}
+
+/** Mark a self-enrolled client as reviewed and seed their compliance
+ *  calendar for the current year. The "Generate {year} obligations"
+ *  button remains for back-fills and additional years. */
+async function confirmEnrollment() {
+  if (!_currentClient || !activeClientId) return
+  const btn = $('btnConfirmEnrollment')
+  if (btn) { btn.disabled = true; btn.textContent = 'Confirming…' }
+
+  // 1. Clear the flag.
+  const { error: upErr } = await supa
+    .from('clients').update({ needs_review: false }).eq('id', activeClientId)
+  if (upErr) {
+    console.error(upErr)
+    showToast(humanError(upErr), 'error')
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm enrollment' }
+    return
+  }
+  _currentClient.needs_review = false
+
+  // 2. Seed obligations for the current year — practitioner can still
+  //    use "Generate obligations" to back-fill or add future years.
+  await seedComplianceRecords(activeClientId, {
+    taxpayer_type:        _currentClient.taxpayer_type,
+    vat_status:           _currentClient.vat_status,
+    tax_classification:   _currentClient.tax_classification,
+    deduction_method:     _currentClient.deduction_method,
+    has_employees:        _currentClient.has_employees,
+    withholds_expanded:   _currentClient.withholds_expanded,
+    withholds_final:      _currentClient.withholds_final,
+    fiscal_year_start:    _currentClient.fiscal_start_month || 1,
+    owner_pays_sss:       _currentClient.owner_pays_sss,
+    owner_pays_philhealth:_currentClient.owner_pays_philhealth,
+    owner_pays_pagibig:   _currentClient.owner_pays_pagibig,
+    requires_audited_fs:  _currentClient.requires_audited_fs,
+  })
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm enrollment' }
+  showToast('Enrollment confirmed — calendar seeded', 'success')
+  await showClientDetail(activeClientId)
 }
 
 /** Back navigation from client detail — branches go to their parent, others go to roster. */
@@ -4926,24 +5201,15 @@ async function _onSessionChange(session) {
   if (!session) {
     currentPractitioner = null
     activeClientId      = null
+    appStore.update({ practitioner: null, activeClientId: null })
     showLoginView()
     return
   }
 
   currentPractitioner = await getCurrentPractitioner()
-
-  // Populate header user indicator
-  const hdrUser = $('hdrUser')
-  if (hdrUser && currentPractitioner) {
-    hdrUser.textContent =
-      currentPractitioner.firm_name ||
-      currentPractitioner.name      ||
-      currentPractitioner.email     || ''
-  }
-
-  // Populate sidebar identity (desktop)
-  const sp = $('sidebarPractName');  if (sp) sp.textContent  = currentPractitioner?.firm_name || currentPractitioner?.name  || ''
-  const se = $('sidebarPractEmail'); if (se) se.textContent  = currentPractitioner?.email || ''
+  // Push to the store; the subscribe() at the top of <head> updates
+  // every header / sidebar / settings DOM surface in one place.
+  appStore.update({ practitioner: currentPractitioner })
 
   // Only navigate to the roster on the *initial* sign-in.
   // If the user is already inside the app (any page other than login),
@@ -4970,493 +5236,63 @@ supa.auth.getSession().then(({ data: { session } }) => {
   _onSessionChange(session)
 })
 
-// Allow Enter key to submit the login form
-;['loginEmail', 'loginPassword'].forEach(id => {
-  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') handlePasswordLogin() })
+// Enter-to-submit on the login form is handled natively by the
+// <form id="loginForm"> wrapper added in chunk 11. No JS listener
+// needed.
+
+// ── Global modal/sheet handling: ESC-to-close, focus return ──
+// Tracks the element that opened the dialog so we can restore focus
+// when the dialog closes. Populated by openSheet() below.
+let _lastFocusedBeforeSheet = null
+
+/** Mark a sheet/modal as the active dialog, save the element that
+ *  opened it, and focus the first interactive control inside. */
+function openSheet(idOrEl) {
+  const el = typeof idOrEl === 'string' ? $(idOrEl) : idOrEl
+  if (!el) return
+  _lastFocusedBeforeSheet = document.activeElement
+  el.classList.remove('hidden')
+  // Defer focus so layout settles first.
+  setTimeout(() => {
+    const first = el.querySelector(
+      'input:not([type=hidden]):not([disabled]), select:not([disabled]), ' +
+      'textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (first) first.focus()
+  }, 30)
+}
+
+/** Find the topmost-open sheet/modal and synthesise a click on its
+ *  close button. Used by the global Escape handler. */
+function _closeTopmostSheet() {
+  const open = document.querySelector(
+    '.sheet-ov:not(.hidden), .modal-ov:not(.hidden), .modal:not(.hidden)'
+  )
+  if (!open) return false
+  const closeBtn = open.querySelector('.sheet-close, .modal-close, [data-sheet-close]')
+  if (closeBtn) { closeBtn.click(); return true }
+  // Fallback: just hide the dialog.
+  open.classList.add('hidden')
+  return true
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (_closeTopmostSheet()) {
+      // Restore focus to the trigger element so keyboard users land
+      // somewhere useful instead of on <body>.
+      _lastFocusedBeforeSheet?.focus?.()
+      _lastFocusedBeforeSheet = null
+    }
+  }
 })
 
 
 // ── OBLIGATION GENERATION ─────────────────────────────────────
-
-const _MONTHS = ['January','February','March','April','May','June',
-                 'July','August','September','October','November','December']
-
-/**
- * Local-timezone-safe ISO date formatter.  date.toISOString() converts
- * to UTC, which silently shifts a local-midnight date back by 24 hours
- * for any user east of UTC (Asia/Manila is UTC+8) — making every
- * persisted due date wrong by one day.  Format the local components
- * directly instead.
- */
-function _iso(date) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-/**
- * Philippine non-working days (regular holidays + special non-working
- * days) for years the app actually generates obligations for.  When a
- * BIR deadline falls on any of these dates — or on a Sat/Sun — the
- * deadline shifts to the next regular business day per the long-
- * standing BIR practice codified in RMC 1-2009 ("Whenever a tax
- * payment falls due on a Saturday, Sunday or legal holiday, the same
- * may be paid on the next succeeding business day").
- *
- * Sources:
- *   • Proclamation No. 368 s.2023 — 2024 holidays
- *   • Proclamation Nos. 514, 579 s.2024 — 2024 Eid'l Fitr / Adha
- *   • Proclamation No. 727 s.2024 — 2025 holidays
- *   • Proclamation Nos. 839, 911 s.2025 — 2025 Eid'l Fitr / Adha
- *   • Proclamation No. 878 s.2025 — additional 12 May 2025 SNW
- *   • Proclamation No. 1006 s.2025 — 2026 holidays
- *
- * Eid'l Fitr and Eid'l Adha for any future year are added once the
- * Office of the President issues the individual proclamation (the
- * dates depend on Hijri / lunar calculation and are not fixed in
- * the annual omnibus proclamation).
- */
-const _PH_HOLIDAYS = new Set([
-  // 2024
-  '2024-01-01', // New Year's Day
-  '2024-02-10', // Chinese New Year
-  '2024-03-28', // Maundy Thursday
-  '2024-03-29', // Good Friday
-  '2024-03-30', // Black Saturday
-  '2024-04-09', // Araw ng Kagitingan
-  '2024-04-10', // Eid'l Fitr (Proc 514)
-  '2024-05-01', // Labor Day
-  '2024-06-12', // Independence Day
-  '2024-06-17', // Eid'l Adha (Proc 579)
-  '2024-08-21', // Ninoy Aquino Day
-  '2024-08-26', // National Heroes Day
-  '2024-11-01', // All Saints' Day
-  '2024-11-02', // additional SNW
-  '2024-11-30', // Bonifacio Day
-  '2024-12-08', // Immaculate Conception
-  '2024-12-24', // Christmas Eve
-  '2024-12-25', // Christmas Day
-  '2024-12-30', // Rizal Day
-  '2024-12-31', // Last Day of the Year
-  // 2025
-  '2025-01-01', // New Year's Day
-  '2025-01-29', // Chinese New Year
-  '2025-04-01', // Eid'l Fitr (Proc 839)
-  '2025-04-09', // Araw ng Kagitingan
-  '2025-04-17', // Maundy Thursday
-  '2025-04-18', // Good Friday
-  '2025-04-19', // Black Saturday
-  '2025-05-01', // Labor Day
-  '2025-05-12', // additional SNW (Proc 878)
-  '2025-06-06', // Eid'l Adha (Proc 911)
-  '2025-06-12', // Independence Day
-  '2025-08-21', // Ninoy Aquino Day
-  '2025-08-25', // National Heroes Day
-  '2025-11-01', // All Saints' Day
-  '2025-11-30', // Bonifacio Day
-  '2025-12-08', // Immaculate Conception
-  '2025-12-24', // Christmas Eve
-  '2025-12-25', // Christmas Day
-  '2025-12-30', // Rizal Day
-  '2025-12-31', // Last Day of the Year
-  // 2026 — Eid'l Fitr/Adha pending separate proclamations
-  '2026-01-01', // New Year's Day
-  '2026-02-17', // Chinese New Year
-  '2026-04-02', // Maundy Thursday
-  '2026-04-03', // Good Friday
-  '2026-04-04', // Black Saturday
-  '2026-04-09', // Araw ng Kagitingan
-  '2026-05-01', // Labor Day
-  '2026-06-12', // Independence Day
-  '2026-08-21', // Ninoy Aquino Day
-  '2026-08-31', // National Heroes Day
-  '2026-11-01', // All Saints' Day
-  '2026-11-02', // All Souls' Day
-  '2026-11-30', // Bonifacio Day
-  '2026-12-08', // Immaculate Conception
-  '2026-12-24', // Christmas Eve
-  '2026-12-25', // Christmas Day
-  '2026-12-30', // Rizal Day
-  '2026-12-31', // Last Day of the Year
-])
-
-/**
- * Move a date forward to the next regular business day, skipping
- * Saturdays, Sundays, and Philippine non-working days (see
- * _PH_HOLIDAYS).  Capped at 14 iterations as a safety net — the
- * longest non-working stretch in PH practice is the Holy Week +
- * weekend run, which is at most 5 consecutive days.
- */
-function _nextBusinessDay(date) {
-  const d = new Date(date)
-  for (let i = 0; i < 14; i++) {
-    const wd = d.getDay()
-    if (wd !== 0 && wd !== 6 && !_PH_HOLIDAYS.has(_iso(d))) return d
-    d.setDate(d.getDate() + 1)
-  }
-  console.warn('_nextBusinessDay: exceeded 14-day cap for', _iso(date))
-  return d
-}
-
-/**
- * Returns an array of obligation objects for the current calendar year
- * based on the client's taxpayer profile.
- *
- * Each object: { id, form, name, period, dueDate, category }
- *
- * Current through:
- *   - RA 11976 (EOPT) — 2550M and 0605 ARF abolished; VAT filed quarterly only.
- *   - RA 12066 (CREATE MORE) — 20% RCIT for RBEs under EDR (rate flag only;
- *     obligation set is the same as other domestic corporations).
- *   - RR 11-2025 as amended by RR 26-2025, and RR 1-2026 — e-invoicing.
- *   - RMC 30-2026 (EO 110, s. 2026) — CY 2025 annual ITR deadline overridden
- *     from 15 Apr 2026 to 15 May 2026.
- */
-function generateObligations(profile, year) {
-  const {
-    taxpayer_type,
-    vat_status,
-    tax_classification,        // 'Micro' | 'Small' | 'Medium' | 'Large' | null  (RR 8-2024)
-    deduction_method,          // 'Itemized' | 'OSD' | '8%' | null
-    has_employees        = false,
-    withholds_expanded   = false,
-    withholds_final      = false,
-    fiscal_year_start    = 1,  // 1 = calendar year
-    owner_pays_sss       = false,
-    owner_pays_philhealth= false,
-    owner_pays_pagibig   = false,
-  } = profile
-  const yr  = year ?? new Date().getFullYear()
-  const obs = []
-
-  /** Build one obligation entry */
-  const ob = (localId, form, name, period, rawDate, category) => ({
-    id:       `${yr}-${localId}`,
-    form,
-    name,
-    period,
-    dueDate:  _nextBusinessDay(rawDate),
-    category,
-  })
-
-  /** Shorthand: new Date(year, month-1, day) */
-  const d = (month, day, y) => new Date(y ?? yr, month - 1, day)
-
-  /** Annual ITR due date for the given covered year; honors RMC 30-2026. */
-  const annualItrDueDate = (coveredYear) => {
-    // CY 2025 Annual ITR: extended from 15 Apr 2026 to 15 May 2026
-    // per RMC 30-2026 (EO 110, s. 2026).
-    if (coveredYear === 2025) return new Date(2026, 4, 15) // May = index 4
-    return new Date(coveredYear + 1, 3, 15)                // default: 15 April
-  }
-
-  /** Add months to a (month, day) pair with year roll-over. */
-  const addMonths = (month, day, addM, baseY = yr) => {
-    const abs = (month - 1) + addM
-    const y   = baseY + Math.floor(abs / 12)
-    const m   = (abs % 12 + 12) % 12
-    return new Date(y, m, day)
-  }
-
-  /** End-of-quarter { y, m } for the Nth quarter, honoring fiscal_year_start. */
-  const quarterEndMonth = (qIdx) => {
-    const absZero = (fiscal_year_start - 1) + qIdx * 3 - 1
-    const y = yr + Math.floor(absZero / 12)
-    const m = (absZero % 12 + 12) % 12 + 1
-    return { y, m }
-  }
-
-  // ── Taxpayer typology ────────────────────────────────────────
-  // NIRC distinguishes "individuals" (natural persons, plus estates &
-  // trusts taxed via fiduciary under Sec. 60) from "corporations" — the
-  // latter defined in Sec. 22(B) to include partnerships (no matter how
-  // created), joint-stock companies, joint accounts, associations, and
-  // insurance companies, EXCEPT general professional partnerships (GPPs)
-  // and joint ventures formed for construction or energy operations.
-  // GPPs and qualifying tax-exempt cooperatives are non-individuals but
-  // file information returns (1702-EX) rather than paying corporate tax.
-  const isEmployee    = taxpayer_type === 'Employee'
-  const isSelfEmp     = taxpayer_type === 'Self-Employed'
-  const isMixed       = taxpayer_type === 'Mixed Income'
-  const isFiduciary   = taxpayer_type === 'Estate' || taxpayer_type === 'Trust'
-  const isCorporation = taxpayer_type === 'Corporation'
-                        || taxpayer_type === 'One Person Corporation'
-                        || taxpayer_type === 'General Partnership'
-  const isGPP         = taxpayer_type === 'General Professional Partnership'
-  const isCoop        = taxpayer_type === 'Cooperative'
-  const isIndividual  = isEmployee || isSelfEmp || isMixed || isFiduciary
-  const isSEOrMixed   = isSelfEmp || isMixed
-  // "Business" here means anyone with a trade/business or practice of
-  // profession — i.e. anyone other than a pure-compensation employee.
-  const isBusiness    = !isEmployee
-  const isVAT         = vat_status === 'VAT-Registered'
-
-  // NOTE: BIR Form 0605 (Annual Registration Fee) is intentionally NOT
-  // generated. The ₱500 ARF was abolished by RA 11976 (EOPT) Sec. 21 and
-  // RR 7-2024, effective 22 January 2024.
-
-  // ── VAT-registered: 2550Q quarterly ───────────────────────────
-  // NIRC Sec. 114 as amended by EOPT: quarterly only, due the 25th day
-  // following the close of each taxable quarter. BIR Form 2550M is abolished
-  // (RA 11976, RR 3-2024).
-  if (isVAT) {
-    for (let q = 1; q <= 4; q++) {
-      const { y: qy, m: qm } = quarterEndMonth(q)
-      const due = addMonths(qm, 25, 1, qy)
-      obs.push(ob(`2550Q-q${q}`, 'BIR Form 2550Q',
-        'Quarterly VAT Return (+ SLSP)', `${yr} Q${q}`,
-        due, 'vat'))
-    }
-  }
-
-  // ── Non-VAT business: 2551Q quarterly percentage tax ──────────
-  // NIRC Sec. 116 (3% of gross quarterly sales/receipts) applies to any
-  // person — individual or non-individual — whose receipts are exempt
-  // from VAT under Sec. 109(BB) and who is not VAT-registered. Two
-  // exclusions in the current rules:
-  //   (a) Individuals who opted for the 8% income tax rate under
-  //       Sec. 24(A)(2)(b) as amended by RA 10963 (TRAIN). The 8% rate
-  //       substitutes both the graduated income tax and percentage tax.
-  //       Only individuals (SE / professional / Mixed Income on the
-  //       business side) may elect 8% — corporations, partnerships,
-  //       cooperatives, estates, and trusts cannot.
-  //   (b) GPPs (Sec. 26) and tax-exempt cooperatives don't pay income
-  //       or business tax at the entity level, so 2551Q does not apply.
-  // The rate reverted from 1% back to 3% on 1 July 2023 (per CREATE Act
-  // sunset; see RMC 69-2023).
-  const isEightPercentOption = vat_status === 'Non-VAT (8% Option)'
-  if (isBusiness && !isVAT && !isEightPercentOption && !isGPP && !isCoop) {
-    for (let q = 1; q <= 4; q++) {
-      const { y: qy, m: qm } = quarterEndMonth(q)
-      const due = addMonths(qm, 25, 1, qy)
-      obs.push(ob(`2551Q-q${q}`, 'BIR Form 2551Q',
-        'Quarterly Percentage Tax', `${yr} Q${q}`,
-        due, 'tax'))
-    }
-  }
-
-  // ── Individual business / fiduciary: 1701Q + annual ITR ──────
-  // 1701Q is cumulative YTD (NIRC Sec. 74; TRAIN deadlines May 15 /
-  // Aug 15 / Nov 15). It applies to anyone with business or professional
-  // income filing on the individual ITR — that is, SE, Mixed Income,
-  // and fiduciaries of estates/trusts engaged in trade or business.
-  if (isSEOrMixed || isFiduciary) {
-    obs.push(ob('1701Q-q1', 'BIR Form 1701Q',
-      'Quarterly ITR (Q1 cumulative)', `${yr} Q1 (covers Jan–Mar)`,
-      d(5, 15), 'income'))
-    obs.push(ob('1701Q-q2', 'BIR Form 1701Q',
-      'Quarterly ITR (Q2 cumulative YTD)', `${yr} Q2 (covers Apr–Jun)`,
-      d(8, 15), 'income'))
-    obs.push(ob('1701Q-q3', 'BIR Form 1701Q',
-      'Quarterly ITR (Q3 cumulative YTD)', `${yr} Q3 (covers Jul–Sep)`,
-      d(11, 15), 'income'))
-
-    // Annual ITR form selection per RMC 17-2019 / current BIR guidance:
-    //   • 1701A — pure SE/professional whose ONLY income is from
-    //     business/profession AND who uses the 8% rate or OSD.
-    //   • 1701  — Mixed Income earners (compensation + business), or
-    //     SE/professional using Itemized Deduction, or estates/trusts
-    //     (1701A is for natural persons only).
-    // For micro/small individuals (RR 8-2024 EOPT classification),
-    // RMC 34-2025 introduced 1701-MS as an OPTIONAL alternative form —
-    // 1701/1701A remain valid (and 1701-MS is not yet on eFPS, per
-    // RMC 49-2025), so we keep the primary form and just append the
-    // 1701-MS alias to flag it for the practitioner.
-    const usesShortForm =
-      isSelfEmp && (isEightPercentOption || deduction_method === 'OSD')
-    let annualForm = usesShortForm ? 'BIR Form 1701A' : 'BIR Form 1701'
-    if (!isFiduciary
-        && (tax_classification === 'Micro' || tax_classification === 'Small')) {
-      annualForm += ' (or 1701-MS)'
-    }
-    obs.push(ob('1701', annualForm,
-      'Annual ITR', `CY ${yr}`,
-      annualItrDueDate(yr), 'income'))
-  }
-
-  // ── Corporation / partnership: 1702Q + annual corporate ITR ──
-  // NIRC Sec. 22(B): "corporation" includes general partnerships, joint
-  // stock companies, and associations. NIRC Sec. 75: 1702Q within 60
-  // days after each of the first three quarter-ends.
-  if (isCorporation) {
-    for (let q = 1; q <= 3; q++) {
-      const { y: qy, m: qm } = quarterEndMonth(q)
-      // NIRC Sec. 75: due "within sixty (60) days following the close
-      // of each of the first three (3) quarters". Compute the actual
-      // 60-day offset from the quarter-end rather than approximating
-      // it as "the 29th of the second month" — that approximation
-      // produces May 29 for calendar-year Q1, which is one day early
-      // (Mar 31 + 60 days = May 30).
-      const qEnd = new Date(qy, qm, 0)            // last day of quarter month
-      const due  = new Date(qEnd)
-      due.setDate(due.getDate() + 60)
-      obs.push(ob(`1702Q-q${q}`, 'BIR Form 1702Q',
-        `Quarterly Corporate ITR Q${q}`, `${yr} Q${q}`,
-        due, 'income'))
-    }
-    obs.push(ob('1702', 'BIR Form 1702-RT / 1702-MX / 1702-EX',
-      'Annual Corporate ITR (+ AFS attachment)', `CY ${yr}`,
-      annualItrDueDate(yr), 'income'))
-  }
-
-  // ── GPP: information return only (1702-EX) ───────────────────
-  // Sec. 26: a general professional partnership is not subject to
-  // income tax as such; it files 1702-EX as an information return.
-  // Each partner reports their distributive share on their own 1701.
-  if (isGPP) {
-    obs.push(ob('1702EX', 'BIR Form 1702-EX',
-      'Annual Information Return (GPP — partners taxed individually)',
-      `CY ${yr}`, annualItrDueDate(yr), 'income'))
-  }
-
-  // ── Cooperative: information return (1702-EX) ────────────────
-  // CDA-registered cooperatives transacting only with members are
-  // generally exempt under RA 9520 / NIRC Sec. 30 and file 1702-EX as
-  // an information return. (Coops with non-member transactions above
-  // the threshold should be reclassified as 'Corporation' to pick up
-  // 1702Q + 1702-RT instead.)
-  if (isCoop) {
-    obs.push(ob('1702EX', 'BIR Form 1702-EX',
-      'Annual Information Return (Cooperative)', `CY ${yr}`,
-      annualItrDueDate(yr), 'income'))
-  }
-
-  // ── Employee: 1700 annual ────────────────────────────────────
-  if (isEmployee) {
-    obs.push(ob('1700', 'BIR Form 1700',
-      'Annual ITR (Compensation)', `CY ${yr}`,
-      annualItrDueDate(yr), 'income'))
-  }
-
-  // ── Employer: compensation withholding ───────────────────────
-  // 1601-C due on the 10th of the month following the month of withholding.
-  // 1604-C + Alphalist + 2316 distribution due 31 January; 2316 BIR-submission 28 February.
-  if (has_employees) {
-    for (let m = 1; m <= 12; m++) {
-      const due = addMonths(m, 10, 1)
-      obs.push(ob(`1601C-${_MONTHS[m-1].toLowerCase().slice(0,3)}`, 'BIR Form 1601-C',
-        'Monthly Compensation Withholding', `${_MONTHS[m-1]} ${yr}`,
-        due, 'withholding'))
-    }
-    obs.push(ob('1604C', 'BIR Form 1604-C',
-      'Annual WT Summary — Compensation (+ Alphalist)', `CY ${yr}`,
-      d(1, 31, yr + 1), 'withholding'))
-    obs.push(ob('2316-issue', 'BIR Form 2316',
-      'Issue 2316 to Employees', `CY ${yr}`,
-      d(1, 31, yr + 1), 'withholding'))
-    obs.push(ob('2316-submit', 'BIR Form 2316',
-      'Submit 2316 Duplicates to BIR', `CY ${yr}`,
-      d(2, 28, yr + 1), 'withholding'))
-  }
-
-  // ── Withholding agent (EWT) ──────────────────────────────────
-  // 0619-E for months 1 & 2 of each quarter (10th of next month);
-  // 1601-EQ on the last day of the month after quarter-end (with QAP);
-  // 1604-E + Alphalist by 1 March of the following year.
-  if (withholds_expanded) {
-    for (let q = 1; q <= 4; q++) {
-      const { y: qy, m: qm } = quarterEndMonth(q)
-      for (let mInQ = 0; mInQ < 2; mInQ++) {
-        const coveredMonth = qm - 2 + mInQ
-        const covered      = addMonths(coveredMonth, 1, 0, qy)
-        const due          = addMonths(coveredMonth, 10, 1, qy)
-        obs.push(ob(`0619E-q${q}m${mInQ+1}`, 'BIR Form 0619-E',
-          'Monthly EWT Remittance',
-          `${_MONTHS[covered.getMonth()]} ${covered.getFullYear()}`,
-          due, 'withholding'))
-      }
-      const nextMonthStart = addMonths(qm, 1, 1, qy)
-      const lastDayOfNext  = new Date(nextMonthStart.getFullYear(),
-                                      nextMonthStart.getMonth() + 1, 0)
-      obs.push(ob(`1601EQ-q${q}`, 'BIR Form 1601-EQ',
-        'Quarterly EWT Return (+ QAP)', `${yr} Q${q}`,
-        lastDayOfNext, 'withholding'))
-    }
-    obs.push(ob('1604E', 'BIR Form 1604-E',
-      'Annual EWT Summary (+ Alphalist)', `CY ${yr}`,
-      d(3, 1, yr + 1), 'withholding'))
-  }
-
-  // ── Withholding agent (FWT) ──────────────────────────────────
-  if (withholds_final) {
-    for (let q = 1; q <= 4; q++) {
-      const { y: qy, m: qm } = quarterEndMonth(q)
-      for (let mInQ = 0; mInQ < 2; mInQ++) {
-        const coveredMonth = qm - 2 + mInQ
-        const covered      = addMonths(coveredMonth, 1, 0, qy)
-        const due          = addMonths(coveredMonth, 10, 1, qy)
-        obs.push(ob(`0619F-q${q}m${mInQ+1}`, 'BIR Form 0619-F',
-          'Monthly Final WT Remittance',
-          `${_MONTHS[covered.getMonth()]} ${covered.getFullYear()}`,
-          due, 'withholding'))
-      }
-      const nextMonthStart = addMonths(qm, 1, 1, qy)
-      const lastDayOfNext  = new Date(nextMonthStart.getFullYear(),
-                                      nextMonthStart.getMonth() + 1, 0)
-      obs.push(ob(`1601FQ-q${q}`, 'BIR Form 1601-FQ',
-        'Quarterly Final WT Return', `${yr} Q${q}`,
-        lastDayOfNext, 'withholding'))
-    }
-    obs.push(ob('1604F', 'BIR Form 1604-F',
-      'Annual Final WT Summary (+ Alphalist)', `CY ${yr}`,
-      d(1, 31, yr + 1), 'withholding'))
-  }
-
-  // ── Employer: government mandatory contributions ──────────────
-  // SSS (RA 11199, eff. Jan 2025): 15% of MSC (ER 10% + EE 5%).
-  //   Deadline: last business day of the month following the applicable month
-  //   (staggered by last digit of employer SSS number; tracked here at latest
-  //   possible deadline — verify your specific schedule with SSS).
-  // PhilHealth (RA 11223, 2025 rate): 5% of basic salary (ER 2.5% + EE 2.5%).
-  //   Floor ₱10,000 / Ceiling ₱100,000.
-  //   Deadline: last day of the month following the applicable month.
-  // Pag-IBIG / HDMF (RA 9679): 2% each (ER + member) for compensation > ₱1,500.
-  //   Contribution ceiling ₱10,000/month → max ₱200 each side (HDMF Circular 460, eff. Feb 2024).
-  //   Deadline: 10th of the month following the applicable month.
-  if (has_employees) {
-    for (let m = 1; m <= 12; m++) {
-      const mnth = _MONTHS[m - 1]
-      const mAbb = mnth.toLowerCase().slice(0, 3)
-      // SSS & PhilHealth: last day of the following month
-      const nx           = addMonths(m, 1, 1)
-      const followingEnd = new Date(nx.getFullYear(), nx.getMonth() + 1, 0)
-      obs.push(ob(`SSS-emp-${mAbb}`, 'SSS Employer Remittance',
-        'Monthly SSS Contribution Remittance', `${mnth} ${yr}`,
-        followingEnd, 'government'))
-      obs.push(ob(`PHIC-emp-${mAbb}`, 'PhilHealth Employer Remittance',
-        'Monthly PhilHealth Premium Remittance', `${mnth} ${yr}`,
-        followingEnd, 'government'))
-      // Pag-IBIG: 10th of the following month (same cadence as BIR 1601-C)
-      obs.push(ob(`HDMF-emp-${mAbb}`, 'Pag-IBIG Employer Remittance',
-        'Monthly Pag-IBIG Contribution Remittance', `${mnth} ${yr}`,
-        addMonths(m, 10, 1), 'government'))
-    }
-  }
-
-  // ── Owner/operator: voluntary government contributions ────────
-  // Self-employed individuals and sole operators not covered by an employer
-  // may voluntarily contribute to SSS, PhilHealth, and/or Pag-IBIG.
-  // SSS voluntary: 15% of the member's chosen MSC (RA 11199).
-  // PhilHealth voluntary: 5% of declared monthly income (RA 11223).
-  // Pag-IBIG voluntary: minimum ₱200/month (HDMF Circular 460, eff. Feb 2024); higher optional savings allowed.
-  // Deadline: last business day of the applicable month.
-  if (owner_pays_sss || owner_pays_philhealth || owner_pays_pagibig) {
-    for (let m = 1; m <= 12; m++) {
-      const mnth   = _MONTHS[m - 1]
-      const mAbb   = mnth.toLowerCase().slice(0, 3)
-      const volDue = new Date(yr, m, 0)  // last day of the applicable month
-      if (owner_pays_sss) obs.push(ob(`SSS-vol-${mAbb}`, 'SSS Voluntary Contribution',
-        'Monthly SSS Voluntary Contribution', `${mnth} ${yr}`, volDue, 'government'))
-      if (owner_pays_philhealth) obs.push(ob(`PHIC-vol-${mAbb}`, 'PhilHealth Voluntary Premium',
-        'Monthly PhilHealth Voluntary Premium', `${mnth} ${yr}`, volDue, 'government'))
-      if (owner_pays_pagibig) obs.push(ob(`HDMF-vol-${mAbb}`, 'Pag-IBIG Voluntary Savings',
-        'Monthly Pag-IBIG Voluntary Savings', `${mnth} ${yr}`, volDue, 'government'))
-    }
-  }
-
-  return obs
-}
+// Engine moved to src/engine/obligations.js. The <script type="module">
+// block in <head> imports it and assigns _MONTHS / _iso / _PH_HOLIDAYS
+// / _nextBusinessDay / generateObligations to window before any callsite
+// in this file (auth callbacks, click handlers) is reached.
 
 /**
  * One-off migration for existing compliance_records rows: applies the
@@ -5486,28 +5322,21 @@ async function seedComplianceRecords(clientId, profile, year = new Date().getFul
   const obligations = generateObligations(profile, year)
   if (!obligations.length) return
 
-  const { data: existing } = await supa
-    .from('compliance_records')
-    .select('obligation_id')
-    .eq('client_id', clientId)
+  // Upsert is race-safe under the compliance_records_client_obl_uq
+  // unique index added in migration 0006 — two concurrent clicks of
+  // "Generate {year} obligations" will not produce duplicate rows.
+  const rows = obligations.map(o => ({
+    client_id:      clientId,
+    obligation_id:  o.id,
+    form:           o.form,
+    period:         o.period,
+    due_date:       _iso(o.dueDate),
+    payment_status: 'n/a',
+  }))
 
-  const seen = new Set((existing || []).map(r => r.obligation_id))
-
-  const rows = obligations
-    .filter(o => !seen.has(o.id))
-    .map(o => ({
-      client_id:      clientId,
-      obligation_id:  o.id,
-      form:           o.form,
-      period:         o.period,
-      due_date:       _iso(o.dueDate),
-      payment_status: 'n/a',
-    }))
-
-  if (rows.length) {
-    const { error } = await supa.from('compliance_records').insert(rows)
-    if (error) console.error('seedComplianceRecords:', error)
-  }
+  const { error } = await supa.from('compliance_records')
+    .upsert(rows, { onConflict: 'client_id,obligation_id', ignoreDuplicates: true })
+  if (error) console.error('seedComplianceRecords:', error)
 }
 
 /**
@@ -5558,9 +5387,14 @@ async function syncComplianceRecords(clientId, profile) {
     return y !== null && y >= cutoffYear
   })
 
-  // Operate on the union of in-scope years already present.
-  const years = [...new Set(inScope.map(yearOf))]
-  if (!years.length) return
+  // Always reconcile at least the current and next calendar year, even
+  // if the DB has no rows in those years yet — otherwise toggling
+  // `has_employees=true` mid-year does not seed next year's 1601-C/SSS
+  // rows, and a status change effective Jan 2027 (recorded in 2026)
+  // mutates nothing.
+  const yearsSet = new Set([cutoffYear, cutoffYear + 1])
+  inScope.map(yearOf).forEach(y => yearsSet.add(y))
+  const years = [...yearsSet].sort()
 
   const wanted    = years.flatMap(y => generateObligations(profile, y))
   const wantedMap = new Map(wanted.map(o => [o.id, o]))
@@ -5587,7 +5421,8 @@ async function syncComplianceRecords(clientId, profile) {
     if (error) console.error('syncComplianceRecords (update):', error)
   }
 
-  // (3) insert newly-required obligations for in-scope years
+  // (3) upsert newly-required obligations (race-safe via the
+  //     compliance_records_client_obl_uq unique index from 0006).
   const toInsert = wanted
     .filter(o => !haveMap.has(o.id))
     .map(o => ({
@@ -5599,7 +5434,8 @@ async function syncComplianceRecords(clientId, profile) {
       payment_status: 'n/a',
     }))
   if (toInsert.length) {
-    const { error } = await supa.from('compliance_records').insert(toInsert)
+    const { error } = await supa.from('compliance_records')
+      .upsert(toInsert, { onConflict: 'client_id,obligation_id', ignoreDuplicates: true })
     if (error) console.error('syncComplianceRecords (insert):', error)
   }
 }
@@ -5615,8 +5451,13 @@ async function syncComplianceRecords(clientId, profile) {
 function buildClientCard(client, stats) {
   const { overdue, urgent, total, trrc, payment } = stats
 
+  // needs_review wins over the regular status — it tells the practitioner
+  // the client was self-enrolled and hasn't been confirmed yet.
   let statusKey, statusBadge
-  if (overdue > 0) {
+  if (client.needs_review) {
+    statusKey   = 'review'
+    statusBadge = `<span class="badge-amber" title="Self-enrolled — review and seed obligations">Needs review</span>`
+  } else if (overdue > 0) {
     statusKey   = 'overdue'
     statusBadge = `<span class="badge-red">${overdue} overdue</span>`
   } else if (urgent > 0) {
@@ -5642,19 +5483,23 @@ function buildClientCard(client, stats) {
     ? `<span class="badge-branch">${esc(client.branch_name)}</span>`
     : ''
 
+  const safeId   = esc(client.id)
+  const safeName = esc(client.display_name)
+
   return `<div class="client-card"
     data-status="${statusKey}"
     data-trrc="${trrc > 0 ? '1' : '0'}"
     data-payment="${payment > 0 ? '1' : '0'}"
-    data-name="${esc(client.display_name.toLowerCase())}"
-    data-client-id="${esc(client.id)}"
+    data-needs-review="${client.needs_review ? '1' : '0'}"
+    data-name="${esc((client.display_name || '').toLowerCase())}"
+    data-client-id="${safeId}"
     data-parent-id="${esc(client.parent_client_id || '')}"
-    onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${esc(client.id)}')"
+    onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${safeId}')"
     role="button" tabindex="0"
-    onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(client.id)}')"
-    aria-label="${esc(client.display_name)}">
+    onkeydown="if((event.key==='Enter'||event.key===' ')&&!document.getElementById('clientList').classList.contains('bulk-mode')){event.preventDefault();showClientDetail('${safeId}')}"
+    aria-label="${safeName}">
   <div class="cc-left">
-    <div class="cc-name">${esc(client.display_name)}</div>
+    <div class="cc-name">${safeName}</div>
     ${metaParts.length ? `<div class="cc-meta">${metaParts.join(' · ')}</div>` : ''}
   </div>
   <div class="cc-right">
@@ -5669,94 +5514,101 @@ function buildClientCard(client, stats) {
 // ── LOAD ROSTER ───────────────────────────────────────────────
 
 let _rosterFilter = 'all'
+const _ROSTER_PAGE_SIZE = 50
+let _rosterPage  = 0
+let _rosterQuery = ''
+let _rosterHasMore = false
 
-async function loadRoster() {
+/**
+ * Fetch one page of the roster via the roster_card_stats RPC plus
+ * a separate roster_summary_totals RPC for the aggregate chip
+ * counts. Pagination + ILIKE search now happen in Postgres, so
+ * 10,000-client tenants don't hit URL-length / row-count limits.
+ *
+ * `append=true` adds to the existing list (load-more); `false`
+ * replaces it (initial render or filter/search change).
+ */
+async function loadRoster(append = false) {
   if (!currentPractitioner) return
 
-  const today = _iso(new Date())
-  const week  = _iso(new Date(Date.now() + 7 * 86400000))
+  if (!append) _rosterPage = 0
 
-  const { data: clients, error } = await supa
-    .from('clients')
-    .select('*')
-    .eq('practitioner_id', currentPractitioner.id)
-    .eq('is_active', true)
-    .order('display_name')
+  // Map UI filter slug to RPC parameter. 'archived' is handled by a
+  // separate path; the others map 1:1.
+  const rpcFilter = (_rosterFilter === 'archived') ? 'all' : _rosterFilter
 
-  if (error) { console.error('loadRoster:', error); return }
+  const [{ data: rows, error: rErr }, { data: totals, error: tErr }] = await Promise.all([
+    supa.rpc('roster_card_stats', {
+      p_query:  _rosterQuery,
+      p_filter: rpcFilter,
+      p_offset: _rosterPage * _ROSTER_PAGE_SIZE,
+      p_limit:  _ROSTER_PAGE_SIZE,
+    }),
+    append ? Promise.resolve({ data: null, error: null })
+           : supa.rpc('roster_summary_totals', { p_query: _rosterQuery }),
+  ])
 
-  // Fetch all compliance records for every client in one round-trip
-  const clientIds = (clients || []).map(c => c.id)
-  const { data: allRecs } = clientIds.length
-    ? await supa
-        .from('compliance_records')
-        .select('client_id,due_date,filed_date,trrc_saved,has_tax_due,payment_status')
-        .in('client_id', clientIds)
-    : { data: [] }
+  if (rErr) { console.error('loadRoster (rows):', rErr); return }
+  if (tErr) console.error('loadRoster (totals):', tErr)
 
-  const recsByClient = {}
-  ;(allRecs || []).forEach(x => {
-    (recsByClient[x.client_id] = recsByClient[x.client_id] || []).push(x)
-  })
+  _rosterHasMore = (rows ?? []).length === _ROSTER_PAGE_SIZE
 
-  // Aggregate counts for summary strip
-  let sumOverdue = 0, sumUrgent = 0, sumTrrc = 0, sumPayment = 0
+  // Update summary strip + nav badge from the totals RPC
+  if (totals && totals.length) {
+    const t = totals[0]
+    $('sumOverdue').textContent = t.overdue_count
+    $('sumUrgent').textContent  = t.urgent_count
+    $('sumTrrc').textContent    = t.trrc_count
+    $('sumPayment').textContent = t.payment_count
+    const nb = $('navBadgeClients')
+    if (nb) nb.textContent = t.total_clients
+  }
 
-  const cards = (clients || []).map(client => {
-    const r = recsByClient[client.id] || []
-
-    const stats = {
-      total:   r.length,
-      overdue: r.filter(x => !x.filed_date && x.due_date < today).length,
-      urgent:  r.filter(x => !x.filed_date && x.due_date >= today && x.due_date <= week).length,
-      trrc:    r.filter(x => x.filed_date && !x.trrc_saved).length,
-      payment: r.filter(x => x.filed_date && x.has_tax_due && x.payment_status !== 'paid').length,
+  // Map the RPC's flat shape onto the legacy { client, stats } shape
+  // buildClientCard expects.
+  const cards = (rows || []).map(row => buildClientCard(
+    {
+      id: row.id, display_name: row.display_name, tin: row.tin,
+      rdo_code: row.rdo_code, taxpayer_type: row.taxpayer_type,
+      vat_status: row.vat_status, parent_client_id: row.parent_client_id,
+      branch_name: row.branch_name, needs_review: row.needs_review,
+    },
+    {
+      total:   row.total_records, overdue: row.overdue_count,
+      urgent:  row.urgent_count,  trrc:    row.trrc_count,
+      payment: row.payment_count,
     }
+  ))
 
-    // Accumulate summary-strip totals
-    r.forEach(x => {
-      if (!x.filed_date && x.due_date < today)                           sumOverdue++
-      if (!x.filed_date && x.due_date >= today && x.due_date <= week)   sumUrgent++
-      if (x.filed_date  && !x.trrc_saved)                               sumTrrc++
-      if (x.filed_date  && x.has_tax_due && x.payment_status !== 'paid') sumPayment++
-    })
-
-    return buildClientCard(client, stats)
-  })
-
-  // Update summary strip
-  $('sumOverdue').textContent  = sumOverdue
-  $('sumUrgent').textContent   = sumUrgent
-  $('sumTrrc').textContent     = sumTrrc
-  $('sumPayment').textContent  = sumPayment
-
-  // Update nav badge
-  const nb = $('navBadgeClients')
-  if (nb) nb.textContent = (clients || []).length
-
-  // Render client list — group branches under their parent
   const listEl = $('clientList')
-  if (!clients || !clients.length) {
-    listEl.innerHTML = `<div class="empty-state">
-      No clients yet.<br>
-      <span style="color:var(--lt)">Click <strong>+ Add Client</strong> to get started.</span>
-    </div>`
+  if (!append && (!rows || !rows.length)) {
+    listEl.innerHTML = _rosterQuery
+      ? `<div class="empty-state">
+          No clients match "${esc(_rosterQuery)}".<br>
+          <button class="btn-ghost btn-sm" type="button" style="margin-top:.6rem"
+            onclick="document.getElementById('rosterSearch').value='';_onRosterSearchChange()">Clear search</button>
+        </div>`
+      : `<div class="empty-state">
+          No clients yet.<br>
+          <span style="color:var(--lt)">Click <strong>+ Add client</strong> to get started.</span>
+        </div>`
     return
   }
 
-  // Separate top-level clients from branches
-  const clientMap = {}
-  ;(clients || []).forEach(c => { clientMap[c.id] = c })
-
-  const topLevel  = (clients || []).filter(c => !c.parent_client_id)
-  const branchMap = {}   // parentId → [client, ...]
-  ;(clients || []).filter(c => !!c.parent_client_id).forEach(c => {
-    ;(branchMap[c.parent_client_id] = branchMap[c.parent_client_id] || []).push(c)
+  // Group branches under parents — server already sorts needs_review
+  // first, then by display_name, but branches within the page need
+  // re-attachment to their parents.
+  const branchMap = {}
+  const topLevel  = []
+  ;(rows || []).forEach(row => {
+    if (row.parent_client_id) {
+      ;(branchMap[row.parent_client_id] = branchMap[row.parent_client_id] || []).push(row)
+    } else {
+      topLevel.push(row)
+    }
   })
-
-  // Build card HTML with branch grouping
   const cardMapById = {}
-  ;(clients || []).forEach((client, i) => { cardMapById[client.id] = cards[i] })
+  ;(rows || []).forEach((row, i) => { cardMapById[row.id] = cards[i] })
 
   const grouped = topLevel.map(client => {
     const branches = branchMap[client.id] || []
@@ -5782,8 +5634,37 @@ async function loadRoster() {
     </div>`
   })
 
-  listEl.innerHTML = grouped.join('')
+  // "Load more" tail row appears when the page filled exactly.
+  const loadMoreHtml = _rosterHasMore
+    ? `<button class="btn-ghost btn-sm btn-full" type="button"
+        style="margin-top:.6rem"
+        onclick="_loadRosterNextPage()">Load more clients</button>`
+    : ''
+
+  if (append) {
+    // Replace any prior "Load more" with the new page + tail.
+    document.querySelectorAll('#clientList .roster-load-more').forEach(el => el.remove())
+    listEl.insertAdjacentHTML('beforeend', grouped.join('') + (loadMoreHtml ? `<div class="roster-load-more">${loadMoreHtml}</div>` : ''))
+  } else {
+    listEl.innerHTML = grouped.join('') + (loadMoreHtml ? `<div class="roster-load-more">${loadMoreHtml}</div>` : '')
+  }
   _applyRosterFilter()
+}
+
+function _loadRosterNextPage() {
+  _rosterPage++
+  loadRoster(true)
+}
+
+/** Debounced search-input handler — re-queries the RPC on each change. */
+let _rosterSearchTimer = null
+function _onRosterSearchChange() {
+  const v = ($('rosterSearch')?.value || '').trim()
+  clearTimeout(_rosterSearchTimer)
+  _rosterSearchTimer = setTimeout(() => {
+    _rosterQuery = v
+    loadRoster(false)
+  }, 250)
 }
 
 function _toggleBranchGroup(btn) {
@@ -5801,59 +5682,37 @@ function _setFilter(filter, btn) {
     b.classList.remove('active')
     b.setAttribute('aria-selected', 'false')
   })
-  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true') }
+  // Summary chips also reflect pressed state via aria-pressed.
+  document.querySelectorAll('.sum-chip').forEach(c => c.setAttribute('aria-pressed', 'false'))
+  if (btn) {
+    btn.classList.add('active')
+    if (btn.classList.contains('filter-tab')) btn.setAttribute('aria-selected', 'true')
+    if (btn.classList.contains('sum-chip'))   btn.setAttribute('aria-pressed', 'true')
+  }
 
   if (filter === 'archived') {
     $('rosterSummary').style.display = 'none'
     loadArchivedClients()
   } else {
     $('rosterSummary').style.display = ''
-    if (wasArchived) loadRoster()
-    else _applyRosterFilter()
+    // Filter is now applied in SQL — refetch the first page so the
+    // result is consistent across pagination boundaries.
+    loadRoster(false)
   }
 }
 
+/**
+ * Filter + search are now applied server-side via roster_card_stats
+ * for the active roster (HI-11). The archived list is still fetched
+ * in full because it's small; this helper handles hide-on-search
+ * for the archived path only.
+ */
 function _applyRosterFilter() {
+  if (_rosterFilter !== 'archived') return
   const q = ($('rosterSearch')?.value || '').toLowerCase()
-
-  if (_rosterFilter === 'archived') {
-    document.querySelectorAll('.archived-client-card').forEach(card => {
-      const name = card.dataset.name || ''
-      card.classList.toggle('hidden', !!(q && !name.includes(q)))
-    })
-    return
-  }
-
-  document.querySelectorAll('.client-card').forEach(card => {
-    const status = card.dataset.status
-    const name   = card.dataset.name || ''
-    const meta   = (card.querySelector('.cc-meta')?.textContent || '').toLowerCase()
-
-    const matchFilter =
-      _rosterFilter === 'overdue'  ? status === 'overdue'     :
-      _rosterFilter === 'urgent'   ? status === 'urgent'      :
-      _rosterFilter === 'trrc'     ? card.dataset.trrc === '1'    :
-      _rosterFilter === 'payment'  ? card.dataset.payment === '1' :
-      _rosterFilter === 'active'   ? true                     : true
-
-    const matchSearch = !q || name.includes(q) || meta.includes(q)
-    card.classList.toggle('hidden', !(matchFilter && matchSearch))
-  })
-
-  // Show/hide entire branch groups based on whether any card inside is visible
-  document.querySelectorAll('.branch-group').forEach(group => {
-    const anyVisible = [...group.querySelectorAll('.client-card')]
-      .some(c => !c.classList.contains('hidden'))
-    group.classList.toggle('hidden', !anyVisible)
-    // If search is active and a branch card matches, expand the children
-    if (q) {
-      const children = group.querySelector('.branch-children')
-      if (children) {
-        const branchVisible = [...children.querySelectorAll('.client-card')]
-          .some(c => !c.classList.contains('hidden'))
-        if (branchVisible) children.classList.remove('collapsed')
-      }
-    }
+  document.querySelectorAll('.archived-client-card').forEach(card => {
+    const name = card.dataset.name || ''
+    card.classList.toggle('hidden', !!(q && !name.includes(q)))
   })
 }
 
@@ -5933,7 +5792,7 @@ function openClientSheet(mode, clientId) {
 
   _syncTaxProfileOptions()
   _renderStep(1)
-  $('addClientSheet').classList.remove('hidden')
+  openSheet('addClientSheet')
   setTimeout(() => $('ac_name').focus(), 60)
 }
 
@@ -6049,13 +5908,13 @@ function _renderStep(n) {
   $('stepDot1').classList.toggle('active', onStep1)
   $('stepDot2').classList.toggle('active', !onStep1)
   $('addSheetTitle').textContent = onStep1
-    ? (isEdit ? 'Edit Client' : (isBranchMode ? 'Add Branch' : 'Add Client'))
+    ? (isEdit ? 'Edit client' : (isBranchMode ? 'Add branch' : 'Add client'))
     : 'Tax Profile'
 
   const backBtn = $('addBackBtn')
   const nextBtn = $('addNextBtn')
   backBtn.classList.toggle('hidden', onStep1)
-  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : (isBranchMode ? 'Save branch' : 'Save client'))
+  nextBtn.textContent = onStep1 ? 'Next →' : (isEdit ? 'Save changes' : (isBranchMode ? 'Save changes' : 'Save changes'))
   nextBtn.onclick     = onStep1 ? () => _goAddStep(2) : saveClient
 }
 
@@ -6156,15 +6015,17 @@ async function saveClient() {
   }
 
   btn.disabled    = false
-  btn.textContent = isEdit ? 'Save changes' : 'Save client'
+  btn.textContent = isEdit ? 'Save changes' : 'Save changes'
 
   if (error) {
-    $('step2Err').textContent   = error.message
+    console.error(error)
+    $('step2Err').textContent   = humanError(error)
     $('step2Err').style.display = 'block'
     return
   }
 
   closeAddClient()
+  showToast(isEdit ? 'Changes saved' : (isBranchMode ? 'Branch added' : 'Client added'), 'success')
   if (isEdit) {
     await showClientDetail(_editingClientId)
   } else if (isBranchMode && parentClientId) {
@@ -6190,7 +6051,8 @@ async function archiveClient() {
     .eq('id', _editingClientId)
 
   if (error) {
-    $('step2Err').textContent   = 'Archive failed: ' + error.message
+    console.error(error)
+    $('step2Err').textContent   = 'Archive failed: ' + humanError(error)
     $('step2Err').style.display = 'block'
     return
   }
@@ -6247,14 +6109,14 @@ function buildArchivedCard(client) {
 async function restoreClient(id, name) {
   if (!confirm(`Restore ${name}? They will return to your active client list.`)) return
   const { error } = await supa.from('clients').update({ is_active: true }).eq('id', id)
-  if (error) { alert('Restore failed: ' + error.message); return }
+  if (error) { console.error(error); showToast('Restore failed: ' + humanError(error), 'error'); return }
   loadArchivedClients()
 }
 
 async function permanentlyDeleteClient(id, name) {
   if (!confirm(`Permanently delete "${name}"?\n\nThis cannot be undone. All compliance records and data for this client will be deleted.`)) return
   const { error } = await supa.from('clients').delete().eq('id', id)
-  if (error) { alert('Delete failed: ' + error.message); return }
+  if (error) { console.error(error); showToast('Delete failed: ' + humanError(error), 'error'); return }
   loadArchivedClients()
 }
 
@@ -6320,22 +6182,71 @@ function eafsStepDone(r) {
   return true
 }
 
-function getCardStatus(r) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const due   = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
-  // Payment is closed either by an actual payment ('paid') OR by the
-  // taxpayer recording the filing with no tax due ('n/a' after a
-  // filed_date is set).  Both cases should mark the obligation as
-  // 'done' rather than leaving it stuck on "Payment pending".
-  if (r.payment_status === 'paid') return 'done'
-  if (r.filed_date && r.trrc_saved && datStepDone(r) && eafsStepDone(r)
-      && r.payment_status === 'n/a') return 'done'
-  if (r.filed_date && r.trrc_saved && (!datStepDone(r) || !eafsStepDone(r))) return 'dat-missing'
-  if (r.filed_date && r.trrc_saved) return 'unpaid'
-  if (r.filed_date && !r.trrc_saved) return 'trrc-missing'
-  if (!r.filed_date && due && due < today) return 'overdue'
-  return 'pending'
+/**
+ * Single source of truth for derived compliance-record state. Used by
+ * the roster, dashboard, client-detail, and reports — replaces four
+ * slightly-divergent inline implementations.
+ *
+ * Returns:
+ *   status         — 'done' | 'overdue' | 'unpaid' | 'trrc-missing'
+ *                  | 'dat-missing' | 'pending'   (for badges)
+ *   isFiled        — filed_date is set
+ *   isOverdue      — unfiled and past the due date
+ *   isUrgent       — unfiled and due within `weekAheadDays` (default 7)
+ *   isPaid         — payment_status === 'paid'
+ *   needsTrrc      — filed but no TRRC saved (gov-contrib gets the
+ *                    same flag — caller may relabel as "Receipt needed")
+ *   paymentPending — filed, has tax due, not yet paid (and not 'n/a')
+ *   complete       — every required step is done
+ *   daysLate       — integer days past due (0 if not overdue)
+ *
+ * Caller passes `opts.today` to override "now" for testing or dashboard
+ * recomputation; `opts.weekAheadDays` to override the urgency horizon.
+ */
+function recordStatus(r, opts = {}) {
+  const today = opts.today instanceof Date
+    ? new Date(opts.today)
+    : (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t })()
+  if (!(opts.today instanceof Date)) today.setHours(0, 0, 0, 0)
+  const due = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
+
+  const isFiled         = !!r.filed_date
+  const isPaid          = r.payment_status === 'paid'
+  const isOverdue       = !isFiled && !!due && due < today
+  const needsTrrc       = isFiled && !r.trrc_saved
+  const datDone         = typeof datStepDone  === 'function' ? datStepDone(r)  : true
+  const eafsDone        = typeof eafsStepDone === 'function' ? eafsStepDone(r) : true
+  const noPaymentNeeded = r.payment_status === 'n/a' && isFiled
+  const paymentPending  = isFiled && r.has_tax_due
+                          && r.payment_status !== 'paid'
+                          && r.payment_status !== 'n/a'
+  const complete        = isPaid
+                          || (isFiled && r.trrc_saved && datDone && eafsDone && noPaymentNeeded)
+
+  let status
+  if (complete)                                                 status = 'done'
+  else if (isFiled && r.trrc_saved && (!datDone || !eafsDone))  status = 'dat-missing'
+  else if (isFiled && r.trrc_saved)                              status = 'unpaid'
+  else if (isFiled && !r.trrc_saved)                              status = 'trrc-missing'
+  else if (isOverdue)                                            status = 'overdue'
+  else                                                            status = 'pending'
+
+  const weekAheadDays = opts.weekAheadDays ?? 7
+  const horizon       = new Date(today.getTime() + weekAheadDays * 86_400_000)
+  const isUrgent      = !isFiled && !!due && due >= today && due <= horizon
+
+  const daysLate = (isOverdue && due)
+    ? Math.floor((today - due) / 86_400_000)
+    : 0
+
+  return {
+    status, isFiled, isOverdue, isUrgent, isPaid,
+    needsTrrc, paymentPending, complete, daysLate,
+  }
 }
+
+/** Back-compat: existing callers used getCardStatus(r) → string. */
+function getCardStatus(r) { return recordStatus(r).status }
 
 function _statusMeta(status) {
   return ({
@@ -6359,12 +6270,16 @@ async function loadObligations(clientId, yearFilter) {
     .order('due_date', { ascending: true })
 
   if (error) {
-    $('obligationsPanel').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
+    console.error(error)
+    uiRender.render(uiRender.errorLine(humanError(error)), $('obligationsPanel'))
     return
   }
 
   if (!records || records.length === 0) {
-    $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem">No obligations found.</p>'
+    uiRender.render(
+      uiRender.emptyState('No obligations for this client yet.'),
+      $('obligationsPanel'),
+    )
     return
   }
 
@@ -6396,21 +6311,23 @@ function buildObligationCard(r) {
   const { label: rawLabel, cls } = _statusMeta(status)
   const label = (status === 'trrc-missing' && isGovContrib) ? 'Receipt needed' : rawLabel
   const due             = r.due_date ? new Date(r.due_date + 'T00:00:00') : null
-  const dueTxt          = due ? due.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '—'
+  const dueTxt          = due ? fmtDate(r.due_date) : '—'
   const isDueOver       = due && due < today && !r.filed_date
 
   let penaltyLine = ''
   if (status === 'overdue' && due) {
     const daysLate = Math.floor((today - due) / 86400000)
     if (isGovContrib) {
-      penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Late contribution — penalties accumulating. Remit as soon as possible.</div>`
+      penaltyLine = `<div class="ob-penalty-line"><em>Late contribution — penalties accumulating. Remit as soon as possible.</em></div>`
     } else {
       const taxDue   = r.has_tax_due && r.tax_due != null ? Number(r.tax_due) : null
       if (taxDue) {
+        // Sec. 248(A): 25% surcharge. Sec. 249 (TRAIN, RA 10963):
+        // deficiency interest = double the BSP legal rate = 12% p.a.
         const total = taxDue * 0.25 + taxDue * 0.12 * (daysLate / 365)
-        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-weight:600;margin-top:.2rem">Est. penalty: ₱${total.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} as of today</div>`
+        penaltyLine = `<div class="ob-penalty-line"><strong>Est. penalty: ${fmtPHP(total)} as of today</strong></div>`
       } else {
-        penaltyLine = `<div style="color:var(--amber,#b45309);font-size:.72rem;font-style:italic;margin-top:.2rem">Penalties accumulating — file to stop the clock</div>`
+        penaltyLine = `<div class="ob-penalty-line"><em>Penalties accumulating — file to stop the clock</em></div>`
       }
     }
   }
@@ -6420,7 +6337,7 @@ function buildObligationCard(r) {
 
   const step1Done   = !!r.filed_date
   const step1Detail = step1Done
-    ? `${r.filed_date}${r.has_tax_due ? ` · ${isGovContrib ? 'Amount' : 'Tax due'}: ₱${Number(r.tax_due||0).toLocaleString()}` : (isGovContrib ? '' : ' · No tax due')}${editLink('openFilingForm')}`
+    ? `${fmtDate(r.filed_date)}${r.has_tax_due ? ` · ${isGovContrib ? 'Amount' : 'Tax due'}: ${fmtPHP(r.tax_due)}` : (isGovContrib ? '' : ' · No tax due')}${editLink('openFilingForm')}`
     : ''
 
   const step2Done   = !!r.trrc_saved
@@ -6475,9 +6392,9 @@ function buildObligationCard(r) {
   const noPaymentNeeded = r.payment_status === 'n/a' && step1Done
   const step3Done   = r.payment_status === 'paid' || noPaymentNeeded
   const feeTxt      = r.transaction_fee != null && +r.transaction_fee > 0
-    ? ` · Fee: ₱${Number(r.transaction_fee).toLocaleString()}` : ''
+    ? ` · Fee: ${fmtPHP(r.transaction_fee)}` : ''
   const step3Detail = r.payment_status === 'paid'
-    ? `₱${Number(r.amount_paid||0).toLocaleString()} · ${r.payment_date ?? ''} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
+    ? `${fmtPHP(r.amount_paid)} · ${fmtDate(r.payment_date)} · ${esc(r.payment_mode ?? '')}${r.payment_reference ? ` · Ref: ${esc(r.payment_reference)}` : ''}${feeTxt}${editLink('openPaymentForm')}`
     : (noPaymentNeeded ? `${isGovContrib ? 'No contribution amount recorded' : 'No tax due — no payment needed'}${editLink('openFilingForm')}` : '')
 
   let actionBtn = ''
@@ -6801,7 +6718,7 @@ async function saveFiling(recordId) {
 
   const { error } = await supa.from('compliance_records').update(payload).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6819,7 +6736,7 @@ async function saveTRRC(recordId) {
     trrc_reference:  trrcRef || null,
   }).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6866,7 +6783,7 @@ async function saveDat(recordId) {
 
   const { error } = await supa.from('compliance_records').update(updatePayload).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6893,7 +6810,7 @@ async function savePayment(recordId) {
     payment_mode:      payMode || null,
   }).eq('id', recordId)
 
-  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return }
+  if (error) { console.error(error); errEl.textContent = humanError(error); errEl.style.display = 'block'; return }
   await loadObligations(activeClientId)
 }
 
@@ -6931,10 +6848,10 @@ async function loadHistory() {
 <tr>
   <td class="mono">${esc(r.form)}</td>
   <td>${esc(r.period ?? '—')}</td>
-  <td class="mono">${r.filed_date ?? '—'}</td>
-  <td class="mono">${r.trrc_saved ? esc(r.trrc_reference ?? '✅') : '—'}</td>
+  <td class="mono">${fmtDate(r.filed_date) || '—'}</td>
+  <td class="mono">${r.trrc_saved ? esc(r.trrc_reference ?? '✓') : '—'}</td>
   <td class="mono">${esc(datCell)}</td>
-  <td>${r.payment_status === 'paid' ? `₱${Number(r.amount_paid||0).toLocaleString()}` : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
+  <td>${r.payment_status === 'paid' ? fmtPHP(r.amount_paid) : (r.payment_status === 'n/a' ? 'n/a' : '—')}</td>
 </tr>`
   }).join('')
 
@@ -6995,8 +6912,21 @@ async function loadClientNotes() {
 }
 
 async function saveClientNotes() {
-  const notes = $('clientNotesArea').value
-  await supa.from('clients').update({ notes }).eq('id', activeClientId)
+  const notes  = $('clientNotesArea').value
+  const status = $('clientNotesStatus')
+  if (status) { status.textContent = 'Saving…'; status.style.color = 'var(--mu)' }
+  const { error } = await supa.from('clients').update({ notes }).eq('id', activeClientId)
+  if (error) {
+    console.error(error)
+    if (status) { status.textContent = 'Save failed — try again'; status.style.color = 'var(--red)' }
+    showToast('Could not save notes', 'error')
+    return
+  }
+  if (_currentClient) _currentClient.notes = notes
+  if (status) {
+    status.textContent = 'Saved ✓'; status.style.color = 'var(--green)'
+    setTimeout(() => { if (status.textContent === 'Saved ✓') status.textContent = '' }, 2000)
+  }
 }
 
 
@@ -7040,7 +6970,7 @@ async function loadBranches(clientId) {
     ;(recsByBranch[r.client_id] = recsByBranch[r.client_id] || []).push(r)
   })
 
-  const addBranchBtn = `<button class="btn-primary btn-sm" onclick="openAddBranchSheet('${esc(clientId)}')">+ Add Branch</button>`
+  const addBranchBtn = `<button class="btn-primary btn-sm" onclick="openAddBranchSheet('${esc(clientId)}')">+ Add branch</button>`
 
   if (!branches || !branches.length) {
     panel.innerHTML = `
@@ -7048,7 +6978,7 @@ async function loadBranches(clientId) {
         <h3>Branches</h3>
         ${addBranchBtn}
       </div>
-      <p class="branch-empty">No branches yet. Use <strong>+ Add Branch</strong> to register a separate branch location or line of business under the same TIN.</p>`
+      <p class="branch-empty">No branches yet. Use <strong>+ Add branch</strong> to register a separate branch location or line of business under the same TIN.</p>`
     return
   }
 
@@ -7072,7 +7002,7 @@ async function loadBranches(clientId) {
     return `<div class="branch-detail-card"
         onclick="showClientDetail('${esc(b.id)}')"
         role="button" tabindex="0"
-        onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(b.id)}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showClientDetail('${esc(b.id)}')}"
         aria-label="${esc(b.branch_name || b.display_name)}">
       <div class="branch-detail-card-left">
         <div class="branch-detail-card-name">${esc(b.branch_name || b.display_name)}</div>
@@ -7134,7 +7064,7 @@ function openStatusChangeSheet() {
   ;['scValidationBox','scSummaryBox','scChecklistBox','scStep2Err']
     .forEach(id => { const el = $(id); if (el) { el.innerHTML = ''; el.style.display = 'none' } })
   _scRenderStep(1)
-  $('statusChangeSheet').classList.remove('hidden')
+  openSheet('statusChangeSheet')
   setTimeout(() => $('sc_effective_date').focus(), 60)
 }
 
@@ -7156,9 +7086,9 @@ function _scRenderStep(n) {
   $('scStep2').style.display = onStep1 ? 'none' : ''
   $('scDot1').classList.toggle('active',  onStep1)
   $('scDot2').classList.toggle('active', !onStep1)
-  $('scSheetTitle').textContent = onStep1 ? 'Record Tax Status Change' : 'Review & Actions'
+  $('scSheetTitle').textContent = onStep1 ? 'Record tax status change' : 'Review & actions'
   $('scBackBtn').classList.toggle('hidden', onStep1)
-  $('scNextBtn').textContent = onStep1 ? 'Next →' : 'Apply Change'
+  $('scNextBtn').textContent = onStep1 ? 'Next →' : 'Apply change'
   $('scNextBtn').onclick     = onStep1 ? () => _scGoStep(2) : saveStatusChange
 }
 
@@ -7237,33 +7167,40 @@ function _validateTaxStatusChange(client, ct, effectiveDate, newVatStatus, newDe
       warnings.push('This date falls mid-quarter. BIR generally recognises VAT changes at the start of a taxable quarter. Confirm the exact effectivity with your RDO before proceeding.')
   }
 
-  // Full-year lock warning for 8% changes
+  // Full-year lock for 8% income tax option changes. Per NIRC Sec.
+  // 24(A)(2)(b) and RR 8-2018, the 8% election (and its revocation)
+  // is binding for the entire taxable year and must be declared on
+  // the Q1 1701Q. Mid-year switches are not permitted — the change
+  // takes effect the following calendar year. Reject the date
+  // outright if it isn't January 1 of any year.
   if (ct === 'itemized_to_8pct' || ct === '8pct_to_itemized') {
-    const d = new Date(effectiveDate)
-    if (!(d.getMonth() === 0 && d.getDate() === 1))
-      warnings.push('The 8% GIT election (and its revocation) applies for the entire taxable year. This change should ideally be effective January 1. Ensure the election is declared on the Q1 1701Q.')
+    const d = new Date(effectiveDate + 'T00:00:00')
+    const isJan1 = d.getMonth() === 0 && d.getDate() === 1
+    if (!isJan1) {
+      errors.push('The 8% income tax option (and its revocation) is binding for the full taxable year and must take effect on January 1. Set the effective date to January 1 of the year the election applies to.')
+    }
   }
 
   switch (ct) {
     case 'vat_to_nonvat':
       if (!isVat) errors.push('Client is not currently VAT-registered.')
       if (newVatStatus === 'Non-VAT (8% Option)' && !isSEOrMix)
-        errors.push('8% GIT option is only available to Self-Employed or Mixed Income individuals (NIRC Sec. 24(A)(2)(b)).')
+        errors.push('8% income tax option is only available to Self-Employed or Mixed Income individuals (NIRC Sec. 24(A)(2)(b)).')
       break
 
     case 'nonvat_to_vat':
       if (isVat)  errors.push('Client is already VAT-registered.')
-      if (is8Pct) errors.push('Cannot register for VAT while on the 8% GIT option. Revoke the 8% election first, then register for VAT.')
+      if (is8Pct) errors.push('Cannot register for VAT while on the 8% income tax option. Revoke the 8% election first, then register for VAT.')
       break
 
     case 'itemized_to_8pct':
-      if (!isSEOrMix)                    errors.push('8% GIT option is only available to Self-Employed or Mixed Income individuals.')
-      if (isVat)                          errors.push('VAT-registered taxpayers cannot avail of the 8% GIT option. De-register from VAT first.')
-      if (is8Pct || deduction_method === '8%') errors.push('Client is already on the 8% GIT option.')
+      if (!isSEOrMix)                    errors.push('8% income tax option is only available to Self-Employed or Mixed Income individuals.')
+      if (isVat)                          errors.push('VAT-registered taxpayers cannot avail of the 8% income tax option. De-register from VAT first.')
+      if (is8Pct || deduction_method === '8%') errors.push('Client is already on the 8% income tax option.')
       break
 
     case '8pct_to_itemized':
-      if (!is8Pct && deduction_method !== '8%') errors.push('Client is not currently on the 8% GIT option.')
+      if (!is8Pct && deduction_method !== '8%') errors.push('Client is not currently on the 8% income tax option.')
       break
 
     case 'add_obligation':
@@ -7421,7 +7358,7 @@ function _getStatusChangeChecklist(ct, obligCode) {
     items.push({ id: 'vat_cert', label: 'Obtain VAT Registration Certificate and update official receipts / invoices', required: true })
 
   if (ct === 'itemized_to_8pct')
-    items.push({ id: '8pct_lock', label: 'Note: 8% GIT election is irrevocable for the taxable year — declare on Q1 1701Q', required: false,
+    items.push({ id: '8pct_lock', label: 'Note: 8% income tax election is irrevocable for the taxable year — declare on Q1 1701Q', required: false,
       hint: 'NIRC Sec. 24(A)(2)(b) as amended by TRAIN' })
 
   if (ct === '8pct_to_itemized')
@@ -7473,8 +7410,8 @@ function _scBuildStep2(ct, effectiveDate, obligCode, newVatStatus, newDeduction,
   const _TSC_LABELS = {
     vat_to_nonvat:    'VAT → Non-VAT De-registration',
     nonvat_to_vat:    'Non-VAT → VAT Registration',
-    itemized_to_8pct: 'Income Tax Regime: Itemised/OSD → 8% GIT',
-    '8pct_to_itemized':'Income Tax Regime: 8% GIT → Itemised/OSD',
+    itemized_to_8pct: 'Income Tax Regime: Itemized/OSD → 8% income tax option',
+    '8pct_to_itemized':'Income Tax Regime: 8% income tax option → Itemized/OSD',
     add_obligation:   `Add Obligation — ${obligCode || ''}`,
     remove_obligation:`Remove Obligation — ${obligCode || ''}`,
   }
@@ -7582,9 +7519,10 @@ async function saveStatusChange() {
     notes,
   })
   if (logErr) {
-    $('scStep2Err').textContent   = 'Could not save audit record: ' + logErr.message
+    console.error(logErr)
+    $('scStep2Err').textContent   = 'Could not save audit record: ' + humanError(logErr)
     $('scStep2Err').style.display = 'block'
-    btn.disabled = false; btn.textContent = 'Apply Change'
+    btn.disabled = false; btn.textContent = 'Apply change'
     return
   }
 
@@ -7602,9 +7540,10 @@ async function saveStatusChange() {
   }
   const { error: upErr } = await supa.from('clients').update(clientPayload).eq('id', activeClientId)
   if (upErr) {
-    $('scStep2Err').textContent   = 'Could not update client profile: ' + upErr.message
+    console.error(upErr)
+    $('scStep2Err').textContent   = 'Could not update client profile: ' + humanError(upErr)
     $('scStep2Err').style.display = 'block'
-    btn.disabled = false; btn.textContent = 'Apply Change'
+    btn.disabled = false; btn.textContent = 'Apply change'
     return
   }
 
@@ -7613,7 +7552,7 @@ async function saveStatusChange() {
 
   Object.assign(_currentClient, clientPayload)
   closeStatusChangeSheet()
-  btn.disabled = false; btn.textContent = 'Apply Change'
+  btn.disabled = false; btn.textContent = 'Apply change'
   await showClientDetail(activeClientId)
 }
 
@@ -7647,8 +7586,12 @@ async function applyStatusChangeCalendar(clientId, newProfile, effectiveDateStr)
     return y !== null && y >= effYear
   })
 
-  const years = [...new Set(inScope.map(yearOf))]
-  if (!years.length) return
+  // Always reconcile the effective year and the next year, even if
+  // those years aren't yet seeded in the DB — a status change effective
+  // Jan 2027 recorded in 2026 must apply forward.
+  const yearsSet = new Set([effYear, effYear + 1])
+  inScope.map(yearOf).forEach(y => yearsSet.add(y))
+  const years = [...yearsSet].sort()
 
   const wanted    = years.flatMap(y => generateObligations(newProfile, y))
   const wantedMap = new Map(wanted.map(o => [o.id, o]))
@@ -7687,7 +7630,8 @@ async function applyStatusChangeCalendar(clientId, newProfile, effectiveDateStr)
       payment_status: 'n/a',
     }))
   if (toInsert.length) {
-    const { error } = await supa.from('compliance_records').insert(toInsert)
+    const { error } = await supa.from('compliance_records')
+      .upsert(toInsert, { onConflict: 'client_id,obligation_id', ignoreDuplicates: true })
     if (error) console.error('applyStatusChangeCalendar (insert):', error)
   }
 }
@@ -7729,8 +7673,8 @@ async function loadTaxHistory(clientId) {
   const _TSC_LABELS = {
     vat_to_nonvat:     'VAT → Non-VAT De-registration',
     nonvat_to_vat:     'Non-VAT → VAT Registration',
-    itemized_to_8pct:  'Regime: Itemised/OSD → 8% GIT',
-    '8pct_to_itemized':'Regime: 8% GIT → Itemised/OSD',
+    itemized_to_8pct:  'Regime: Itemized/OSD → 8% income tax option',
+    '8pct_to_itemized':'Regime: 8% income tax option → Itemized/OSD',
     add_obligation:    'Obligation Added',
     remove_obligation: 'Obligation Removed',
   }
@@ -7823,7 +7767,8 @@ async function updateStatusChangeRecord(recordId, field, value) {
     const panel = $('taxHistoryPanel')
     const errDiv = document.createElement('div')
     errDiv.className = 'fld-error'; errDiv.style.marginBottom = '.5rem'
-    errDiv.textContent = 'Could not update: ' + error.message
+    console.error(error)
+    errDiv.textContent = 'Could not update: ' + humanError(error)
     panel.prepend(errDiv)
     setTimeout(() => errDiv.remove(), 5000)
     return
@@ -7868,9 +7813,11 @@ async function _initReportControls() {
     ).join('')
   }
 
-  // As-of date — set to today if blank
+  // As-of date — set to today (in local PHT, not UTC) if blank.
+  // toISOString() in PHT after 4pm renders as the next UTC date,
+  // pushing the report's "as of" to tomorrow.
   const asOf = $('rptAsOf')
-  if (asOf && !asOf.value) asOf.value = new Date().toISOString().slice(0, 10)
+  if (asOf && !asOf.value) asOf.value = _iso(new Date())
 
   // Client dropdown — always refresh so newly added clients appear
   const clientSel = $('rptClient')
@@ -7913,14 +7860,28 @@ function _selectReport(n) {
     const el = $(`rptCtrl${i}`)
     if (el) el.classList.toggle('hidden', i !== n)
   })
-  $('rptContent').innerHTML =
-    '<p style="color:var(--mu);font-size:.85rem">Click <strong>Generate</strong> to run this report.</p>'
+  uiRender.render(
+    uiRender.html`<p style="color:var(--mu);font-size:.85rem">Click <strong>Generate</strong> to run this report.</p>`,
+    $('rptContent'),
+  )
 }
 
 // ── REPORT HELPERS ────────────────────────────────────────────
+//
+// _rptError / _rptBusy / and the loading-empty-state helpers all
+// route through uiRender so XSS is auto-escaped and the chunk-10
+// pattern is consistent across the app.
 
 function _rptError(msg) {
-  $('rptContent').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(msg)}</p>`
+  uiRender.render(uiRender.errorLine(msg), $('rptContent'))
+}
+
+function _rptLoading() {
+  uiRender.render(uiRender.loadingLine('Generating…'), $('rptContent'))
+}
+
+function _rptEmpty(msg) {
+  uiRender.render(uiRender.emptyState(msg), $('rptContent'))
 }
 
 function _rptBusy(btnId, busy) {
@@ -7930,18 +7891,16 @@ function _rptBusy(btnId, busy) {
   btn.textContent = busy ? 'Generating…' : 'Generate'
 }
 
-function _rptFmtDate(s) {
-  return s ? new Date(s).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}) : '—'
-}
-
-function _rptFmtAmt(v) {
-  return '₱' + Number(v).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
-}
+// Aliases retained for backwards-compat at call sites.
+const _rptFmtDate = s => s ? fmtDate(s) : '—'
+const _rptFmtAmt  = v => fmtPHP(v)
 
 function _rptStatusBadge(r) {
   const s = getCardStatus(r)
   const cls = {done:'badge-green', unpaid:'badge-blue', 'trrc-missing':'badge-amber', 'dat-missing':'badge-amber', overdue:'badge-red', pending:'badge-dim'}
-  const lbl = {done:'Filed & Paid', unpaid:'Unpaid', 'trrc-missing':'TRRC Missing', 'dat-missing':'DAT Validation', overdue:'Overdue', pending:'Pending'}
+  // Glossary aligned with getCardStatus: "Complete" instead of "Filed & Paid",
+  // "Payment pending" instead of "Unpaid", "TRRC pending" instead of "TRRC Missing".
+  const lbl = {done:'Complete', unpaid:'Payment pending', 'trrc-missing':'TRRC pending', 'dat-missing':'DAT validation', overdue:'Overdue', pending:'Pending'}
   return `<span class="${cls[s] || 'badge-dim'}">${lbl[s] || s}</span>`
 }
 
@@ -8057,7 +8016,7 @@ async function generateReport1() {
   if (!clientId) { _rptError('Select a client first.'); return }
 
   _rptBusy('btnGen1', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const [{ data: client }, { data: records, error }] = await Promise.all([
     supa.from('clients')
@@ -8070,7 +8029,7 @@ async function generateReport1() {
       .order('due_date')
   ])
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
   if (!records?.length) {
     $('rptContent').innerHTML =
       '<p style="color:var(--mu);font-size:.85rem">No obligations found for this client and year.</p>'
@@ -8188,7 +8147,7 @@ async function generateReport2() {
   const year  = +$('rptYear2').value
 
   _rptBusy('btnGen2', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const pad        = n => String(n).padStart(2, '0')
   const mo         = pad(month)
@@ -8203,7 +8162,7 @@ async function generateReport2() {
     .order('display_name')
 
   if (cErr || !clients?.length) {
-    $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
+    _rptEmpty('No active clients found.')
     return
   }
 
@@ -8218,7 +8177,7 @@ async function generateReport2() {
     .lte('due_date', rangeEnd)
     .order('due_date')
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
 
   const today    = new Date(); today.setHours(0, 0, 0, 0)
   const todayStr = _iso(today)
@@ -8301,7 +8260,7 @@ async function generateReport3() {
   const asOf = $('rptAsOf').value || new Date().toISOString().slice(0, 10)
 
   _rptBusy('btnGen3', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const { data: clients, error: cErr } = await supa
     .from('clients')
@@ -8310,7 +8269,7 @@ async function generateReport3() {
     .eq('is_active', true)
 
   if (cErr || !clients?.length) {
-    $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
+    _rptEmpty('No active clients found.')
     return
   }
 
@@ -8325,7 +8284,7 @@ async function generateReport3() {
     .lt('due_date', asOf)
     .order('due_date')
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
 
   const asOfD = new Date(asOf); asOfD.setHours(0, 0, 0, 0)
 
@@ -8404,7 +8363,7 @@ async function generateReport3() {
   </div>`
 
   html += `<div class="rpt-warning">
-    <strong>Important:</strong> Estimates are computed under NIRC Sec. 248 (25% surcharge) and Sec. 249 (20% interest p.a.) on the last recorded tax due amount. Actual BIR assessments may differ due to compromise penalties, deficiency interest adjustments, or additional assessments issued after filing. These figures are for practitioner reference only and do not constitute a formal BIR computation. Always reconcile with official BIR notices before advising clients.
+    <strong>Important:</strong> Estimates use NIRC Sec. 248 (25% surcharge) and Sec. 249 deficiency interest at 12% p.a. (double the BSP legal rate, per RA 10963 / TRAIN). They exclude compromise penalties and the 50% surcharge for fraudulent / wilful neglect cases under Sec. 248(B). Reconcile with official BIR notices before advising clients.
   </div>`
 
   $('rptContent').innerHTML = html
@@ -8419,7 +8378,7 @@ async function generateReport4() {
   if (!clientId) { _rptError('Select a client first.'); return }
 
   _rptBusy('btnGen4', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const [{ data: client }, { data: records, error }] = await Promise.all([
     supa.from('clients')
@@ -8432,7 +8391,7 @@ async function generateReport4() {
       .order('due_date')
   ])
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
 
   const genTs    = new Date().toLocaleString('en-PH')
   const firmName = currentPractitioner?.firm_name || currentPractitioner?.name || ''
@@ -8550,16 +8509,20 @@ async function saveSettings() {
     .update(payload)
     .eq('id', currentPractitioner.id)
   if (error) {
+    console.error(error)
     msg.style.color = 'var(--red)'
-    msg.textContent = error.message
+    msg.textContent = humanError(error)
     return
   }
   Object.assign(currentPractitioner, payload)
-  const nEls = ['sidebarPractName', 'dbSidebarName', 'rptSidebarName', 'stSidebarName', 'hdrUser']
-  nEls.forEach(id => { const el = $(id); if (el) el.textContent = payload.firm_name || payload.name || '' })
+  // Push the new practitioner row to the store; its subscribe() at
+  // the top of <head> updates every DOM surface that displays the
+  // name / email in one place.
+  appStore.update({ practitioner: { ...currentPractitioner } })
   msg.style.color = 'var(--green)'
   msg.textContent = 'Saved ✓'
   setTimeout(() => { msg.textContent = '' }, 2000)
+  showToast('Settings saved', 'success')
 }
 
 // ── ENROLLMENT LINK ───────────────────────────────────────────
@@ -8586,7 +8549,8 @@ async function shareEnrollmentLink() {
 
   if (error || !data) {
     err.style.display = 'block'
-    err.textContent   = error?.message || 'Could not create link.'
+    console.error(error)
+    err.textContent   = humanError(error || new Error('Could not create link.'))
     hint.textContent  = ''
     return
   }
@@ -8613,6 +8577,7 @@ async function copyEnrollLink() {
   }
   const prev = btn.textContent
   btn.textContent = 'Copied ✓'
+  showToast('Enrollment link copied', 'success')
   setTimeout(() => { btn.textContent = prev }, 1500)
 }
 
@@ -8794,7 +8759,7 @@ async function openCombinedObligations() {
   const recMap = {}; (records || []).forEach(r => { recMap[r.id] = r })
   $('combinedObBody').innerHTML = groups +
     `<div style="margin-top:1rem;display:flex;gap:.5rem">
-       <button class="btn-primary btn-sm" onclick="_combinedMarkFiled()">Mark as Filed</button>
+       <button class="btn-primary btn-sm" onclick="_combinedMarkFiled()">Mark as filed</button>
      </div>`
   $('combinedObSheet')._recMap = recMap
   $('combinedObSheet').classList.remove('hidden')

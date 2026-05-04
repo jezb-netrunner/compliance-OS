@@ -1,0 +1,224 @@
+// src/ui/render.js
+//
+// Thin facade over lit-html so the inline app script can opt into
+// declarative rendering one view at a time without a big-bang rewrite.
+//
+// Usage from the inline (non-module) script:
+//
+//   uiRender.render(
+//     uiRender.html`<div class="empty-state">${msg}</div>`,
+//     document.getElementById('myPanel')
+//   )
+//
+// Templates auto-escape interpolated values (no need for esc()) and
+// `@click=${fn}` binds an event listener that survives re-renders
+// without leaking. To convert a view, replace its
+// `el.innerHTML = '...'` with a render() call; lit-html diffs
+// against the previous render so unchanged DOM is preserved.
+
+import { html, render, nothing } from 'lit-html'
+
+export { html, render, nothing }
+
+// ── Tiny library of shared templates ─────────────────────────────
+//
+// These exist so the eventual view-by-view migration has a stable,
+// composable starting point. Keep them pure: no DOM lookups, no
+// supabase calls.
+
+/**
+ * Status badge as a lit-html template. Caller passes the
+ * recordStatus() string (`done` | `overdue` | …) and the label.
+ */
+const STATUS_CLASS = {
+  pending:        'badge-dim',
+  overdue:        'badge-red',
+  'trrc-missing': 'badge-amber',
+  'dat-missing':  'badge-amber',
+  unpaid:         'badge-blue',
+  done:           'badge-green',
+}
+
+export function statusBadge(status, label) {
+  const cls = STATUS_CLASS[status] ?? 'badge-dim'
+  return html`<span class=${cls}>${label}</span>`
+}
+
+/** Inline loading line — used while async data resolves. */
+export function loadingLine(text = 'Loading…') {
+  return html`<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">${text}</p>`
+}
+
+/** Empty-state block with optional CTA. */
+export function emptyState(message, cta) {
+  return html`
+    <div class="empty-state">
+      ${message}
+      ${cta ? html`<br><button class="btn-ghost btn-sm" type="button"
+                              style="margin-top:.6rem"
+                              @click=${cta.onClick}>${cta.label}</button>` : nothing}
+    </div>
+  `
+}
+
+/** Inline error block — used by failed-fetch handlers. */
+export function errorLine(message) {
+  return html`<p style="color:var(--red);font-size:.82rem">${message}</p>`
+}
+
+/** Dashboard list-panel state: list of records OR loading / empty / error. */
+const BADGE_CLASS = {
+  pending: 'badge-dim',
+  overdue: 'badge-red',
+  trrc:    'badge-blue',
+  unpaid:  'badge-amber',
+}
+const BADGE_LABEL = {
+  pending: 'Pending',
+  overdue: 'Overdue',
+  trrc:    'TRRC',
+  unpaid:  'Unpaid',
+}
+
+/**
+ * One dashboard list row. `r` is a compliance_records row enriched
+ * with the client name (caller resolves the join). `badge` is one of
+ * 'pending' | 'overdue' | 'trrc' | 'unpaid'. `onAction` runs when the
+ * row's ✓ button is clicked; `onOpen` runs when the row body is
+ * clicked or activated via keyboard.
+ */
+export function dashboardRow({ r, clientName, badge, onAction, onOpen }) {
+  const due = r.due_date
+    ? new Date(r.due_date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+    : '—'
+  const ariaLabel = `${clientName} — ${r.form || ''} ${r.period || ''}`.trim()
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() }
+  }
+  return html`
+    <div class="db-row" role="button" tabindex="0"
+         aria-label=${ariaLabel}
+         @click=${onOpen}
+         @keydown=${onKey}>
+      <div class="db-row-client">${clientName}</div>
+      <div class="db-row-meta">${r.form || ''}${r.period ? ' · ' + r.period : ''}</div>
+      <div class="db-row-meta" style="margin-left:auto">Due ${due}</div>
+      <span class="badge ${BADGE_CLASS[badge] ?? 'badge-dim'}">${BADGE_LABEL[badge] ?? badge}</span>
+      ${onAction
+        ? html`<button class="db-row-act" type="button"
+                       aria-label="Mark done"
+                       @click=${(e) => { e.stopPropagation(); onAction() }}>✓</button>`
+        : nothing}
+    </div>
+  `
+}
+
+/** Render a list of records into a panel. Falls back to an empty
+ *  state when the list is empty. */
+export function dashboardList({ rows, badge, emptyText, resolveClientName, onAction, onOpen }) {
+  if (!rows.length) {
+    return html`<p class="db-empty">${emptyText}</p>`
+  }
+  return rows.map((r) => dashboardRow({
+    r, clientName: resolveClientName(r),
+    badge,
+    onAction: onAction ? () => onAction(r) : undefined,
+    onOpen:   () => onOpen(r),
+  }))
+}
+
+// ── Dashboard quick-action modal forms ───────────────────────────
+// Three small forms shown by openDbAction. The caller wires the
+// onSave / onCancel handlers and reads the input values from the
+// rendered DOM (input IDs are stable so existing _dbaSave* paths
+// keep working).
+
+const PAYMENT_MODES = [
+  'Online banking', 'Over-the-counter', 'GCash',
+  'Maya', 'MyEG PH', 'Check', 'Others',
+]
+
+/** "Mark as filed" form. */
+export function quickActionFiling({ today, onSave, onCancel, onToggleTaxDue }) {
+  return html`
+    <div class="inline-form" style="padding:0">
+      <div class="fld">
+        <label for="dba_date">Date filed <span class="req">*</span></label>
+        <input type="date" id="dba_date" .value=${today}>
+      </div>
+      <label class="check-inline">
+        <input type="checkbox" id="dba_taxdue" @change=${onToggleTaxDue}> Has tax due?
+      </label>
+      <div class="fld hidden" id="dba_taxdue_wrap">
+        <label for="dba_taxamt">Tax due amount (₱)</label>
+        <input type="number" id="dba_taxamt" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none" role="alert"></div>
+      <div class="inline-form-actions">
+        <button class="btn-primary btn-sm" type="button" @click=${onSave}>Save</button>
+        <button class="btn-cancel-inline" type="button" @click=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `
+}
+
+/** "Mark TRRC saved" form. */
+export function quickActionTRRC({ today, onSave, onCancel }) {
+  return html`
+    <div class="inline-form" style="padding:0">
+      <div class="fld">
+        <label for="dba_date">TRRC date <span class="req">*</span></label>
+        <input type="date" id="dba_date" .value=${today}>
+      </div>
+      <div class="fld">
+        <label for="dba_ref">TRRC file name <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
+        <input type="text" id="dba_ref" placeholder="e.g. TRRC_2550Q_2026Q1.pdf">
+      </div>
+      <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none" role="alert"></div>
+      <div class="inline-form-actions">
+        <button class="btn-primary btn-sm" type="button" @click=${onSave}>Save</button>
+        <button class="btn-cancel-inline" type="button" @click=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `
+}
+
+/** "Record payment" form. */
+export function quickActionPayment({ today, onSave, onCancel }) {
+  return html`
+    <div class="inline-form" style="padding:0">
+      <div class="inline-form-row">
+        <div class="fld">
+          <label for="dba_amt">Amount paid (₱) <span class="req">*</span></label>
+          <input type="number" id="dba_amt" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="fld">
+          <label for="dba_date">Payment date <span class="req">*</span></label>
+          <input type="date" id="dba_date" .value=${today}>
+        </div>
+      </div>
+      <div class="inline-form-row">
+        <div class="fld">
+          <label for="dba_ref">Reference / confirmation no.</label>
+          <input type="text" id="dba_ref" placeholder="e.g. LANDBANK-…">
+        </div>
+        <div class="fld">
+          <label for="dba_mode">Payment mode</label>
+          <select id="dba_mode">
+            <option value="">Select…</option>
+            ${PAYMENT_MODES.map((m) => html`<option value=${m}>${m}</option>`)}
+          </select>
+        </div>
+      </div>
+      <div class="fld">
+        <label for="dba_fee">Transaction fee (₱) <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
+        <input type="number" id="dba_fee" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none" role="alert"></div>
+      <div class="inline-form-actions">
+        <button class="btn-primary btn-sm" type="button" @click=${onSave}>Save</button>
+        <button class="btn-cancel-inline" type="button" @click=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `
+}
