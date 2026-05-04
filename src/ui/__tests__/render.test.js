@@ -8,6 +8,7 @@ import {
   render, html,
   statusBadge, loadingLine, emptyState, errorLine,
   dashboardRow, dashboardList,
+  quickActionFiling, quickActionTRRC, quickActionPayment,
 } from '../render.js'
 
 let container
@@ -139,6 +140,61 @@ describe('dashboardList', () => {
     ]
     render(dashboardList({ rows, ...props }), container)
     expect(container.querySelectorAll('.db-row').length).toBe(2)
+  })
+})
+
+describe('quickAction modal forms', () => {
+  it('quickActionFiling — Save fires onSave (not onCancel)', () => {
+    let saves = 0, cancels = 0
+    render(quickActionFiling({
+      today: '2026-05-15',
+      onSave:   () => saves++,
+      onCancel: () => cancels++,
+      onToggleTaxDue: () => {},
+    }), container)
+
+    const buttons = container.querySelectorAll('button')
+    // Expect Save then Cancel
+    buttons[0].click()
+    expect(saves).toBe(1)
+    expect(cancels).toBe(0)
+    buttons[1].click()
+    expect(cancels).toBe(1)
+  })
+
+  it('quickActionFiling — date input prefilled with today', () => {
+    render(quickActionFiling({
+      today: '2026-05-15', onSave: () => {}, onCancel: () => {}, onToggleTaxDue: () => {},
+    }), container)
+    expect(container.querySelector('#dba_date').value).toBe('2026-05-15')
+  })
+
+  it('quickActionTRRC — exposes file-name input', () => {
+    render(quickActionTRRC({
+      today: '2026-05-15', onSave: () => {}, onCancel: () => {},
+    }), container)
+    expect(container.querySelector('#dba_ref')).toBeTruthy()
+  })
+
+  it('quickActionPayment — renders all 7 payment modes', () => {
+    render(quickActionPayment({
+      today: '2026-05-15', onSave: () => {}, onCancel: () => {},
+    }), container)
+    const opts = [...container.querySelectorAll('#dba_mode option')]
+      .map((o) => o.value).filter(Boolean)
+    expect(opts).toEqual([
+      'Online banking', 'Over-the-counter', 'GCash',
+      'Maya', 'MyEG PH', 'Check', 'Others',
+    ])
+  })
+
+  it('quickActionPayment — Save button binds onSave', () => {
+    let saves = 0
+    render(quickActionPayment({
+      today: '2026-05-15', onSave: () => saves++, onCancel: () => {},
+    }), container)
+    container.querySelectorAll('button')[0].click()
+    expect(saves).toBe(1)
   })
 })
 

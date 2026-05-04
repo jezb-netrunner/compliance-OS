@@ -4781,104 +4781,56 @@ function changeDashboardTimeframe(val) {
 }
 
 // ── DASHBOARD QUICK-ACTION MODAL ─────────────────────────────
+// The three forms (filing / TRRC / payment) are now lit-html
+// templates in src/ui/render.js. Click handlers are real function
+// refs instead of inline onclick="…", and select options are no
+// longer concatenated as strings (the chunk-9 audit flagged this
+// as fragile).
 function openDbAction(type, recordId) {
   _dbActionRid = recordId
-  const meta    = _dbRecordMeta[recordId] || {}
-  const today   = _iso(new Date())
-  const subtitle = `${esc(meta.form)}${meta.period ? ' · ' + esc(meta.period) : ''} — ${esc(meta.clientName)}`
+  const meta   = _dbRecordMeta[recordId] || {}
+  const today  = _iso(new Date())
 
-  $('dbActionSubtitle').innerHTML = subtitle
+  // Subtitle is plain text; no innerHTML.
+  $('dbActionSubtitle').textContent =
+    `${meta.form ?? ''}${meta.period ? ' · ' + meta.period : ''} — ${meta.clientName ?? ''}`
 
+  let template
   if (type === 'file') {
     $('dbActionTitle').textContent = 'Mark as filed'
-    $('dbActionBody').innerHTML = `
-<div class="inline-form" style="padding:0">
-  <div class="fld">
-    <label>Date filed <span class="req">*</span></label>
-    <input type="date" id="dba_date" value="${today}">
-  </div>
-  <label class="check-inline">
-    <input type="checkbox" id="dba_taxdue" onchange="_dbaToggleTaxDue()"> Has tax due?
-  </label>
-  <div class="fld hidden" id="dba_taxdue_wrap">
-    <label>Tax due amount (₱)</label>
-    <input type="number" id="dba_taxamt" min="0" step="0.01" placeholder="0.00">
-  </div>
-  <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none"></div>
-  <div class="inline-form-actions">
-    <button class="btn-primary btn-sm" onclick="_dbaSaveFiling()">Save</button>
-    <button class="btn-cancel-inline" onclick="closeDbAction()">Cancel</button>
-  </div>
-</div>`
-
+    template = uiRender.quickActionFiling({
+      today,
+      onSave:          _dbaSaveFiling,
+      onCancel:        closeDbAction,
+      onToggleTaxDue:  _dbaToggleTaxDue,
+    })
   } else if (type === 'trrc') {
     $('dbActionTitle').textContent = 'Mark TRRC saved'
-    $('dbActionBody').innerHTML = `
-<div class="inline-form" style="padding:0">
-  <div class="fld">
-    <label>TRRC date <span class="req">*</span></label>
-    <input type="date" id="dba_date" value="${today}">
-  </div>
-  <div class="fld">
-    <label>TRRC file name <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
-    <input type="text" id="dba_ref" placeholder="e.g. TRRC_2550Q_2026Q1.pdf">
-  </div>
-  <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none"></div>
-  <div class="inline-form-actions">
-    <button class="btn-primary btn-sm" onclick="_dbaSaveTRRC()">Save</button>
-    <button class="btn-cancel-inline" onclick="closeDbAction()">Cancel</button>
-  </div>
-</div>`
-
+    template = uiRender.quickActionTRRC({
+      today, onSave: _dbaSaveTRRC, onCancel: closeDbAction,
+    })
   } else if (type === 'pay') {
-    $('dbActionTitle').textContent = 'Record Payment'
-    const modes = ['Online banking','Over-the-counter','GCash','Maya','MyEG PH','Check','Others']
-    $('dbActionBody').innerHTML = `
-<div class="inline-form" style="padding:0">
-  <div class="inline-form-row">
-    <div class="fld">
-      <label>Amount paid (₱) <span class="req">*</span></label>
-      <input type="number" id="dba_amt" min="0" step="0.01" placeholder="0.00">
-    </div>
-    <div class="fld">
-      <label>Payment date <span class="req">*</span></label>
-      <input type="date" id="dba_date" value="${today}">
-    </div>
-  </div>
-  <div class="inline-form-row">
-    <div class="fld">
-      <label>Reference / confirmation no.</label>
-      <input type="text" id="dba_ref" placeholder="e.g. LANDBANK-…">
-    </div>
-    <div class="fld">
-      <label>Payment mode</label>
-      <select id="dba_mode">
-        <option value="">— select —</option>
-        ${modes.map(m => `<option value="${m}">${m}</option>`).join('')}
-      </select>
-    </div>
-  </div>
-  <div class="fld">
-    <label>Transaction fee (₱) <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
-    <input type="number" id="dba_fee" min="0" step="0.01" placeholder="0.00">
-  </div>
-  <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none"></div>
-  <div class="inline-form-actions">
-    <button class="btn-primary btn-sm" onclick="_dbaSavePayment()">Save</button>
-    <button class="btn-cancel-inline" onclick="closeDbAction()">Cancel</button>
-  </div>
-</div>`
+    $('dbActionTitle').textContent = 'Record payment'
+    template = uiRender.quickActionPayment({
+      today, onSave: _dbaSavePayment, onCancel: closeDbAction,
+    })
+  } else {
+    return
   }
 
-  $('dbActionModal').classList.remove('hidden')
-  // Focus first input for keyboard users
-  setTimeout(() => { const f = $('dbActionBody').querySelector('input'); if (f) f.focus() }, 50)
+  uiRender.render(template, $('dbActionBody'))
+  openSheet('dbActionModal')
+  // openSheet handles initial focus + ESC to close + focus return.
 }
 
 function closeDbAction() {
   $('dbActionModal').classList.add('hidden')
-  $('dbActionBody').innerHTML = ''
+  uiRender.render(uiRender.html``, $('dbActionBody'))
   _dbActionRid = null
+  // Restore focus to the trigger element so keyboard users land
+  // somewhere useful (mirrors the global Escape handler's behaviour).
+  _lastFocusedBeforeSheet?.focus?.()
+  _lastFocusedBeforeSheet = null
 }
 
 function _dbaToggleTaxDue() {

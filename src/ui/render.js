@@ -126,3 +126,99 @@ export function dashboardList({ rows, badge, emptyText, resolveClientName, onAct
     onOpen:   () => onOpen(r),
   }))
 }
+
+// ── Dashboard quick-action modal forms ───────────────────────────
+// Three small forms shown by openDbAction. The caller wires the
+// onSave / onCancel handlers and reads the input values from the
+// rendered DOM (input IDs are stable so existing _dbaSave* paths
+// keep working).
+
+const PAYMENT_MODES = [
+  'Online banking', 'Over-the-counter', 'GCash',
+  'Maya', 'MyEG PH', 'Check', 'Others',
+]
+
+/** "Mark as filed" form. */
+export function quickActionFiling({ today, onSave, onCancel, onToggleTaxDue }) {
+  return html`
+    <div class="inline-form" style="padding:0">
+      <div class="fld">
+        <label for="dba_date">Date filed <span class="req">*</span></label>
+        <input type="date" id="dba_date" .value=${today}>
+      </div>
+      <label class="check-inline">
+        <input type="checkbox" id="dba_taxdue" @change=${onToggleTaxDue}> Has tax due?
+      </label>
+      <div class="fld hidden" id="dba_taxdue_wrap">
+        <label for="dba_taxamt">Tax due amount (₱)</label>
+        <input type="number" id="dba_taxamt" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none" role="alert"></div>
+      <div class="inline-form-actions">
+        <button class="btn-primary btn-sm" type="button" @click=${onSave}>Save</button>
+        <button class="btn-cancel-inline" type="button" @click=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `
+}
+
+/** "Mark TRRC saved" form. */
+export function quickActionTRRC({ today, onSave, onCancel }) {
+  return html`
+    <div class="inline-form" style="padding:0">
+      <div class="fld">
+        <label for="dba_date">TRRC date <span class="req">*</span></label>
+        <input type="date" id="dba_date" .value=${today}>
+      </div>
+      <div class="fld">
+        <label for="dba_ref">TRRC file name <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
+        <input type="text" id="dba_ref" placeholder="e.g. TRRC_2550Q_2026Q1.pdf">
+      </div>
+      <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none" role="alert"></div>
+      <div class="inline-form-actions">
+        <button class="btn-primary btn-sm" type="button" @click=${onSave}>Save</button>
+        <button class="btn-cancel-inline" type="button" @click=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `
+}
+
+/** "Record payment" form. */
+export function quickActionPayment({ today, onSave, onCancel }) {
+  return html`
+    <div class="inline-form" style="padding:0">
+      <div class="inline-form-row">
+        <div class="fld">
+          <label for="dba_amt">Amount paid (₱) <span class="req">*</span></label>
+          <input type="number" id="dba_amt" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="fld">
+          <label for="dba_date">Payment date <span class="req">*</span></label>
+          <input type="date" id="dba_date" .value=${today}>
+        </div>
+      </div>
+      <div class="inline-form-row">
+        <div class="fld">
+          <label for="dba_ref">Reference / confirmation no.</label>
+          <input type="text" id="dba_ref" placeholder="e.g. LANDBANK-…">
+        </div>
+        <div class="fld">
+          <label for="dba_mode">Payment mode</label>
+          <select id="dba_mode">
+            <option value="">Select…</option>
+            ${PAYMENT_MODES.map((m) => html`<option value=${m}>${m}</option>`)}
+          </select>
+        </div>
+      </div>
+      <div class="fld">
+        <label for="dba_fee">Transaction fee (₱) <span style="font-weight:400;color:var(--mu)">(optional)</span></label>
+        <input type="number" id="dba_fee" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div id="dba_err" style="color:var(--red);font-size:.78rem;display:none" role="alert"></div>
+      <div class="inline-form-actions">
+        <button class="btn-primary btn-sm" type="button" @click=${onSave}>Save</button>
+        <button class="btn-cancel-inline" type="button" @click=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `
+}
