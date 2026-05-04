@@ -26,6 +26,9 @@ jobs:
       - name: Unit tests + engine parity
         run: npm test
 
+      - name: Production build (Vite)
+        run: npm run build
+
   migrations:
     runs-on: ubuntu-latest
     services:

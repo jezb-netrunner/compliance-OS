@@ -1,73 +1,48 @@
-// Until chunk 6 wires index.html to import the engine via
-// <script type="module">, the same engine code lives in two places:
-// the canonical src/engine/obligations.js and the inline <script>
-// block in index.html. This parity check fails CI when the two
-// drift, so a forgotten copy-paste-update can't ship.
+// Engine module presence + import surface check.
 //
-// The check extracts everything between the `const _MONTHS` line and
-// the closing `}` of generateObligations from index.html and
-// compares it character-for-character to the body of obligations.js
-// (modulo header/footer banners).
+// Pre-chunk-9, this file enforced parity between the inline
+// engine copy in index.html and src/engine/obligations.js.
+// The inline copy has now been deleted (chunk 9). What remains:
+//
+//   1. index.html still imports the canonical module via
+//      <script type="module"> — verify the import line is present
+//      so a refactor can't accidentally drop the load and break
+//      the runtime.
+//   2. The module exports the public surface the rest of the app
+//      relies on (generateObligations / _iso / _PH_HOLIDAYS /
+//      _nextBusinessDay / _MONTHS).
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import * as engine from '../obligations.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '../../..')
 
-const SENTINEL_START = 'const _MONTHS = '
-const SENTINEL_END   = 'function generateObligations'
+describe('engine wiring', () => {
+  it('index.html imports the canonical engine module', () => {
+    const html = readFileSync(resolve(ROOT, 'index.html'), 'utf8')
+    expect(html).toMatch(
+      /<script\s+type=["']module["']>[\s\S]*?import\s+\*\s+as\s+engine\s+from\s+['"]\.\/src\/engine\/obligations\.js['"]/m
+    )
+  })
 
-function extractEngineFrom(src) {
-  const start = src.indexOf(SENTINEL_START)
-  if (start < 0) throw new Error(`could not locate "${SENTINEL_START}" sentinel`)
-
-  // Walk forward from generateObligations to find the matching close brace.
-  const fnStart = src.indexOf(SENTINEL_END, start)
-  if (fnStart < 0) throw new Error('could not locate generateObligations')
-
-  // Find the opening { of generateObligations.
-  const openBrace = src.indexOf('{', fnStart)
-  let depth = 0
-  let i = openBrace
-  for (; i < src.length; i++) {
-    if (src[i] === '{') depth++
-    else if (src[i] === '}') { depth--; if (depth === 0) { i++; break } }
-  }
-  return src.slice(start, i)
-}
-
-describe('engine parity: src/engine/obligations.js ⇔ index.html inline copy', () => {
-  it('inline engine in index.html matches the canonical module body', () => {
-    const inlineSrc = readFileSync(resolve(ROOT, 'index.html'),               'utf8')
-    const moduleSrc = readFileSync(resolve(ROOT, 'src/engine/obligations.js'), 'utf8')
-
-    const fromInline = extractEngineFrom(inlineSrc)
-    const fromModule = extractEngineFrom(moduleSrc)
-
-    if (fromInline !== fromModule) {
-      // Show a small diff hint instead of dumping 600 lines.
-      const inlineLines = fromInline.split('\n')
-      const moduleLines = fromModule.split('\n')
-      const max = Math.max(inlineLines.length, moduleLines.length)
-      let firstDiff = -1
-      for (let n = 0; n < max; n++) {
-        if (inlineLines[n] !== moduleLines[n]) { firstDiff = n; break }
-      }
-      const inlineLen = inlineLines.length
-      const moduleLen = moduleLines.length
-      throw new Error(
-        `engine drift detected.\n` +
-        `  inline (index.html) lines: ${inlineLen}\n` +
-        `  module (obligations.js) lines: ${moduleLen}\n` +
-        `  first diverging line: ${firstDiff + 1}\n` +
-        `    inline: ${(inlineLines[firstDiff] ?? '<eof>').slice(0, 120)}\n` +
-        `    module: ${(moduleLines[firstDiff] ?? '<eof>').slice(0, 120)}\n` +
-        `Run \`diff <(sed -n '/const _MONTHS/,/^}/p' index.html) <(sed -n '/const _MONTHS/,/^}/p' src/engine/obligations.js)\` for full diff.`
-      )
+  it('module exports the full public surface', () => {
+    for (const name of [
+      '_MONTHS', '_iso', '_PH_HOLIDAYS', '_nextBusinessDay', 'generateObligations',
+    ]) {
+      expect(engine).toHaveProperty(name)
     }
-    expect(fromInline).toBe(fromModule)
+  })
+
+  it('index.html no longer carries the duplicate inline engine', () => {
+    const html = readFileSync(resolve(ROOT, 'index.html'), 'utf8')
+    // The inline copy was a top-level "function generateObligations"
+    // (no `export`, no indentation). The module is the only place
+    // that string should appear now.
+    const inlineCount = (html.match(/^function generateObligations\b/gm) || []).length
+    expect(inlineCount).toBe(0)
   })
 })
