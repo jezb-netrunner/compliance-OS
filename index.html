@@ -22,9 +22,13 @@
 -->
 <script type="module">
   import * as engine from './src/engine/obligations.js'
+  import * as ui     from './src/ui/render.js'
   for (const [name, value] of Object.entries(engine)) {
     window[name] = value
   }
+  // The inline app script reaches the lit-html facade through this
+  // single global; views convert one at a time via uiRender.render().
+  window.uiRender = ui
 </script>
 
 <style>
@@ -4890,13 +4894,13 @@ async function showClientDetail(clientId) {
   _showPage('clientView')
 
   _switchSubtab('obligations')
-  $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem;padding:.5rem 0">Loading…</p>'
+  uiRender.render(uiRender.loadingLine(), $('obligationsPanel'))
   $('detailClientName').textContent = ''
   $('detailMetaStrip').textContent  = ''
 
   const { data: client } = await supa.from('clients').select('*').eq('id', clientId).single()
   if (!client) {
-    $('obligationsPanel').innerHTML = '<p style="color:var(--red);font-size:.82rem">Could not load client.</p>'
+    uiRender.render(uiRender.errorLine('Could not load client.'), $('obligationsPanel'))
     return
   }
 
@@ -6265,12 +6269,16 @@ async function loadObligations(clientId, yearFilter) {
     .order('due_date', { ascending: true })
 
   if (error) {
-    $('obligationsPanel').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
+    console.error(error)
+    uiRender.render(uiRender.errorLine(humanError(error)), $('obligationsPanel'))
     return
   }
 
   if (!records || records.length === 0) {
-    $('obligationsPanel').innerHTML = '<p style="color:var(--mu);font-size:.82rem">No obligations found.</p>'
+    uiRender.render(
+      uiRender.emptyState('No obligations for this client yet.'),
+      $('obligationsPanel'),
+    )
     return
   }
 

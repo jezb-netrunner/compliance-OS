@@ -13,7 +13,12 @@ export default [
       ecmaVersion: 'latest',
       sourceType:  'module',
       globals: {
-        console: 'readonly',
+        console:    'readonly',
+        // Browser-side globals — src/ui/* uses these and tests run
+        // under jsdom (see vitest.config.js environmentMatchGlobs).
+        document:   'readonly',
+        window:     'readonly',
+        globalThis: 'readonly',
       },
     },
     rules: {
