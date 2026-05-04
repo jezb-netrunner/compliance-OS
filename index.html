@@ -7908,14 +7908,28 @@ function _selectReport(n) {
     const el = $(`rptCtrl${i}`)
     if (el) el.classList.toggle('hidden', i !== n)
   })
-  $('rptContent').innerHTML =
-    '<p style="color:var(--mu);font-size:.85rem">Click <strong>Generate</strong> to run this report.</p>'
+  uiRender.render(
+    uiRender.html`<p style="color:var(--mu);font-size:.85rem">Click <strong>Generate</strong> to run this report.</p>`,
+    $('rptContent'),
+  )
 }
 
 // ── REPORT HELPERS ────────────────────────────────────────────
+//
+// _rptError / _rptBusy / and the loading-empty-state helpers all
+// route through uiRender so XSS is auto-escaped and the chunk-10
+// pattern is consistent across the app.
 
 function _rptError(msg) {
-  $('rptContent').innerHTML = `<p style="color:var(--red);font-size:.82rem">${esc(msg)}</p>`
+  uiRender.render(uiRender.errorLine(msg), $('rptContent'))
+}
+
+function _rptLoading() {
+  uiRender.render(uiRender.loadingLine('Generating…'), $('rptContent'))
+}
+
+function _rptEmpty(msg) {
+  uiRender.render(uiRender.emptyState(msg), $('rptContent'))
 }
 
 function _rptBusy(btnId, busy) {
@@ -8050,7 +8064,7 @@ async function generateReport1() {
   if (!clientId) { _rptError('Select a client first.'); return }
 
   _rptBusy('btnGen1', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const [{ data: client }, { data: records, error }] = await Promise.all([
     supa.from('clients')
@@ -8063,7 +8077,7 @@ async function generateReport1() {
       .order('due_date')
   ])
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
   if (!records?.length) {
     $('rptContent').innerHTML =
       '<p style="color:var(--mu);font-size:.85rem">No obligations found for this client and year.</p>'
@@ -8181,7 +8195,7 @@ async function generateReport2() {
   const year  = +$('rptYear2').value
 
   _rptBusy('btnGen2', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const pad        = n => String(n).padStart(2, '0')
   const mo         = pad(month)
@@ -8196,7 +8210,7 @@ async function generateReport2() {
     .order('display_name')
 
   if (cErr || !clients?.length) {
-    $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
+    _rptEmpty('No active clients found.')
     return
   }
 
@@ -8211,7 +8225,7 @@ async function generateReport2() {
     .lte('due_date', rangeEnd)
     .order('due_date')
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
 
   const today    = new Date(); today.setHours(0, 0, 0, 0)
   const todayStr = _iso(today)
@@ -8294,7 +8308,7 @@ async function generateReport3() {
   const asOf = $('rptAsOf').value || new Date().toISOString().slice(0, 10)
 
   _rptBusy('btnGen3', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const { data: clients, error: cErr } = await supa
     .from('clients')
@@ -8303,7 +8317,7 @@ async function generateReport3() {
     .eq('is_active', true)
 
   if (cErr || !clients?.length) {
-    $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.85rem">No active clients found.</p>'
+    _rptEmpty('No active clients found.')
     return
   }
 
@@ -8318,7 +8332,7 @@ async function generateReport3() {
     .lt('due_date', asOf)
     .order('due_date')
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
 
   const asOfD = new Date(asOf); asOfD.setHours(0, 0, 0, 0)
 
@@ -8412,7 +8426,7 @@ async function generateReport4() {
   if (!clientId) { _rptError('Select a client first.'); return }
 
   _rptBusy('btnGen4', true)
-  $('rptContent').innerHTML = '<p style="color:var(--mu);font-size:.82rem">Generating…</p>'
+  _rptLoading()
 
   const [{ data: client }, { data: records, error }] = await Promise.all([
     supa.from('clients')
@@ -8425,7 +8439,7 @@ async function generateReport4() {
       .order('due_date')
   ])
 
-  if (error) { _rptError(error.message); return }
+  if (error) { console.error(error); _rptError(humanError(error)); return }
 
   const genTs    = new Date().toLocaleString('en-PH')
   const firmName = currentPractitioner?.firm_name || currentPractitioner?.name || ''
