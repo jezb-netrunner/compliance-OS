@@ -115,6 +115,16 @@
   --font-sans:  'Inter', system-ui, sans-serif;
   --font-mono:  ui-monospace, SFMono-Regular, 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
 
+  /* Type scale — explicit ladder so a future audit doesn't find 30
+     distinct font-size values. Selectors should reach for the named
+     step instead of inlining `font-size: 0.82rem` etc. */
+  --fs-h1:    1.5rem;     /* page H1 */
+  --fs-h2:    1.25rem;    /* section title */
+  --fs-h3:    1.0rem;     /* card title */
+  --fs-body:  0.875rem;   /* body text */
+  --fs-meta:  0.78rem;    /* meta lines, sublabels */
+  --fs-micro: 0.7rem;     /* badges, eyebrow labels */
+
   /* ── Layout ───────────────────────────────────────────────────── */
   --hdr-h:       60px;
   --sidebar-w:   240px;
@@ -3045,30 +3055,43 @@ table.ct thead { background: var(--s2); }
 
     <div id="loginMsg" class="login-msg" role="alert" aria-live="polite"></div>
 
-    <div class="fld">
-      <label for="loginEmail">Email address</label>
-      <input
-        type="email"
-        id="loginEmail"
-        placeholder="you@yourfirm.com"
-        autocomplete="email"
-        inputmode="email"
-      >
-    </div>
+    <!--
+      Wrapped in a real <form> so password managers detect the
+      email/password pair, autofill works, and Enter submits the
+      form without the JS-side Enter listener that was wired in
+      pre-chunk-11. The button's type="submit" handles Enter; the
+      event handler calls preventDefault() inside handlePasswordLogin.
+    -->
+    <form id="loginForm" onsubmit="event.preventDefault();handlePasswordLogin()">
+      <div class="fld">
+        <label for="loginEmail">Email address</label>
+        <input
+          type="email"
+          id="loginEmail"
+          name="email"
+          placeholder="you@yourfirm.com"
+          autocomplete="email"
+          inputmode="email"
+          required
+        >
+      </div>
 
-    <div class="fld">
-      <label for="loginPassword">Password</label>
-      <input
-        type="password"
-        id="loginPassword"
-        placeholder="Your password"
-        autocomplete="current-password"
-      >
-    </div>
+      <div class="fld" style="margin-top:.85rem">
+        <label for="loginPassword">Password</label>
+        <input
+          type="password"
+          id="loginPassword"
+          name="password"
+          placeholder="Your password"
+          autocomplete="current-password"
+          required
+        >
+      </div>
 
-    <button class="btn-primary btn-lg btn-full" id="loginBtn" type="button" onclick="handlePasswordLogin()">
-      Sign in
-    </button>
+      <button class="btn-primary btn-lg btn-full" id="loginBtn" type="submit" style="margin-top:.85rem">
+        Sign in
+      </button>
+    </form>
 
     <div style="text-align:center;margin-top:.85rem;font-size:.82rem;color:var(--mu)">
       Don't have an account?
@@ -5234,10 +5257,9 @@ supa.auth.getSession().then(({ data: { session } }) => {
   _onSessionChange(session)
 })
 
-// Allow Enter key to submit the login form
-;['loginEmail', 'loginPassword'].forEach(id => {
-  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') handlePasswordLogin() })
-})
+// Enter-to-submit on the login form is handled natively by the
+// <form id="loginForm"> wrapper added in chunk 11. No JS listener
+// needed.
 
 // ── Global modal/sheet handling: ESC-to-close, focus return ──
 // Tracks the element that opened the dialog so we can restore focus
@@ -5495,7 +5517,7 @@ function buildClientCard(client, stats) {
     data-parent-id="${esc(client.parent_client_id || '')}"
     onclick="if(document.getElementById('clientList').classList.contains('bulk-mode'))return;showClientDetail('${safeId}')"
     role="button" tabindex="0"
-    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showClientDetail('${safeId}')}"
+    onkeydown="if((event.key==='Enter'||event.key===' ')&&!document.getElementById('clientList').classList.contains('bulk-mode')){event.preventDefault();showClientDetail('${safeId}')}"
     aria-label="${safeName}">
   <div class="cc-left">
     <div class="cc-name">${safeName}</div>
@@ -7001,7 +7023,7 @@ async function loadBranches(clientId) {
     return `<div class="branch-detail-card"
         onclick="showClientDetail('${esc(b.id)}')"
         role="button" tabindex="0"
-        onkeydown="if(event.key==='Enter'||event.key===' ')showClientDetail('${esc(b.id)}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showClientDetail('${esc(b.id)}')}"
         aria-label="${esc(b.branch_name || b.display_name)}">
       <div class="branch-detail-card-left">
         <div class="branch-detail-card-name">${esc(b.branch_name || b.display_name)}</div>
