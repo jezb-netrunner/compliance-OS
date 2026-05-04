@@ -4605,17 +4605,15 @@ function showDashboard() {
 }
 
 async function loadDashboard() {
-  const loading = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">Loading…</p>'
-  ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList']
-    .forEach(id => { $(id).innerHTML = loading })
+  const panelIds = ['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList']
+  panelIds.forEach(id => uiRender.render(uiRender.loadingLine(), $(id)))
   ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue']
     .forEach(id => { $(id).textContent = '—' })
 
   const practitioner = currentPractitioner
 
   if (!practitioner) {
-    const msg = '<p style="color:var(--red);font-size:.82rem">Not signed in.</p>'
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    panelIds.forEach(id => uiRender.render(uiRender.errorLine('Not signed in.'), $(id)))
     return
   }
 
@@ -4638,8 +4636,10 @@ async function loadDashboard() {
     .eq('is_active', true)
 
   if (cErr || !clients?.length) {
-    const msg = '<p style="color:var(--mu);font-size:.82rem;padding:.25rem 0">No active clients found.</p>'
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    panelIds.forEach(id => uiRender.render(
+      uiRender.emptyState('No active clients found.'),
+      $(id),
+    ))
     ;['dbStatTotal','dbStatFiled','dbStatPending','dbStatOverdue'].forEach(id => { $(id).textContent = '0' })
     return
   }
@@ -4660,8 +4660,11 @@ async function loadDashboard() {
     .or(`due_date.gte.${yearStart},and(filed_date.is.null,due_date.lt.${todayStr}),and(filed_date.not.is.null,trrc_saved.is.false),and(filed_date.not.is.null,has_tax_due.is.true,payment_status.eq.unpaid)`)
 
   if (error) {
-    const msg = `<p style="color:var(--red);font-size:.82rem">${esc(error.message)}</p>`
-    ;['dbThisWeekList','dbOverdueList','dbTrrcList','dbPaymentList'].forEach(id => { $(id).innerHTML = msg })
+    console.error(error)
+    panelIds.forEach(id => uiRender.render(
+      uiRender.errorLine(humanError(error)),
+      $(id),
+    ))
     return
   }
 
@@ -4696,45 +4699,52 @@ async function loadDashboard() {
   $('dbStatPending').textContent = pending
   $('dbStatOverdue').textContent = overdueCount
 
+  // _dbRecordMeta is still consulted by the quick-action modal
+  // (openDbAction reads it to render the modal subtitle), so we
+  // populate it here while preparing the lit-html row props.
   _dbRecordMeta = {}
-  const _row = (r, badge, actionType) => {
-    _dbRecordMeta[r.id] = { clientName: clientMap[r.client_id] || '—', form: r.form || '', period: r.period || '' }
-    const name = esc(clientMap[r.client_id] || '—')
-    const due  = r.due_date
-      ? new Date(r.due_date + 'T00:00:00').toLocaleDateString('en-PH', {month:'short', day:'numeric'})
-      : '—'
-    const actBtn = actionType
-      ? `<button class="db-row-act" type="button" onclick="event.stopPropagation();openDbAction('${actionType}','${r.id}')" aria-label="Mark done">✓</button>`
-      : ''
-    // Keyboard-accessible row: real button semantics. role+tabindex+keydown
-    // mimics a <button> while preserving the existing flex layout.
-    const ariaLabel = `${clientMap[r.client_id] || ''} — ${r.form || ''} ${r.period || ''}`.trim()
-    return `<div class="db-row" role="button" tabindex="0"
-      aria-label="${esc(ariaLabel)}"
-      onclick="showClientDetail('${r.client_id}')"
-      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showClientDetail('${r.client_id}')}">
-      <div class="db-row-client">${name}</div>
-      <div class="db-row-meta">${esc(r.form||'')}${r.period ? ` · ${esc(r.period)}` : ''}</div>
-      <div class="db-row-meta" style="margin-left:auto">Due ${due}</div>
-      ${badge}${actBtn}
-    </div>`
+  for (const r of [...thisWeek, ...overdue, ...trrcNeeded, ...paymentPending]) {
+    _dbRecordMeta[r.id] = {
+      clientName: clientMap[r.client_id] || '—',
+      form:       r.form   || '',
+      period:     r.period || '',
+    }
   }
-  const _empty = t => `<p class="db-empty">${t}</p>`
 
-  // Standardised relative-window phrasing (ME-13) — same voice for every option.
+  const resolveClientName = (r) => clientMap[r.client_id] || '—'
   const tfLabel = `in the next ${_dbTimeframeDays} day${_dbTimeframeDays === 1 ? '' : 's'}`
-  $('dbThisWeekList').innerHTML = thisWeek.length
-    ? thisWeek.map(r => _row(r, '<span class="badge badge-dim">Pending</span>', 'file')).join('')
-    : _empty(`No filings due ${tfLabel} ✓`)
-  $('dbOverdueList').innerHTML = overdue.length
-    ? overdue.map(r => _row(r, '<span class="badge badge-red">Overdue</span>', 'file')).join('')
-    : _empty('Nothing overdue ✓')
-  $('dbTrrcList').innerHTML = trrcNeeded.length
-    ? trrcNeeded.map(r => _row(r, '<span class="badge badge-blue">TRRC</span>', 'trrc')).join('')
-    : _empty('No TRRC pending ✓')
-  $('dbPaymentList').innerHTML = paymentPending.length
-    ? paymentPending.map(r => _row(r, '<span class="badge badge-amber">Unpaid</span>', 'pay')).join('')
-    : _empty('No payments pending ✓')
+
+  uiRender.render(uiRender.dashboardList({
+    rows: thisWeek, badge: 'pending',
+    emptyText: `No filings due ${tfLabel} ✓`,
+    resolveClientName,
+    onAction: (r) => openDbAction('file', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbThisWeekList'))
+
+  uiRender.render(uiRender.dashboardList({
+    rows: overdue, badge: 'overdue',
+    emptyText: 'Nothing overdue ✓',
+    resolveClientName,
+    onAction: (r) => openDbAction('file', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbOverdueList'))
+
+  uiRender.render(uiRender.dashboardList({
+    rows: trrcNeeded, badge: 'trrc',
+    emptyText: 'No TRRC pending ✓',
+    resolveClientName,
+    onAction: (r) => openDbAction('trrc', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbTrrcList'))
+
+  uiRender.render(uiRender.dashboardList({
+    rows: paymentPending, badge: 'unpaid',
+    emptyText: 'No payments pending ✓',
+    resolveClientName,
+    onAction: (r) => openDbAction('pay', r.id),
+    onOpen:   (r) => showClientDetail(r.client_id),
+  }), $('dbPaymentList'))
 }
 
 

@@ -4,7 +4,11 @@
 
 // Uses the jsdom environment configured in vitest.config.js.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, html, statusBadge, loadingLine, emptyState, errorLine } from '../render.js'
+import {
+  render, html,
+  statusBadge, loadingLine, emptyState, errorLine,
+  dashboardRow, dashboardList,
+} from '../render.js'
 
 let container
 
@@ -69,6 +73,72 @@ describe('emptyState', () => {
     render(emptyState('No clients', { label: 'Add', onClick: () => clicks++ }), container)
     container.querySelector('button').click()
     expect(clicks).toBe(1)
+  })
+})
+
+describe('dashboardRow', () => {
+  const baseRow = {
+    r: { id: 'r1', form: 'BIR Form 1701Q', period: 'CY 2026 Q1', due_date: '2026-05-15' },
+    clientName: 'Acme Corp',
+    badge: 'pending',
+  }
+
+  it('renders client / form / due / badge', () => {
+    render(dashboardRow({ ...baseRow, onOpen: () => {} }), container)
+    expect(container.querySelector('.db-row-client').textContent).toBe('Acme Corp')
+    expect(container.querySelector('.badge').className).toContain('badge-dim')
+    expect(container.textContent).toContain('BIR Form 1701Q')
+    expect(container.textContent).toContain('May 15')
+  })
+
+  it('action ✓ button stops propagation and fires onAction (not onOpen)', () => {
+    let opens = 0, actions = 0
+    render(dashboardRow({
+      ...baseRow,
+      onOpen:   () => opens++,
+      onAction: () => actions++,
+    }), container)
+    container.querySelector('.db-row-act').click()
+    expect(opens).toBe(0)
+    expect(actions).toBe(1)
+  })
+
+  it('clicking the row body fires onOpen', () => {
+    let opens = 0
+    render(dashboardRow({
+      ...baseRow, onOpen: () => opens++,
+    }), container)
+    container.querySelector('.db-row').click()
+    expect(opens).toBe(1)
+  })
+
+  it('escapes form/period (no XSS via record.form)', () => {
+    const malicious = { ...baseRow.r, form: '<img onerror=alert(1)>' }
+    render(dashboardRow({ ...baseRow, r: malicious, onOpen: () => {} }), container)
+    expect(container.querySelector('img')).toBeNull()
+  })
+})
+
+describe('dashboardList', () => {
+  const props = {
+    badge: 'overdue',
+    emptyText: 'Nothing overdue ✓',
+    resolveClientName: (r) => `Client ${r.client_id}`,
+    onOpen:   () => {},
+  }
+
+  it('renders empty-state when list is empty', () => {
+    render(dashboardList({ rows: [], ...props }), container)
+    expect(container.querySelector('.db-empty')?.textContent).toBe('Nothing overdue ✓')
+  })
+
+  it('renders one row per record', () => {
+    const rows = [
+      { id: 'a', client_id: 'c1', form: '1701Q', period: 'CY 2026 Q1', due_date: '2026-05-15' },
+      { id: 'b', client_id: 'c2', form: '2550Q', period: 'CY 2026 Q1', due_date: '2026-05-25' },
+    ]
+    render(dashboardList({ rows, ...props }), container)
+    expect(container.querySelectorAll('.db-row').length).toBe(2)
   })
 })
 

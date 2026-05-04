@@ -65,3 +65,64 @@ export function emptyState(message, cta) {
 export function errorLine(message) {
   return html`<p style="color:var(--red);font-size:.82rem">${message}</p>`
 }
+
+/** Dashboard list-panel state: list of records OR loading / empty / error. */
+const BADGE_CLASS = {
+  pending: 'badge-dim',
+  overdue: 'badge-red',
+  trrc:    'badge-blue',
+  unpaid:  'badge-amber',
+}
+const BADGE_LABEL = {
+  pending: 'Pending',
+  overdue: 'Overdue',
+  trrc:    'TRRC',
+  unpaid:  'Unpaid',
+}
+
+/**
+ * One dashboard list row. `r` is a compliance_records row enriched
+ * with the client name (caller resolves the join). `badge` is one of
+ * 'pending' | 'overdue' | 'trrc' | 'unpaid'. `onAction` runs when the
+ * row's ✓ button is clicked; `onOpen` runs when the row body is
+ * clicked or activated via keyboard.
+ */
+export function dashboardRow({ r, clientName, badge, onAction, onOpen }) {
+  const due = r.due_date
+    ? new Date(r.due_date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+    : '—'
+  const ariaLabel = `${clientName} — ${r.form || ''} ${r.period || ''}`.trim()
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() }
+  }
+  return html`
+    <div class="db-row" role="button" tabindex="0"
+         aria-label=${ariaLabel}
+         @click=${onOpen}
+         @keydown=${onKey}>
+      <div class="db-row-client">${clientName}</div>
+      <div class="db-row-meta">${r.form || ''}${r.period ? ' · ' + r.period : ''}</div>
+      <div class="db-row-meta" style="margin-left:auto">Due ${due}</div>
+      <span class="badge ${BADGE_CLASS[badge] ?? 'badge-dim'}">${BADGE_LABEL[badge] ?? badge}</span>
+      ${onAction
+        ? html`<button class="db-row-act" type="button"
+                       aria-label="Mark done"
+                       @click=${(e) => { e.stopPropagation(); onAction() }}>✓</button>`
+        : nothing}
+    </div>
+  `
+}
+
+/** Render a list of records into a panel. Falls back to an empty
+ *  state when the list is empty. */
+export function dashboardList({ rows, badge, emptyText, resolveClientName, onAction, onOpen }) {
+  if (!rows.length) {
+    return html`<p class="db-empty">${emptyText}</p>`
+  }
+  return rows.map((r) => dashboardRow({
+    r, clientName: resolveClientName(r),
+    badge,
+    onAction: onAction ? () => onAction(r) : undefined,
+    onOpen:   () => onOpen(r),
+  }))
+}
