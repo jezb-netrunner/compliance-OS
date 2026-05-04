@@ -25,3 +25,29 @@ jobs:
 
       - name: Unit tests + engine parity
         run: npm test
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER:     postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB:       postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout  5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply migrations + schema sanity
+        run: ./scripts/test-migrations.sh
+        env:
+          PG_URL: postgres://postgres:postgres@localhost:5432/postgres
